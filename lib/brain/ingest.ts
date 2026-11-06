@@ -15,11 +15,12 @@ import {getQuote, searchStocks} from "@/lib/prices/finnhub";
 import {injectJson} from "@/lib/ai/prompt-utils";
 import {getTopEntities, getTopVerifiedTickers} from "@/lib/brain/store";
 import {type ArticleFold} from "@/lib/brain/update";
-import {parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
+import {answeredInBatch, parseExtractionResponse, sanitizeExtraction} from "@/lib/brain/extraction";
 import {EXTRACTION_PROMPT} from "@/lib/brain/prompts";
 import {
     EXTRACTION_BATCH_SIZE,
     MAX_EXTRACTION_CALLS_PER_DAY,
+    MAX_EXTRACTION_TRIES,
     NEW_TICKER_VERIFY_BUDGET,
     THEME_REUSE_LIST_SIZE,
     UNEXTRACTED_PICKUP_LIMIT,
@@ -88,11 +89,12 @@ type QueuedArticle = {
 
 type ExtractionQueue = {articles: QueuedArticle[]; activeThemes: string[]};
 
-// Extraction queue: newest unextracted articles first, hard daily budget.
+// Extraction queue: newest unread articles first, hard daily budget. An article the model has
+// read — tagged, or with nothing in it to tag — is never sent again (applyExtractionBatch).
 export const loadExtractionQueue = async (): Promise<ExtractionQueue> => {
     await connectToDatabase();
     const limit = EXTRACTION_BATCH_SIZE * MAX_EXTRACTION_CALLS_PER_DAY + UNEXTRACTED_PICKUP_LIMIT;
-    const items = await NewsItem.find({extraction: {$exists: false}})
+    const items = await NewsItem.find({extraction: {$exists: false}, readAt: {$exists: false}})
         .sort({createdAt: -1})
         .limit(limit)
         .lean();
@@ -129,7 +131,9 @@ export const buildExtractionPrompt = (batch: readonly QueuedArticle[], activeThe
         '{{activeThemes}}', activeThemes,
     );
 
-type AppliedBatch = {folds: ArticleFold[]; ids: string[]};
+// ids: the articles tagged; read: answered with nothing that could be tagged; skipped: left out
+// of the answer (sent again until MAX_EXTRACTION_TRIES).
+type AppliedBatch = {folds: ArticleFold[]; ids: string[]; read: number; skipped: number};
 
 // One batch's model answer, sanitized and stamped on its articles. Returns the folds instead of
 // writing them anywhere else: the job must carry fold data through the step's RETURN value,
@@ -141,25 +145,31 @@ export const applyExtractionBatch = async ({index, batch, text, model, activeThe
     model: string;
     activeThemes: string[];
 }): Promise<AppliedBatch> => {
-    if (!text) return {folds: [], ids: []};
+    // No answer, or one that does not parse: the model read nothing, so nothing is stamped.
+    if (!text) return {folds: [], ids: [], read: 0, skipped: 0};
 
     const parsed = parseExtractionResponse(text);
     if (!parsed) {
         console.warn(`Extraction batch ${index} returned invalid JSON — skipped`);
-        return {folds: [], ids: []};
+        return {folds: [], ids: [], read: 0, skipped: 0};
     }
 
     await connectToDatabase();
     const queuedById = new Map(batch.map((a) => [a.id, a]));
     const batchFolds: ArticleFold[] = [];
     const batchIds: string[] = [];
+    const nothingToTag: string[] = [];
+    const {skipped} = answeredInBatch(batch.map((a) => a.id), parsed.articles.map((a) => a.id));
     for (const article of parsed.articles) {
         // Consume-once: hallucinated ids AND duplicate ids in one response are skipped.
         const queued = queuedById.get(article.id);
         if (queued === undefined) continue;
         queuedById.delete(article.id);
         const clean = sanitizeExtraction(article, queued.sourceType, activeThemes, {source: queued.source, url: queued.url});
-        if (clean.entities.length === 0) continue;
+        if (clean.entities.length === 0) {
+            nothingToTag.push(queued.id);
+            continue;
+        }
         await NewsItem.updateOne(
             {_id: clean.id},
             {$set: {extraction: {
@@ -178,7 +188,13 @@ export const applyExtractionBatch = async ({index, batch, text, model, activeThe
         batchFolds.push({importance: clean.importance, nature: clean.nature, entities: clean.entities});
         batchIds.push(clean.id);
     }
-    return {folds: batchFolds, ids: batchIds};
+    const readAt = new Date();
+    if (nothingToTag.length > 0) await NewsItem.updateMany({_id: {$in: nothingToTag}}, {$set: {readAt}});
+    if (skipped.length > 0) {
+        await NewsItem.updateMany({_id: {$in: skipped}}, {$inc: {extractTries: 1}});
+        await NewsItem.updateMany({_id: {$in: skipped}, extractTries: {$gte: MAX_EXTRACTION_TRIES}}, {$set: {readAt}});
+    }
+    return {folds: batchFolds, ids: batchIds, read: nothingToTag.length, skipped: skipped.length};
 };
 
 // Ticker hallucination guard: unknown tickers must resolve via Finnhub before

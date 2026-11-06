@@ -1,5 +1,6 @@
 import {describe, expect, it} from "vitest";
 import {
+    answeredInBatch,
     buildDisplayName,
     ExtractionBatchSchema,
     parseExtractionResponse,
@@ -300,5 +301,20 @@ describe("buildDisplayName", () => {
     it("strips the theme prefix and title-cases each word", () => {
         expect(buildDisplayName("theme:ai-capex", "theme")).toBe("Ai Capex");
         expect(buildDisplayName("theme:rate-cut-hopes", "theme")).toBe("Rate Cut Hopes");
+    });
+});
+
+describe("answeredInBatch", () => {
+    it("splits a batch into the articles the model answered and the ones it skipped, in batch order", () => {
+        expect(answeredInBatch(["a", "b", "c", "d"], ["c", "a"])).toEqual({answered: ["a", "c"], skipped: ["b", "d"]});
+    });
+
+    it("ignores an id the batch never carried, and an id answered twice", () => {
+        expect(answeredInBatch(["a", "b"], ["zz", "b", "b"])).toEqual({answered: ["b"], skipped: ["a"]});
+    });
+
+    it("skips nothing when every article was answered", () => {
+        expect(answeredInBatch(["a"], ["a"])).toEqual({answered: ["a"], skipped: []});
+        expect(answeredInBatch([], [])).toEqual({answered: [], skipped: []});
     });
 });

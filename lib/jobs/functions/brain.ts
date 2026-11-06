@@ -34,6 +34,7 @@ export const updateNewsBrain = inngest.createFunction(
 
         const folds: ArticleFold[] = [];
         const extractedIds: string[] = [];
+        let readEmpty = 0;
         const batches = extractionBatches(queue.articles);
 
         for (let b = 0; b < batches.length; b++) {
@@ -55,6 +56,7 @@ export const updateNewsBrain = inngest.createFunction(
             }));
             folds.push(...applied.folds);
             extractedIds.push(...applied.ids);
+            readEmpty += applied.read;
         }
 
         const verifiedTickers = await step.run('verify-new-tickers', async () => verifyNewTickers(folds, queue.articles));
@@ -62,7 +64,7 @@ export const updateNewsBrain = inngest.createFunction(
         const foldResult = await step.run('fold-brain', async () =>
             foldExtractionsIntoBrain(folds, new Set(verifiedTickers), runId));
 
-        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
+        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted${readEmpty > 0 ? `, ${readEmpty} read with nothing to tag` : ''}, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
         await step.run('record-job-run', async () => recordJobRun(JOBS.newsBrain.id, summary));
         return {success: true, message: summary};
     },

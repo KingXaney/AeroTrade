@@ -4,6 +4,7 @@ import PaperAccount from '@/database/models/paper-account.model';
 import PaperTrade from '@/database/models/paper-trade.model';
 import AccountSnapshot from '@/database/models/account-snapshot.model';
 import BenchmarkSnapshot from '@/database/models/benchmark-snapshot.model';
+import AccountIncome from '@/database/models/account-income.model';
 
 type Declared = {collection: {collectionName: string}; schema: {indexes(): unknown[]}};
 
@@ -14,6 +15,7 @@ const MODELS: Record<string, Declared> = {
     papertrades: PaperTrade,
     accountsnapshots: AccountSnapshot,
     benchmarksnapshots: BenchmarkSnapshot,
+    accountincomes: AccountIncome,
 };
 
 // Order-insensitive: the model's declaration order says nothing about the build.

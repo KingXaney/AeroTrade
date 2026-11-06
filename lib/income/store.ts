@@ -21,10 +21,12 @@ import type {CoverageRange} from "@/lib/prices/coverage";
 import {
     SYMBOL_RELEASE_DAYS,
     createIncomeClock,
+    distinctIncomeRows,
     dividendsByExDate,
     holdingSpans,
+    describeWaitingOn,
     makeRateLookup,
-    readyThrough,
+    readinessOf,
     reconcile,
     replayIncome,
     type IncomeRow,
@@ -46,7 +48,7 @@ type LeanAccount = {
 };
 
 type LeanTrade = {symbol: string; side: 'buy' | 'sell'; quantity: number; total: number; createdAt: Date};
-type LeanRow = {date: string; kind: 'interest' | 'dividend'; amount: number};
+type LeanRow = {date: string; kind: 'interest' | 'dividend'; symbol?: string; amount: number; createdAt?: Date};
 
 
 const toIncomeTrade = (trade: LeanTrade): IncomeTrade => ({
@@ -179,7 +181,7 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
     // Filtered by timestamp, not ET date: leftovers of a reset that crashed mid-cascade are
     // older than the new inceptionAt even when they share its calendar day.
     const trades = (await PaperTrade.find({accountId, createdAt: {$gte: inceptionAt}}).sort({createdAt: 1}).lean<LeanTrade[]>()).map(toIncomeTrade);
-    const stored = await AccountIncome.find({accountId, epoch}).lean<LeanRow[]>();
+    const {rows: stored, copies} = distinctIncomeRows(await AccountIncome.find({accountId, epoch}).lean<LeanRow[]>());
     const credited = sumBy(stored.filter((row) => watermark !== null && row.date <= watermark));
 
     const check = reconcile({
@@ -189,16 +191,18 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
         trades,
         creditedTotal: credited.total,
     });
-    if (!check.ok) return {accountId, status: 'skipped', reason: check.reason};
+    // Books that counted a copied row (written twice before the ledger's key was unique) no longer
+    // rebuild once each key counts once: say so, and what repairs it, rather than only the sums.
+    if (!check.ok) return {accountId, status: 'skipped', reason: copies > 0 ? `${copies} income row(s) recorded twice: npm run migrate:accounts repairs them (${check.reason})` : check.reason};
 
     const start = watermark ? addCalendarDays(watermark, 1) : inceptionDate;
     let through = watermark;
     let outcome: CreditOutcome = {accountId, status: 'current'};
 
     if (start <= end) {
-        const ready = readyThrough({start, end, rateOn: inputs.rateOn, spans: holdingSpans(trades), coverage: inputs.coverage, released: inputs.released});
+        const {ready, waitingOn} = readinessOf({start, end, rateOn: inputs.rateOn, spans: holdingSpans(trades), coverage: inputs.coverage, released: inputs.released});
         if (ready === null) {
-            outcome = {accountId, status: 'waiting', reason: `data not ready from ${start}`};
+            outcome = {accountId, status: 'waiting', reason: `data not ready from ${start}${waitingOn ? `: waiting on ${describeWaitingOn(waitingOn)}` : ''}`};
         } else {
             // Replayed from inception so every entitlement and every day's cash is rebuilt
             // exactly; days already paid move cash by what was stored, not by a recomputation.
@@ -228,7 +232,7 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
             // (b) Credit what is STORED for the window, once. The guard on the watermark makes a
             // retry or an overlapping run a no-op; the guard on inceptionAt stops a reset
             // landing mid-run from receiving the old account's income.
-            const windowRows = await AccountIncome.find({accountId, epoch, date: {$gte: start, $lte: ready}}).lean<LeanRow[]>();
+            const windowRows = distinctIncomeRows(await AccountIncome.find({accountId, epoch, date: {$gte: start, $lte: ready}}).lean<LeanRow[]>()).rows;
             const due = sumBy(windowRows);
             const moved = await PaperAccount.updateOne(
                 {
@@ -260,7 +264,8 @@ const catchUpSnapshots = async (accountId: string, epoch: number, through: strin
     const current = await PaperAccount.findById(accountId).select('inceptionAt createdAt').lean<{inceptionAt?: Date; createdAt: Date} | null>();
     if (!current || accountEpoch(current).getTime() !== epoch) return 0;
 
-    const rows = await AccountIncome.find({accountId, epoch, date: {$lte: through}}).sort({date: 1}).lean<LeanRow[]>();
+    const rows = distinctIncomeRows(await AccountIncome.find({accountId, epoch, date: {$lte: through}}).sort({date: 1}).lean<LeanRow[]>()).rows
+        .sort((a, b) => a.date.localeCompare(b.date));
     const dates: string[] = [];
     const cumulative: number[] = [];
     for (const row of rows) {

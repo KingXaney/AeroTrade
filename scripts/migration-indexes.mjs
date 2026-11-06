@@ -26,6 +26,12 @@ export const MIGRATION_INDEXES = {
     benchmarksnapshots: [
         [{symbol: 1, date: 1}, {unique: true}],
     ],
+    // The income ledger's key: one credit per account, epoch, kind, date and symbol. Built only
+    // after step 4 of the migration has removed the rows written twice before it existed.
+    accountincomes: [
+        [{userId: 1}, {}],
+        [{accountId: 1, epoch: 1, kind: 1, date: 1, symbol: 1}, {unique: true}],
+    ],
 };
 
 // Indexes a model has replaced, by name. Mongoose adds indexes but never drops them, so these

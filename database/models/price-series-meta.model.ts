@@ -9,6 +9,9 @@ export interface PriceSeriesMetaDoc extends Document {
     dividendsFrom?: string;       // 'YYYY-MM-DD'
     dividendsThrough?: string;    // 'YYYY-MM-DD'
     failingSince?: string;        // first ET date of an unbroken run of failed fetches
+    // The company's first session, as Yahoo's chart gives it: no provider holds an older bar, so
+    // a history that starts there is deep enough and its dividends are needed only from there.
+    listedOn?: string;            // 'YYYY-MM-DD'
     updatedAt: Date;
 }
 
@@ -17,6 +20,7 @@ const PriceSeriesMetaSchema = new Schema<PriceSeriesMetaDoc>({
     dividendsFrom: {type: String},
     dividendsThrough: {type: String},
     failingSince: {type: String},
+    listedOn: {type: String},
     updatedAt: {type: Date, default: Date.now},
 });
 

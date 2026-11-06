@@ -232,10 +232,11 @@ export type BrainSystemStatus = {
 export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
     await connectToDatabase();
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [articlesTotal, articlesLast24h, articlesExtracted, entityCount, thesisCount, pricedSymbols, jobs] = await Promise.all([
+    const [articlesTotal, articlesLast24h, articlesExtracted, articlesReadEmpty, entityCount, thesisCount, pricedSymbols, jobs] = await Promise.all([
         NewsItem.countDocuments({}),
         NewsItem.countDocuments({createdAt: {$gte: dayAgo}}),
         NewsItem.countDocuments({extraction: {$exists: true}}),
+        NewsItem.countDocuments({readAt: {$exists: true}}),
         BrainEntity.countDocuments({}),
         BrainEntity.countDocuments({thesisSince: {$ne: null}}),
         countPricedSymbols(),
@@ -246,8 +247,9 @@ export const getBrainSystemStatus = async (): Promise<BrainSystemStatus> => {
         articlesLast24h,
         articlesExtracted,
         // Derived, not queried: {extraction: {$exists: false}} is an unindexed scan
-        // and this page is rendered on every visit.
-        articlesUnextracted: articlesTotal - articlesExtracted,
+        // and this page is rendered on every visit. An article read with nothing to tag is
+        // not waiting (its readAt count is served by a partial index).
+        articlesUnextracted: Math.max(0, articlesTotal - articlesExtracted - articlesReadEmpty),
         entityCount,
         thesisCount,
         pricedSymbols,

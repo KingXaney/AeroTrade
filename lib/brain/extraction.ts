@@ -52,6 +52,18 @@ const stripCodeFences = (raw: string): string => {
     return inner !== undefined ? inner : trimmed;
 };
 
+// Which articles of a batch the model answered — an id it was sent, the first time it appears —
+// and which it skipped. An answered article is read, whether or not anything in it can be
+// tagged; a skipped one is sent once more (MAX_EXTRACTION_TRIES) before it counts as read too,
+// so no article is sent to the model day after day.
+export const answeredInBatch = (batchIds: readonly string[], answerIds: readonly string[]): {answered: string[]; skipped: string[]} => {
+    const answers = new Set(answerIds);
+    return {
+        answered: batchIds.filter((id) => answers.has(id)),
+        skipped: batchIds.filter((id) => !answers.has(id)),
+    };
+};
+
 export const parseExtractionResponse = (raw: string): ExtractionBatch | null => {
     let parsed: unknown;
     try {

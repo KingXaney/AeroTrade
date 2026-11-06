@@ -38,8 +38,23 @@ const barDateOf = (timestampSeconds: number): string =>
 
 // The `events` query param is deliberately absent — adding it drew a 429; the
 // plain chart already carries split-adjusted OHLCV plus `adjclose`.
+// The app writes a US share class as Finnhub does, with a dot (BRK.B); Yahoo writes it with a
+// hyphen and answers "No data found" for the dotted form, so the class shares had no bars at all.
+export const yahooTicker = (symbol: string): string => symbol.toUpperCase().replace(/^([A-Z]{1,5})\.([A-Z])$/, "$1-$2");
+
 export const yahooChartUrl = (symbol: string, range: YahooRange): string =>
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol.toUpperCase())}?range=${range}&interval=1d`;
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker(symbol))}?range=${range}&interval=1d`;
+
+// The ET date of the symbol's first session, as the chart's meta gives it (firstTradeDate, epoch
+// seconds): a ten-year payload of a company listed since starts there, and no provider holds an
+// older bar — what lets a backfill stop asking and a dividend window start at the listing.
+export const parseYahooListing = (json: unknown): string | null => {
+    if (!isRecord(json) || !isRecord(json.chart) || !Array.isArray(json.chart.result)) return null;
+    const result: unknown = json.chart.result[0];
+    if (!isRecord(result) || !isRecord(result.meta)) return null;
+    const first = result.meta.firstTradeDate;
+    return typeof first === "number" && Number.isFinite(first) ? barDateOf(first) : null;
+};
 
 export const parseYahooChart = (json: unknown, {excludeFrom}: {excludeFrom: string}): Bar[] => {
     if (!isRecord(json) || !isRecord(json.chart) || !Array.isArray(json.chart.result)) {
@@ -133,10 +148,12 @@ export const dividendCoverage = (bars: readonly Bar[]): {from: string; through: 
     return from === null ? null : {from, through: bars[bars.length - 1].date};
 };
 
-export const fetchYahooDaily = async (
+export type YahooChart = {bars: Bar[]; listedOn: string | null};
+
+export const fetchYahooChart = async (
     symbol: string,
     {range}: {range: YahooRange},
-): Promise<Bar[]> => {
+): Promise<YahooChart> => {
     const url = yahooChartUrl(symbol, range);
     try {
         const response = await fetch(url, {
@@ -146,12 +163,15 @@ export const fetchYahooDaily = async (
         if (!response.ok) {
             console.error(`Yahoo fetch failed for ${symbol}: HTTP ${response.status}`);
             await reportLimit('yahoo', await responseSignal(response, `chart ${symbol}`));
-            return [];
+            return {bars: [], listedOn: null};
         }
         const json: unknown = await response.json();
-        return parseYahooChart(json, {excludeFrom: getEasternDateString()});
+        return {bars: parseYahooChart(json, {excludeFrom: getEasternDateString()}), listedOn: parseYahooListing(json)};
     } catch (error) {
         console.error(`Yahoo fetch threw for ${symbol}`, error);
-        return [];
+        return {bars: [], listedOn: null};
     }
 };
+
+export const fetchYahooDaily = async (symbol: string, options: {range: YahooRange}): Promise<Bar[]> =>
+    (await fetchYahooChart(symbol, options)).bars;

@@ -15,3 +15,24 @@ export const mergeCoverage = (stored: CoverageRange | null, payload: CoverageRan
         through: payload.through > stored.through ? payload.through : stored.through,
     };
 };
+
+// A payload from a company's first session vouches for its dividends from the second (the first
+// bar of any payload has no step to infer one from); a week covers a session the provider
+// skipped early on. No dividend is paid on a share in its first week of trading.
+export const LISTING_COVERAGE_SLACK_DAYS = 7;
+
+const plusDays = (date: string, days: number): string => {
+    const at = new Date(`${date}T00:00:00Z`);
+    at.setUTCDate(at.getUTCDate() + days);
+    return at.toISOString().slice(0, 10);
+};
+
+// Are a symbol's dividends vouched for over [from, through]? From `from`, or for a company
+// listed inside the window (listedOn, from the provider) from its listing — before it, there
+// was no share to pay on, and a requirement no payload can meet would hold a backtest back
+// for ever (the culture backtest waited on DoorDash, Airbnb and two dozen more from launch).
+export const coversWindow = (range: CoverageRange | null, listedOn: string | null, from: string, through: string): boolean => {
+    if (range === null || range.through < through) return false;
+    const needFrom = listedOn !== null && listedOn > from ? plusDays(listedOn, LISTING_COVERAGE_SLACK_DAYS) : from;
+    return range.from <= needFrom;
+};
