@@ -80,7 +80,7 @@ the average is distinguishable from zero.
 
 **Limits.** The culture backtest has pageviews and prices only: the terms that need App Store ranks,
 mentions, the press or report dates have no row, and the catalog was chosen in 2026, which flatters
-it. The Navigator's record starts with its first weekly run after this was built (2 November 2026);
+it. The Navigator's record starts with its first weekly run after this merged (9 November 2026);
 its 1-week column needs eight recorded weeks, its 13-week column twenty-one.
 
 **Changes it.** Nothing undoes a measurement. Bump `SIGNALS_VERSION` whenever what is measured, or
