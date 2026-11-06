@@ -38,7 +38,8 @@ export const runWeeklyNavigator = inngest.createFunction(
         await ensureUniverseBars(step, universe.symbols, 'ensure-price-bars');
 
         // Deterministic scoring inputs: brain slow layer + eligibility counts + signals.
-        const scored = await step.run('compute-global-scores', async () => computeNavigatorScores(universe.symbols));
+        const scored = await step.run('compute-global-scores', async () =>
+            computeNavigatorScores(universe.symbols, {record: {weekKey: getEasternWeekKey(today), date: today}}));
 
         const inputs = decisionInputs(scored, universe);
 

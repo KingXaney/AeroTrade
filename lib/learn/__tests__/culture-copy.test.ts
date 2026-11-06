@@ -20,6 +20,8 @@ import {
     PICKS_TERMS,
     PROFILE_COPY,
     RISING_TERMS,
+    SIGNAL_CHECK_COPY,
+    SIGNAL_CHECK_TERMS,
     SOURCE_LABELS,
     TERM_LABELS,
 } from '@/lib/learn/copy/culture';
@@ -186,5 +188,19 @@ describe('the /culture page copy', () => {
             clean(text);
             expect(text).not.toMatch(MECHANISM_ONLY);
         }
+    });
+});
+
+describe('the signal check', () => {
+    it('says what it measured without advice, and claims nothing for a picker', () => {
+        const lines = [SIGNAL_CHECK_COPY.heading, SIGNAL_CHECK_COPY.lead, SIGNAL_CHECK_COPY.simulatedOnly, SIGNAL_CHECK_COPY.pickerRow('Spike')];
+        for (const line of lines) {
+            clean(line);
+            expect(line).not.toMatch(MECHANISM_ONLY);
+        }
+    });
+
+    it('lists only glossary entries', () => {
+        for (const key of SIGNAL_CHECK_TERMS) expect(GLOSSARY[key], key).toBeDefined();
     });
 });

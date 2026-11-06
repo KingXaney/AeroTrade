@@ -195,6 +195,9 @@ export type PickerProfile = {
 // reader can watch. Quiet follows attention that has lasted, that the press has not caught up
 // with, that built since the last report, and that is taking share inside its category — the
 // terms the market is slowest on. Price only is the backtest's baseline. Each sums to one.
+// Research log R2 (docs/research/log.md): whether Spike's jump in attention keeps paying or
+// reverses is measured by the backtest's signal check, not assumed. Research log R3: the evidence
+// behind Quiet's terms — attention that has lasted and that the press has not covered.
 export const CULTURE_PROFILES: Record<ProfileId, PickerProfile> = {
     spike: {
         id: 'spike',
@@ -245,6 +248,11 @@ export const CULTURE_RAILS: AllocatorRails = {
 // The backtest: five years of weekly decisions after a warm-up of daily bars, stored once under
 // this key and rebuilt when the engine version or the catalog's owners change.
 export const SIM_RESULT_WEEKS = 260;
+// What each signal said against what followed (lib/culture/signal-check): the horizons in weeks,
+// and the version of the measurement — a stored backtest measured under another is rebuilt.
+// Research log R1 (docs/research/log.md).
+export const SIGNAL_HORIZONS_WEEKS = [1, 2, 4, 8, 13] as const;
+export const SIGNALS_VERSION = '1';
 export const SIM_WARMUP_BARS = 260;
 export const CULTURE_BACKTEST_KEY = 'culture';
 // The weekly rationale call's narratives, and the reasons a decision item keeps.

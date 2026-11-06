@@ -31,6 +31,7 @@ import {
     type ProfileId,
 } from "@/lib/culture/config";
 import {decideWeek, firstWeekTrades} from "@/lib/culture/engine";
+import {measureCultureSignals, type MeasuredWeek, type SignalIcRow} from "@/lib/culture/signal-check";
 import {wikipediaAnomaly} from "@/lib/culture/features";
 import {toScoringInputs, type BrandSeriesInput} from "@/lib/culture/inputs";
 import type {CultureScoringInput} from "@/lib/culture/scoring";
@@ -85,6 +86,8 @@ export type CultureSimulation = {
     feeds: CultureFeed[];
     benchmark: SeriesPoint[];
     variants: CultureVariantResult[];
+    // What each signal said against what followed, over the same weeks (lib/culture/signal-check).
+    signals: SignalIcRow[];
 };
 
 // ---- dated slices, by binary search: the series are years long and read hundreds of times ----
@@ -299,7 +302,7 @@ export const simulateCulture = (input: CultureSimulationInput): CultureSimulatio
         const date = n > 0 ? calendar[n - 1] : input.launchDate;
         const bench = onOrBefore(benchmarkIndex, date);
         const benchmark: SeriesPoint[] = bench ? [{date, value: bench.value}] : [];
-        return {from: date, to: date, feeds: [], benchmark, variants: profiles.map((profile) => emptyVariant(profile, date, startingBalance, benchmark))};
+        return {from: date, to: date, feeds: [], benchmark, variants: profiles.map((profile) => emptyVariant(profile, date, startingBalance, benchmark)), signals: []};
     }
     const startIndex = kept[0] - 1;
 
@@ -317,6 +320,7 @@ export const simulateCulture = (input: CultureSimulationInput): CultureSimulatio
     const firstBench = onOrBefore(benchmarkIndex, calendar[startIndex]);
     if (firstBench) benchmark.push({date: calendar[startIndex], value: firstBench.value});
     const feeds = new Set<CultureFeed>();
+    const measured: MeasuredWeek[] = [];
 
     const closeOn = (symbol: string, date: string): number | null => {
         const index = barIndex.get(symbol);
@@ -344,6 +348,7 @@ export const simulateCulture = (input: CultureSimulationInput): CultureSimulatio
             const held = [...new Set(variants.flatMap((variant) => variant.account.positions.map((position) => position.symbol)))];
             const week = sim.inputsFor(asOf, tradeDate, held);
             for (const feed of week.feeds) feeds.add(feed);
+            measured.push({index: i, inputs: week.inputs, feeds: week.feeds});
             const universe = week.inputs.map((item) => item.symbol);
             const targetable = new Set(universe.filter((symbol) => week.quoted.has(symbol)));
 
@@ -424,6 +429,7 @@ export const simulateCulture = (input: CultureSimulationInput): CultureSimulatio
         to: calendar[n - 1],
         feeds: [...feeds],
         benchmark,
+        signals: measureCultureSignals({weeks: measured, calendar, bars: input.bars, profiles}),
         variants: variants.map((variant) => {
             const meanEquity = variant.points.reduce((sum, point) => sum + point.value, 0) / variant.points.length;
             return {

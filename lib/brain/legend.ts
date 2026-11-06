@@ -13,6 +13,8 @@ import {
     HALF_LIFE_FAST_DAYS,
     HALF_LIFE_SLOW_DAYS,
     MAX_EXTRACTION_CALLS_PER_DAY,
+    REPEAT_SENTIMENT_SHARE,
+    REPEAT_SIMILARITY,
     SENTIMENT_SHARE_BY_NATURE,
     TAKE_IMPORTANCE_CAP,
     THESIS_EXIT_FRACTION,
@@ -79,6 +81,7 @@ export const brainLegend = (): BrainLegend => {
                     C.reading(EXTRACTION_BATCH_SIZE * MAX_EXTRACTION_CALLS_PER_DAY),
                     C.adding(),
                     C.nature(String(TAKE_IMPORTANCE_CAP), shareText(SENTIMENT_SHARE_BY_NATURE.company), shareText(SENTIMENT_SHARE_BY_NATURE.opinion), shareText(SENTIMENT_SHARE_BY_NATURE.rumour), shareText(COMMENTARY_IMPORTANCE_SHARE)),
+                    C.repeat(shareText(REPEAT_SIMILARITY), shareText(REPEAT_SENTIMENT_SHARE)),
                 ],
             },
             {

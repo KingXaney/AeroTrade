@@ -40,6 +40,7 @@ const backtest: CultureBacktestView = {
         {profile: 'spike', label: 'Spike', from: '2021-10-15', to: '2026-10-06', weeks: 260, closeFills: 0, tradeCount: 19, turnoverPct: 50, stats: stats(21.5555), series: []},
         {profile: 'quiet', label: 'Quiet', from: '2021-10-15', to: '2026-10-06', weeks: 260, closeFills: 0, tradeCount: 19, turnoverPct: 50, stats: stats(21.5555), series: []},
     ],
+    signals: null,
 };
 
 const picker = (id: 'spike' | 'quiet', over: Partial<ChatPickerInput> = {}): ChatPickerInput => ({

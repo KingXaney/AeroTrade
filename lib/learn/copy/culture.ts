@@ -115,6 +115,8 @@ export const BRAND_BOARD_TERMS = ['attention', 'brand-sentiment', 'brand-thesis'
 export const RISING_TERMS = ['attention'] as const;
 export const PICKS_TERMS = ['picker-profile', 'brand-owner'] as const;
 export const COMPARISON_TERMS = ['picker-profile', 'total-return'] as const;
+// The signal check (components/culture/SignalCheck): research log R1 and R2, docs/research/log.md.
+export const SIGNAL_CHECK_TERMS = ['information-coefficient', 'ic-t-statistic', 'attention-backtest'] as const;
 
 export const CULTURE_COPY = {
     pageSubtitle: 'What younger consumers look up, install and post about, mapped onto the companies that own the brands — read by two pickers that trade on it inside hard rails',
@@ -146,6 +148,14 @@ export const CULTURE_COPY = {
     suggestionsLead: 'Names the model met that are not in the catalog. A person adds one in code; the brain never adds a brand itself.',
     suggestionsEmpty: 'The model has met no name the catalog lacks.',
     suggestionRow: (count: number, firstSeen: string): string => `${plural(count, 'mention', 'mentions')} · first seen ${firstSeen}`,
+} as const;
+
+// What each signal said, against what followed: the backtest's weeks, measured (lib/culture/signal-check).
+export const SIGNAL_CHECK_COPY = {
+    heading: 'What each signal said, against what followed',
+    lead: "In each simulated week the owners the pickers could buy are put in two orders: by a signal, and by what they returned from that week's open over the weeks after it. A cell is how closely the two orders agreed, averaged over the weeks measured, with its t-statistic beneath; a picker's row reads its whole score. No cell is coloured and no row is sorted by its figure.",
+    pickerRow: (label: string): string => `${label}, whole score`,
+    simulatedOnly: 'Simulated weeks only, from pageviews and prices: the live feeds — App Store ranks, mentions, the press — have no history here, so their terms have no row.',
 } as const;
 
 export const CULTURE_PICKS_COPY = {

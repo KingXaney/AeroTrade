@@ -8,6 +8,7 @@ import CultureLegend from "@/components/culture/CultureLegend";
 import CultureSystem from "@/components/culture/CultureSystem";
 import PickerColumn from "@/components/culture/PickerColumn";
 import PickerComparison from "@/components/culture/PickerComparison";
+import SignalCheck from "@/components/culture/SignalCheck";
 import RisingBrands from "@/components/culture/RisingBrands";
 import SuggestedBrands from "@/components/culture/SuggestedBrands";
 import Panel from "@/components/primitives/Panel";
@@ -82,6 +83,8 @@ const PicksView = async ({userId}: {userId: string}) => {
                     <PickerColumn key={picker.id} picker={picker} follow={follows.find((follow) => follow.profile === picker.id) ?? null} />
                 ))}
             </div>
+            {/* What each signal said against what followed: only once a backtest measured some. */}
+            {view.backtest?.signals && <SignalCheck table={view.backtest.signals} />}
         </>
     );
 };

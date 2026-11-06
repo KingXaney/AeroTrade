@@ -16,6 +16,8 @@ import NarrativeLeaderboard from "@/components/brain/NarrativeLeaderboard";
 import NavigatorCard from "@/components/navigator/NavigatorCard";
 import SecondOpinionCard from "@/components/brain/SecondOpinionCard";
 import SuggestionPanel from "@/components/navigator/SuggestionPanel";
+import NavigatorSignalCheck from "@/components/navigator/NavigatorSignalCheck";
+import {getNavigatorSignalCheck} from "@/lib/navigator/signal-store";
 import SystemStatus from "@/components/jobs/SystemStatus";
 import LimitsPanel from "@/components/limits/LimitsPanel";
 import {getLimitsView} from "@/lib/limits/store";
@@ -105,11 +107,12 @@ const NarrativesView = async ({userId, entity}: {userId: string; entity?: string
 };
 
 const NavigatorView = async ({userId}: {userId: string}) => {
-    const [navigatorStatus, suggestions, portfolios, secondOpinion] = await Promise.all([
+    const [navigatorStatus, suggestions, portfolios, secondOpinion, signalCheck] = await Promise.all([
         getNavigatorStatus(userId),
         getLatestSuggestions(userId),
         getPortfoliosForUser(userId),
         getLatestSecondOpinion(userId),
+        getNavigatorSignalCheck(),
     ]);
 
     return (
@@ -126,6 +129,9 @@ const NavigatorView = async ({userId}: {userId: string}) => {
 
             {/* Claude's critique of the brain's current picture */}
             <SecondOpinionCard configured={isSecondOpinionConfigured()} opinion={secondOpinion} />
+
+            {/* Each term against what followed (research log R1) */}
+            <NavigatorSignalCheck view={signalCheck} />
         </>
     );
 };

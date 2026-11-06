@@ -118,6 +118,46 @@ try {
         await page.locator('img[src*="example.com"]').count() === 0);
     await shot('03-markdown');
 
+    // --- the Navigator's signal check (research log R1) -----------------------------------------
+    // No week recorded yet: one line saying the record starts with the next weekly run.
+    await db.collection('navigatorsignalweeks').deleteMany({});
+    check('the Navigator view says its signal check starts with the next weekly run',
+        /starts with the Navigator's next weekly run/.test(await page.locator('#navigator-signal-check [data-signal-recording]').innerText().catch(() => '')));
+    // Ten recorded Mondays of twelve QA-only names whose next week's return follows their slow news
+    // weight, with their bars: the table draws, the whole score first, nothing coloured.
+    const mondays = Array.from({length: 10}, (_, k) => new Date(Date.UTC(2026, 7, 3 + 7 * k)).toISOString().slice(0, 10));
+    const names = Array.from({length: 12}, (_, j) => `QASIG${String.fromCharCode(65 + j)}`);
+    const lead = (j, k) => (((j * 5 + k * 7) % 12) - 5.5) / 10;
+    const signalBars = names.flatMap((symbol, j) => {
+        let price = 50;
+        return mondays.map((date, k) => {
+            const bar = {symbol, date, open: price, close: price, high: price, low: price, source: 'qa-signal', dividend: 0};
+            price *= 1 + 0.01 * lead(j, k);
+            return bar;
+        });
+    });
+    await db.collection('pricebars').deleteMany({source: 'qa-signal'});
+    await db.collection('pricebars').insertMany(signalBars);
+    await db.collection('navigatorsignalweeks').insertMany(mondays.map((date, k) => ({
+        weekKey: date, date, createdAt: new Date(),
+        symbols: names.map((symbol, j) => ({symbol, newsWeightSlow: 10 + lead(j, k), sentimentSlow: 0.1, r63: 0.01, r126: 0.02, r252: 0.03, sectorTilt: null, thesis: false, score: lead(j, k), eligible: true})),
+    })));
+    try {
+        await page.goto(`${BASE}/brain?view=navigator`, {waitUntil: 'domcontentloaded'});
+        await page.locator('#navigator-signal-check [data-signal-check]').waitFor({timeout: 30000});
+        const signalRows = await page.locator('#navigator-signal-check [data-signal]').evaluateAll((els) => els.map((el) => el.getAttribute('data-signal')));
+        check('…and, once weeks are recorded, the table: the whole score first, then the terms', signalRows[0] === 'score' && signalRows.includes('newsSlow'), signalRows.join(','));
+        const firstWeek = await page.locator('#navigator-signal-check [data-signal="newsSlow"] [data-horizon="1"] [data-ic]').innerText();
+        check('…a term that ranked next week exactly reads +1.000, with its t-statistic and no colour', firstWeek.trim() === '+1.000'
+            && await page.locator('#navigator-signal-check [data-signal="newsSlow"] [data-horizon="1"] [data-t]').count() === 1
+            && await page.locator('#navigator-signal-check .text-positive, #navigator-signal-check .text-negative').count() === 0
+            && await page.locator('#navigator-signal-check [data-what-these-mean]').count() === 1, firstWeek);
+        await shot('03b-signal-check');
+    } finally {
+        await db.collection('navigatorsignalweeks').deleteMany({});
+        await db.collection('pricebars').deleteMany({source: 'qa-signal'});
+    }
+
     // --- destructive actions confirm ------------------------------------------------
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'networkidle'});
     await page.getByRole('button', {name: /Reset Account/i}).click();

@@ -14,6 +14,7 @@ import {
     CULTURE_STARTING_BALANCE,
     PROFILE_IDS,
     SERIES_LOOKBACK_DAYS,
+    SIGNALS_VERSION,
 } from "@/lib/culture/config";
 import {toBacktestView, type CultureBacktestStamp, type CultureBacktestView, type StoredCultureBacktest} from "@/lib/culture/backtest";
 import {backtestWindow, coverageWindow} from "@/lib/culture/backtest-window";
@@ -26,12 +27,12 @@ import {RATE_MAX_STALENESS_DAYS} from "@/lib/income/accrual";
 import {BENCHMARK_SYMBOL, RATE_SYMBOL} from "@/lib/prices/config";
 import {ensureBars, getBarsForSymbols, getRatePoints, symbolsLackingDividendCoverage} from "@/lib/prices/store";
 
-type LeanStamp = {version: string; catalogHash: string; computedAt: Date};
+type LeanStamp = {version: string; catalogHash: string; computedAt: Date; signalsVersion?: string};
 
 export const getCultureBacktestStamp = async (): Promise<CultureBacktestStamp | null> => {
     await connectToDatabase();
-    const doc = await CultureBacktest.findOne({key: CULTURE_BACKTEST_KEY}, {version: 1, catalogHash: 1, computedAt: 1}).lean<LeanStamp | null>();
-    return doc ? {version: doc.version, catalogHash: doc.catalogHash, computedAt: new Date(doc.computedAt).getTime()} : null;
+    const doc = await CultureBacktest.findOne({key: CULTURE_BACKTEST_KEY}, {version: 1, catalogHash: 1, computedAt: 1, signalsVersion: 1}).lean<LeanStamp | null>();
+    return doc ? {version: doc.version, catalogHash: doc.catalogHash, computedAt: new Date(doc.computedAt).getTime(), signalsVersion: doc.signalsVersion ?? null} : null;
 };
 
 // Symbols whose dividends are not yet vouched for across the coverage window (the backfill's
@@ -111,6 +112,8 @@ export const simulateCultureBacktest = async (symbols: readonly string[], launch
                     trades: variant.trades,
                     stats: variant.stats,
                 })),
+                signalsVersion: SIGNALS_VERSION,
+                signals: result.signals,
                 computedAt: new Date(),
             },
             $setOnInsert: {key: CULTURE_BACKTEST_KEY},
@@ -128,6 +131,7 @@ type LeanBacktest = {
     to: string;
     benchmark?: {date: string; value: number}[];
     variants?: {profile: string; weeks: number; turnoverPct: number; closeFills: number; points?: {date: string; value: number}[]; trades?: unknown[]; stats: StoredCultureBacktest['variants'][number]['stats']}[];
+    signals?: StoredCultureBacktest['signals'];
     computedAt: Date;
 };
 
@@ -136,7 +140,7 @@ export const getCultureBacktest = async (): Promise<CultureBacktestView | null> 
     await connectToDatabase();
     const doc = await CultureBacktest.findOne(
         {key: CULTURE_BACKTEST_KEY},
-        {version: 1, catalogHash: 1, feeds: 1, from: 1, to: 1, benchmark: 1, computedAt: 1, 'variants.profile': 1, 'variants.weeks': 1, 'variants.turnoverPct': 1, 'variants.closeFills': 1, 'variants.points': 1, 'variants.stats': 1, 'variants.trades.date': 1},
+        {version: 1, catalogHash: 1, feeds: 1, from: 1, to: 1, benchmark: 1, computedAt: 1, signals: 1, 'variants.profile': 1, 'variants.weeks': 1, 'variants.turnoverPct': 1, 'variants.closeFills': 1, 'variants.points': 1, 'variants.stats': 1, 'variants.trades.date': 1},
     ).lean<LeanBacktest | null>();
     if (!doc) return null;
     return toBacktestView({
@@ -155,6 +159,7 @@ export const getCultureBacktest = async (): Promise<CultureBacktestView | null> 
             points: variant.points ?? [],
             stats: variant.stats,
         })),
+        signals: doc.signals ?? [],
         computedAt: new Date(doc.computedAt).getTime(),
     });
 };

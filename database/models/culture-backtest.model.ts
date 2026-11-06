@@ -42,7 +42,20 @@ export interface CultureBacktestDoc extends Document {
     fillRule: 'next-open';
     benchmark: CultureBacktestPointDoc[];
     variants: CultureBacktestVariantDoc[];
+    // What each signal said against what followed (lib/culture/signal-check), measured under
+    // signalsVersion; a build without it is rebuilt (lib/culture/backtest.cultureBacktestDue).
+    signalsVersion?: string;
+    signals: CultureSignalRowDoc[];
     computedAt: Date;
+}
+
+export interface CultureSignalRowDoc {
+    signal: string;               // a CULTURE_TERMS id, or score:<profile>
+    horizonWeeks: number;
+    weeks: number;
+    meanIc: number;
+    tStat: number | null;
+    positiveShare: number;
 }
 
 const PointSchema = new Schema<CultureBacktestPointDoc>(
@@ -79,6 +92,18 @@ const VariantSchema = new Schema<CultureBacktestVariantDoc>(
     {_id: false, minimize: false},
 );
 
+const SignalRowSchema = new Schema<CultureSignalRowDoc>(
+    {
+        signal: {type: String, required: true},
+        horizonWeeks: {type: Number, required: true},
+        weeks: {type: Number, required: true},
+        meanIc: {type: Number, required: true},
+        tStat: {type: Number, default: null},
+        positiveShare: {type: Number, required: true},
+    },
+    {_id: false},
+);
+
 const CultureBacktestSchema = new Schema<CultureBacktestDoc>({
     key: {type: String, required: true},
     version: {type: String, required: true},
@@ -89,6 +114,8 @@ const CultureBacktestSchema = new Schema<CultureBacktestDoc>({
     fillRule: {type: String, required: true, enum: ['next-open'], default: 'next-open'},
     benchmark: {type: [PointSchema], default: []},
     variants: {type: [VariantSchema], default: []},
+    signalsVersion: {type: String},
+    signals: {type: [SignalRowSchema], default: []},
     computedAt: {type: Date, required: true},
 }, {minimize: false});
 

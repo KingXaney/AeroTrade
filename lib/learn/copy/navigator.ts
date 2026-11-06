@@ -18,6 +18,25 @@ export const NAVIGATOR_COPY = {
     tileSchedule: 'Navigator runs Mondays',
 } as const;
 
+// The Navigator's signal check (components/navigator/NavigatorSignalCheck): research log R1,
+// docs/research/log.md. Its rows' names, and the words before a figure exists.
+export const NAVIGATOR_SIGNAL_TERMS = ['information-coefficient', 'ic-t-statistic', 'news-weight', 'news-sentiment'] as const;
+export const NAVIGATOR_SIGNAL_COPY = {
+    heading: 'What each term said, against what followed',
+    lead: "Each week the Navigator scores its whole universe; the names it could buy are then put in two orders, by a term and by what they returned from that week's scoring day over the weeks after it. A cell is how closely the two orders agreed, averaged over the weeks recorded, with its t-statistic beneath. No cell is coloured and no row is sorted by its figure.",
+    rows: {
+        score: 'Navigator, whole score',
+        newsSlow: 'slow news weight',
+        sentimentSlow: 'news sentiment',
+        momentumLong: 'price momentum',
+        sectorSlow: 'sector standing',
+        thesis: 'thesis',
+    },
+    notStarted: "The record starts with the Navigator's next weekly run: each week's whole scored universe is kept, so its terms can be set beside the returns that follow.",
+    recording: (since: string, weeks: number): string =>
+        `Recording since ${since}: ${weeks === 1 ? '1 week' : `${weeks} weeks`} so far. A column fills once eight recorded weeks have a return that far ahead.`,
+} as const;
+
 type EligibilityNeed = {articles: number; sources: number; days: number; bars: number};
 
 export const NAVIGATOR_GLOSS = {

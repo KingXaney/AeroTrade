@@ -320,6 +320,9 @@ and friends keep none beyond Shared and the invariants).
 - `lib/navigator/run` is the one run the weekly job and the bootstrap share — claim, plan, orders,
   rationale (`lib/navigator/prompts` the rationale prompt).
 - `lib/navigator/allocator.HOLDING_REASON` is the kept-position fallback reason.
+- The weekly job's scoring step also keeps the week's whole scored universe, one
+  `NavigatorSignalWeek` per ET week (`lib/navigator/store.computeNavigatorScores` with `record`; the
+  bootstrap records nothing), for the Navigator's signal check (### research).
 - `/brain` decodes its reasons on the server with `lib/learn/reasons.glossNavigatorReasons`, for
   `SuggestionPanel`'s one "What the Navigator saw" per decision, which the weekly-decisions widget
   never gets.
@@ -329,6 +332,8 @@ and friends keep none beyond Shared and the invariants).
 - `lib/brain/ingest` is the daily update's sweep, extraction batches and ticker guard. An article the
   model has read is never sent again: one it answered with nothing to tag is stamped `readAt`, one it
   left out of its answer after `MAX_EXTRACTION_TRIES`; the queue and "waiting to be read" skip both.
+- A story the same run already folded under a near-identical headline (`lib/brain/novelty`,
+  `REPEAT_SIMILARITY`) adds its attention but no tone (`REPEAT_SENTIMENT_SHARE`): research log R4.
 - A piece's nature — `reported`, `company`, `opinion`, `rumour` (`NATURES` in `lib/brain/config`) — is
   the extractor's second label, beside the event type. `lib/brain/trust.sourceTrust` reads the
   outlet first (a press-release wire is `company` whatever the model said; a commentary outlet
@@ -371,6 +376,23 @@ and friends keep none beyond Shared and the invariants).
   `components/brain/BrainLegend` shows it collapsed, at the foot of every view.
 - `lib/brain/event-types` are the evidence badges: eight of the extractor's nine labels, 'other'
   none, each a glossary `event-*` entry.
+
+### research
+
+- `docs/research/log.md` is the research log: every idea behind a brain's scoring, decay, sources or
+  rails, the papers it rests on, how the app measures it and what would change it, numbered R1, R2, …
+  (never reused or renumbered; a dropped idea is marked rejected). Read an idea's entry before moving a
+  constant it names; add an entry before shipping a change that rests on research, and say
+  `Research log R<n>` in a comment beside what it built. `lib/__tests__/research-log.test.ts` holds the
+  log and the code to each other; `lib/__tests__/docs-map.test.ts` checks its paths.
+- The signal check is how an idea is judged (R1). `lib/research/ic` is the maths (Spearman information
+  coefficients per week, their mean, a Newey–West t-statistic for overlapping horizons, `icTable`);
+  `lib/research/returns` the forward returns, open to open with dividends. `lib/culture/signal-check`
+  measures inside the culture backtest (`simulateCulture` returns the rows; stored under
+  `SIGNALS_VERSION`, whose change rebuilds the backtest) and `lib/navigator/signal-check` over the
+  Navigator's weekly record. `components/research/IcTable` draws both — /culture?view=picks and
+  /brain?view=navigator — neutral like every record: rows in the registry's order, no sign colour
+  (invariant 12). Inside ±2 is noise; with many rows read at once the log asks ±3.
 
 ### news
 
@@ -432,7 +454,7 @@ and friends keep none beyond Shared and the invariants).
   weights renormalise over the feeds present (price, pageviews, the replayed entities), so a
   variant and a live run score on one scale. One document, `CultureBacktest` under
   `CULTURE_BACKTEST_KEY`, rebuilt by the weekly job's last phase when `lib/culture/backtest.cultureBacktestDue`
-  says so (a new `CULTURE_ENGINE_VERSION`, a moved `catalogHash`, a resimulate, no build yet),
+  says so (a new `CULTURE_ENGINE_VERSION`, a moved `catalogHash`, a resimulate, a new `SIGNALS_VERSION`, no build yet),
   inside `lib/culture/backtest-store.cultureBacktestReady` (dividends vouched for across the
   window for every simulated owner and SPY, a T-bill rate for every day of it — the bars step
   refetches whole whatever is lacking while a rebuild is pending); a failure or a wait is a note

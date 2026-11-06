@@ -26,6 +26,7 @@ describe('brainLegend', () => {
         const text = legendText(brainLegend());
         for (const figure of ['up to 160 new articles', 'halves every 5 days', 'halves every 60 days', 'reaches 5', 'below 40%',
             'counts at most 0.3 in importance', 'a company statement adds 50% of its tone', 'an opinion piece 50%, a rumour 0%', 'weighs 60% of its importance',
+            '(60% of its words alike)', 'but only 0% of its tone',
             'news rank 0.20', 'news sentiment 0.15', 'momentum 0.35', 'thesis 0.20', 'sector standing 0.10',
             '6-month (0.50), 12-month (0.30) and 3-month (0.20)', 'most volatile 20%', 'multiplied by 0.8',
             'the 8 highest scores above 0.15', 'at most 20%', 'with at least 10% kept in cash', 'drops below 0 ', '25% under the average cost',

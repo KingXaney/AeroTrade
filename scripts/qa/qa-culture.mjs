@@ -320,6 +320,13 @@ try {
                 backtest ? `${backtest.from} → ${backtest.to}, ${backtest.variants.map((v) => `${v.profile}:${v.weeks}w/${v.trades.length}t`).join(' ')}; ${await jobMessage()}` : await jobMessage());
             check('…stamped with the engine version and the catalog, its feeds price, pageviews and the replayed entities',
                 backtest?.version === '1' && typeof backtest?.catalogHash === 'string' && ['price', 'wikipedia', 'mentions'].every((f) => backtest?.feeds.includes(f)), JSON.stringify(backtest?.feeds));
+            // Research log R1: the build measures each signal against what followed. The harness
+            // prices two owners (BAR_SYMBOLS), under the ten a week needs before a coefficient means
+            // anything (lib/research/ic MIN_CROSS_SECTION): the measurement is stamped and says nothing.
+            const signals = backtest?.signals ?? [];
+            check('…measuring its signals under the current version, with no figure from two priced owners',
+                backtest?.signalsVersion === '1' && Array.isArray(backtest?.signals) && signals.length === 0,
+                `${backtest?.signalsVersion} · ${signals.length} rows`);
 
             await fire({force: true});
             const againRun = await pollUntil(async () => ((await jobMessage()).includes('already ran') ? await jobMessage() : null), 60_000);
@@ -472,7 +479,11 @@ try {
             && /Simulated — attention and price only/.test(await page.locator('[data-simulated-strip]').innerText())
             && await page.locator('[data-backtest-pending]').count() === 0, simulatedTiles.join(','));
         check('…its tiles carrying the backtest\'s definition', await page.locator('[data-simulated] [data-term="attention-backtest"][title]').count() === 3);
+        // A backtest with no measured figure draws no signal check (invariant 8); the table itself
+        // is the Navigator's in qa-chat, the same component.
+        check('…and no signal check, its two priced owners too few to measure', await page.locator('#signal-check').count() === 0);
     } else {
+        check('…and no signal check before a backtest', await page.locator('#signal-check').count() === 0);
         check('…saying the backtest is not computed yet', await page.locator('[data-backtest-pending]').count() === 1);
     }
     check('the lead says what each picker follows, once', await page.locator('[data-picks-lead]').count() === 1 && await page.locator('[data-picker-lead]').count() === 2);

@@ -15,6 +15,7 @@ import {
     CULTURE_QUOTE_CHUNK,
     LIVE_PROFILES,
     RATIONALE_NARRATIVES,
+    SIGNALS_VERSION,
     WIKI_DATA_START,
     WIKIPEDIA_CHUNK,
 } from "@/lib/culture/config";
@@ -287,7 +288,7 @@ export const runCultureWeekly = inngest.createFunction(
         const simSymbols = ordered.filter((t) => BACKTEST_LISTINGS.includes(t.listing) && universe.symbols.includes(t.symbol)).map((t) => t.symbol);
         const launchDate = states.map((s) => s.launchDate).sort()[0] ?? day.today;
         const stamp = await step.run('check-backtest', getCultureBacktestStamp);
-        const rebuild = cultureBacktestDue(stamp, {version: CULTURE_ENGINE_VERSION, catalogHash: catalogHash(), resimulate: day.resimulate});
+        const rebuild = cultureBacktestDue(stamp, {version: CULTURE_ENGINE_VERSION, catalogHash: catalogHash(), resimulate: day.resimulate, signalsVersion: SIGNALS_VERSION});
         const deep = rebuild ? await step.run('dividend-coverage', async () => lackingDividendCoverage(simSymbols, launchDate)) : [];
 
         const earnings = await step.run('earnings-calendar', async () => refreshReportDates(universe.symbols, day.today));
