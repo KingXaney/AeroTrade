@@ -29,7 +29,9 @@ export const STRATEGIES_PAGE_COPY = {
     // The leaderboard's label: what the live column ranks by and what price it is valued at.
     valuation: (state: 'open' | 'closed' | 'not-started'): string => {
         if (state === 'not-started') return 'no live records yet';
-        return state === 'open' ? 'live valuation at the last price' : 'valued at the last close';
+        // Open: the quote sheet's price for each holding, at most a few minutes old — the last
+        // quote, not a live one.
+        return state === 'open' ? 'valued at the last quote' : 'valued at the last close';
     },
     rankedBy: (valuation: string): string => `ranked by live return · ${valuation}`,
     young: (days: number): string =>

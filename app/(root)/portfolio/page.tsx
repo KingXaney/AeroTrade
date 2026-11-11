@@ -12,6 +12,8 @@ import TradedBy from "@/components/trading/portfolio/TradedBy";
 import FillReplay from "@/components/culture/FillReplay";
 import ResetAccountButton from "@/components/trading/accounts/ResetAccountButton";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
+import AccountHeading from "@/components/trading/accounts/AccountHeading";
+import AccountRegion from "@/components/trading/accounts/AccountRegion";
 import ManageAccountMenu from "@/components/trading/accounts/ManageAccountMenu";
 import AccountComparisonTable from "@/components/trading/portfolio/AccountComparisonTable";
 import AnalyticsStats from "@/components/trading/portfolio/AnalyticsStats";
@@ -49,17 +51,17 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
         <div className="space-y-4">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
-                <div>
-                    <h1 className="text-2xl font-semibold text-fg mb-1 font-heading">
-                        {account.name}
-                    </h1>
-                    <p className="text-sm text-fg-muted">{view.summaryLine}</p>
+                {/* Names the account being opened from the click on (AccountHeading). */}
+                <AccountHeading accounts={view.switcherAccounts} activeId={account.id} summaryLine={view.summaryLine}>
                     <TradedBy by={view.tradedBy} />
-                </div>
+                </AccountHeading>
                 <div className="flex flex-wrap items-center gap-3">
                     <AccountSwitcher accounts={view.switcherAccounts} activeId={account.id} />
-                    <ManageAccountMenu accountId={account.id} accountName={account.name} canDelete={view.multiAccount} />
-                    <ExportCsvButton accountId={account.id} />
+                    {/* These act on the account shown; out of reach while another is on its way. */}
+                    <AccountRegion activeId={account.id} dim={false} className="contents">
+                        <ManageAccountMenu accountId={account.id} accountName={account.name} canDelete={view.multiAccount} />
+                        <ExportCsvButton accountId={account.id} />
+                    </AccountRegion>
                     <Link
                         href="/trade"
                         className={actionButton({size: 'md', className: 'inline-flex items-center gap-2 transition-all active:scale-[0.98]'})}
@@ -67,16 +69,20 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                         <span className="material-symbols-outlined text-base">candlestick_chart</span>
                         Trade Desk
                     </Link>
-                    <ResetAccountButton
-                        accountId={account.id}
-                        accountName={account.name}
-                        startingBalance={portfolio.startingBalance}
-                    />
+                    <AccountRegion activeId={account.id} dim={false} className="contents">
+                        <ResetAccountButton
+                            accountId={account.id}
+                            accountName={account.name}
+                            startingBalance={portfolio.startingBalance}
+                        />
+                    </AccountRegion>
                 </div>
             </div>
 
             {/* The account's numbers come first: what it is worth, what it returned, what is in it. */}
-            <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
+            <AccountRegion activeId={account.id}>
+                <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
+            </AccountRegion>
 
             {/* Which account wins — all accounts side by side */}
             {view.multiAccount && (
@@ -88,6 +94,9 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </Panel>
             )}
 
+            {/* Everything below is the active account's own: faded and out of reach while another
+                account is being opened (AccountRegion). */}
+            <AccountRegion activeId={account.id} className="space-y-4">
             {/* Performance vs benchmark + analytics */}
             {analytics && (
                 <>
@@ -159,6 +168,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                     />
                 </Panel>
             )}
+            </AccountRegion>
         </div>
     );
 };

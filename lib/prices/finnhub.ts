@@ -1,17 +1,20 @@
 // The Finnhub client: quotes, company profiles, financials, symbol search and company news.
 // A plain server module, NOT 'use server' — every export of a 'use server' file is a public
-// endpoint, and lib code (trading, news, dashboard, chat, jobs) calls these directly. The two
-// fetches client components need are wrapped, one-to-one, in lib/actions/stocks.actions.ts.
+// endpoint, and lib code (trading, news, dashboard, chat, jobs) calls these directly. Client
+// components reach the search, and the quote sheet's price for one symbol, through
+// lib/actions/stocks.actions.ts.
+//
+// A quote is never read from here by a page or a job: fetchQuote is the raw call, and
+// lib/prices/quote-store.ts is its one caller (the quote sheet, and the fresh read a fill or a
+// snapshot acts on). lib/prices/__tests__/quote-guard.test.ts holds that.
 
-import {cache} from "react";
 import {validateArticle, formatArticle} from "@/lib/news/article";
 import {reportLimit, responseSignal} from "@/lib/limits/report";
-import {formatPrice, formatChangePercent, formatMarketCapValue} from "@/lib/format";
 import {POPULAR_STOCK_SYMBOLS} from "@/lib/stocks/popular";
-import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS} from "@/lib/prices/config";
+import {FINANCIALS_REVALIDATE_SECONDS, PROFILE_REVALIDATE_SECONDS, QUOTE_FETCH_TIMEOUT_MS} from "@/lib/prices/config";
 import type {MarketNewsArticle, RawNewsArticle} from '@/lib/news/types';
 import type {FinnhubSearchResult, QuoteData} from '@/lib/prices/types';
-import type {Stock, StockWithData} from '@/lib/stocks/types';
+import type {Stock} from '@/lib/stocks/types';
 
 type ProfileData = {
     name?: string;
@@ -27,9 +30,17 @@ type FinnhubSearchResponse = {
     result: FinnhubSearchResult[];
 };
 
-const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+const FINNHUB_DEFAULT_URL = 'https://finnhub.io/api/v1';
+// Overridable so the browser QA can stand a server in for Finnhub (scripts/qa/start-finnhub-stub.mjs);
+// unset everywhere else. The culture earnings calendar (lib/culture/sources/earnings.ts) reads it too.
+export const finnhubBaseUrl = (env: Record<string, string | undefined> = process.env): string =>
+    (env.FINNHUB_API_URL ?? '').trim().replace(/\/+$/, '') || FINNHUB_DEFAULT_URL;
+const FINNHUB_BASE_URL = finnhubBaseUrl();
 // Server-only. NEXT_PUBLIC_FINNHUB_API_KEY is still honoured for existing deployments.
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY ?? '';
+
+// Whether a quote can be asked for at all: without a key every answer is the same empty one.
+export const finnhubConfigured = (): boolean => FINNHUB_API_KEY !== '';
 
 // Generic fetch wrapper — caches the response if revalidateSeconds is provided, otherwise always fetches fresh
 const fetchJSON = async <T>(url: string, revalidateSeconds?: number): Promise<T> => {
@@ -197,30 +208,40 @@ export const searchStocks = async (query?: string): Promise<Stock[]> => {
 // --- Quote / profile / financials ---
 // ============================================================================
 
-// One quote per symbol per server render. Next already shares one network request between
-// identical fetches in a render, but each caller that awaited a refusal logged it and filed its
-// own limit row, so a page valuing an account twice (the shell's accounts and the page's own
-// analytics) counted every 429 twice. React's cache passes straight through outside a render
-// (jobs, tests), so a job's quotes are as before.
-const quoteOnce = cache(async (symbol: string): Promise<QuoteData> => {
-    // Without a key every request is a guaranteed 401: the answer is the same empty quote
-    // (the symbol reads as unpriced), so skip the round-trip and the per-call error log —
-    // in development that log opens Next's error overlay on every page that values a position.
-    if (!FINNHUB_API_KEY) return {};
-    try {
-        const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
-        return await fetchJSON<QuoteData>(url, 30);
-    } catch (error) {
-        console.error(`Error fetching quote for ${symbol}:`, error);
-        return {};
-    }
-});
+// What asking Finnhub for one quote came to. 'off': there is no key, nothing was asked (the
+// answer is the same empty quote, so the round trip and its error are skipped). 'answer': HTTP
+// 200 with a JSON object — which may still hold no price: an unknown symbol reads `c: 0`, and
+// the free plan answers a burst with an empty body. 'refused': any other status (429 past the
+// minute, 401 or 403 for the key). 'failed': the call threw — the network, or no answer within
+// QUOTE_FETCH_TIMEOUT_MS.
+export type QuoteAnswer =
+    | {kind: 'off'}
+    | {kind: 'answer'; body: QuoteData}
+    | {kind: 'refused'; status: number; detail: string}
+    | {kind: 'failed'; error: unknown};
 
-export const getQuote = (symbol: string): Promise<QuoteData> => quoteOnce(symbol.toUpperCase());
+// One quote, asked now: never cached (a price a fill or a snapshot acts on must be this
+// moment's, and Next's fetch cache serves a stale entry of any age), never retried, never
+// logged or filed here — the caller knows whether a refusal is one of thirty or the only one.
+export const fetchQuote = async (symbol: string): Promise<QuoteAnswer> => {
+    if (!FINNHUB_API_KEY) return {kind: 'off'};
+    const path = `/quote?symbol=${encodeURIComponent(symbol.toUpperCase())}`;
+    try {
+        const response = await fetch(`${FINNHUB_BASE_URL}${path}&token=${FINNHUB_API_KEY}`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(QUOTE_FETCH_TIMEOUT_MS),
+        });
+        if (!response.ok) return {kind: 'refused', status: response.status, detail: (await responseSignal(response, path)).message};
+        const body: unknown = await response.json();
+        return {kind: 'answer', body: typeof body === 'object' && body !== null && !Array.isArray(body) ? body as QuoteData : {}};
+    } catch (error) {
+        return {kind: 'failed', error};
+    }
+};
 
 export const getCompanyProfile = async (symbol: string): Promise<ProfileData> => {
-    // Keyless, the answer is the same empty profile getQuote gives: skip the certain 401 and
-    // its error log (the stock page renders keyless for every symbol a strategy watches).
+    // Keyless, the answer is the same empty profile: skip the certain 401 and its error log
+    // (the stock page renders keyless for every symbol a strategy watches).
     if (!FINNHUB_API_KEY) return {};
     try {
         const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol.toUpperCase())}&token=${FINNHUB_API_KEY}`;
@@ -240,39 +261,4 @@ export const getFinancials = async (symbol: string): Promise<FinancialsData> => 
         console.error(`Error fetching financials for ${symbol}:`, error);
         return {};
     }
-};
-
-// Fans out quote + profile + financials per symbol in parallel and packs into StockWithData.
-// Callers (e.g. watchlist page) layer their own company/addedAt on top of these rows.
-export const getStocksWithData = async (symbols: string[]): Promise<StockWithData[]> => {
-    if (!symbols || symbols.length === 0) return [];
-    const unique = Array.from(new Set(symbols.map((s) => s.trim().toUpperCase()))).filter(Boolean);
-
-    const rows = await Promise.all(
-        unique.map(async (symbol) => {
-            const [quote, profile, financials] = await Promise.all([
-                getQuote(symbol),
-                getCompanyProfile(symbol),
-                getFinancials(symbol),
-            ]);
-
-            const peRatio = financials.metric?.peTTM ?? financials.metric?.peBasicExclExtraTTM;
-            const marketCapUsd = (profile.marketCapitalization ?? 0) * 1_000_000; // Finnhub returns millions
-
-            return {
-                userId: '',
-                symbol,
-                company: profile.name || symbol,
-                addedAt: new Date(0),
-                currentPrice: quote.c,
-                changePercent: quote.dp,
-                priceFormatted: typeof quote.c === 'number' ? formatPrice(quote.c) : undefined,
-                changeFormatted: formatChangePercent(quote.dp) || undefined,
-                marketCap: profile.marketCapitalization ? formatMarketCapValue(marketCapUsd) : undefined,
-                peRatio: typeof peRatio === 'number' && Number.isFinite(peRatio) ? peRatio.toFixed(2) : undefined,
-            } satisfies StockWithData;
-        }),
-    );
-
-    return rows;
 };

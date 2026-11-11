@@ -1,7 +1,9 @@
 // Fixed-window rate limiting on a database counter. Server-only (Mongoose); the
 // server actions that guard sign-in-adjacent endpoints call this at the top. The limits and
 // keys they pass live in lib/auth/limits.ts (import-free, unit-tested). peekRateLimit reads
-// a window without spending it (the chat's usage caption).
+// a window without spending it (the chat's usage caption). bumpCounter is the same counter
+// without a verdict: it adds to a keyed window and says the count, for a caller with a rule of
+// its own (the quote sheet's budget, lib/prices/quote-store.ts).
 
 import {connectToDatabase} from "@/database/mongoose";
 import RateLimit from "@/database/models/rate-limit.model";
@@ -35,6 +37,27 @@ export const takeRateLimit = async (key: string, limit: number, windowMs: number
         // Someone else opened the window between our two statements: count into theirs.
         const bumped = await RateLimit.findOneAndUpdate({key}, {$inc: {count: 1}}, {new: true}).lean<{count: number} | null>();
         return (bumped?.count ?? 1) <= limit;
+    }
+};
+
+// Adds `by` to a counter that is its own window (the caller puts the window in the key — the
+// clock minute, say) and returns the count after it: one atomic step, so two writers in the same
+// instant each see the other's share. What the count allows is the caller's rule (the quote
+// sheet's ceilings, lib/prices/quotes.grantedOfMinute). The row lapses `ttlMs` after its first write.
+export const bumpCounter = async (key: string, by: number, ttlMs: number): Promise<number> => {
+    await connectToDatabase();
+    const now = new Date();
+    const bump = () => RateLimit.findOneAndUpdate(
+        {key},
+        {$inc: {count: by}, $setOnInsert: {windowStartedAt: now, expiresAt: new Date(now.getTime() + ttlMs)}},
+        {upsert: true, returnDocument: 'after'},
+    ).lean<{count: number} | null>();
+    try {
+        return (await bump())?.count ?? by;
+    } catch (error) {
+        if (!isDuplicateKey(error)) throw error;
+        // Two writers raced to open the row: the loser's retry finds it.
+        return (await bump())?.count ?? by;
     }
 };
 

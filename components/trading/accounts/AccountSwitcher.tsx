@@ -11,17 +11,20 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 // Dropdown to switch between the user's paper accounts. Lives in the /trade and /portfolio headers
-// and on the dashboard; the active account is stored in an HTTP-only cookie.
+// and on the dashboard; the active account is stored in an HTTP-only cookie. The trigger names
+// the account picked from the click on, and stays focusable while the page follows.
 const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; activeId: string}) => {
-    const {switching, switchTo} = useSwitchAccount(activeId);
+    const {shownId, pending, switchTo} = useSwitchAccount(activeId);
     const [creating, setCreating] = useState(false);
 
-    const active = accounts.find((a) => a.id === activeId) ?? accounts[0];
+    const active = accounts.find((a) => a.id === shownId) ?? accounts.find((a) => a.id === activeId) ?? accounts[0];
 
     return (
         <>
@@ -29,22 +32,26 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                 <DropdownMenuTrigger asChild>
                     <button
                         type="button"
-                        disabled={switching}
-                        className="control-type inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-fg hover:text-brand transition-colors disabled:opacity-50 border border-line-strong/40 bg-surface-2/40"
+                        aria-busy={pending || undefined}
+                        data-account-switcher={shownId}
+                        className="control-type inline-flex items-center gap-2 px-3 py-2 max-lg:min-h-11 rounded-lg text-xs text-fg hover:text-brand transition-colors border border-line-strong/40 bg-surface-2/40"
                     >
                         <span className="material-symbols-outlined text-base">account_tree</span>
                         {active?.name ?? 'Account'}
                         <span className="material-symbols-outlined text-base">expand_more</span>
                     </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-surface-1 border-line-strong/50 min-w-[220px]">
+                <DropdownMenuContent align="end" className="bg-surface-1 border-line-strong/50 min-w-[260px]">
+                    {/* One of several, one chosen: radio items, so the account shown is announced
+                        as checked rather than left to its colour. */}
+                    <DropdownMenuRadioGroup value={shownId} onValueChange={(id) => void switchTo(id)}>
                     {accounts.map((a) => (
-                        <DropdownMenuItem
+                        <DropdownMenuRadioItem
                             key={a.id}
-                            onSelect={() => void switchTo(a.id)}
-                            className="flex items-center justify-between gap-4 cursor-pointer focus:bg-brand-strong/6"
+                            value={a.id}
+                            className="flex items-center justify-between gap-4 cursor-pointer max-lg:min-h-11 focus:bg-brand-strong/6"
                         >
-                            <span className={cn('font-mono text-sm', a.id === activeId ? 'text-brand font-bold' : 'text-fg')}>
+                            <span className={cn('font-mono text-sm whitespace-nowrap', a.id === shownId ? 'text-brand font-bold' : 'text-fg')}>
                                 {a.name}
                             </span>
                             {typeof a.totalReturnPct === 'number' && (
@@ -57,12 +64,13 @@ const AccountSwitcher = ({accounts, activeId}: {accounts: SwitcherAccount[]; act
                                     )}
                                 </span>
                             )}
-                        </DropdownMenuItem>
+                        </DropdownMenuRadioItem>
                     ))}
+                    </DropdownMenuRadioGroup>
                     <DropdownMenuSeparator className="bg-line-strong/40" />
                     <DropdownMenuItem
                         onSelect={() => setCreating(true)}
-                        className="cursor-pointer text-brand focus:bg-brand-strong/6"
+                        className="cursor-pointer max-lg:min-h-11 text-brand focus:bg-brand-strong/6"
                     >
                         <span className="text-sm font-mono">＋ New account</span>
                     </DropdownMenuItem>

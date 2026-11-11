@@ -4,7 +4,7 @@
 // (at most HAD_YOU_HELD_MAX_SYMBOLS) that the portfolio does not already price. A plain server
 // module; the maths is lib/trading/learn/habits.ts.
 
-import {buildPriceMap} from "@/lib/trading/valuation";
+import {buildSheetPriceMap} from "@/lib/trading/valuation";
 import {closedLots, computeHabits, HABITS_MIN_CLOSED_LOTS, hadYouHeldSymbols, type Habits} from "@/lib/trading/learn/habits";
 import type {LedgerTrade} from "@/lib/trading/lots";
 
@@ -26,7 +26,7 @@ export const getTradingHabits = async ({ledger, positions, inceptionAt, starting
 
     const missing = hadYouHeldSymbols(ledger).symbols.filter((symbol) => !prices.has(symbol.toUpperCase()));
     if (missing.length > 0) {
-        const quotes = await buildPriceMap(missing).catch((error) => {
+        const quotes = await buildSheetPriceMap(missing).catch((error) => {
             console.error('Trading habits: quotes failed', error);
             return new Map<string, {price?: number}>();
         });

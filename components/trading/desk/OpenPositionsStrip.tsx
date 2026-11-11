@@ -18,7 +18,11 @@ import {HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
 // dialog. The full positions table + trade history live on /portfolio.
 // lotNotes: the learner's notes on the shares still held, by symbol (pages only).
 const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: EnrichedPosition[]; accountId: string; lotNotes?: Readonly<Record<string, readonly Lot[]>>}) => {
-    const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
+    // The dialog belongs to the account it was opened on: once the page is another account's,
+    // it is gone (its position, quantity and price were the old account's).
+    const [selling, setSelling] = useState<{accountId: string; position: EnrichedPosition} | null>(null);
+    const sellTarget = selling?.accountId === accountId ? selling.position : null;
+    const setSellTarget = (position: EnrichedPosition | null) => setSelling(position ? {accountId, position} : null);
 
     if (positions.length === 0) {
         return <p className="text-sm text-fg-muted">No open positions yet. Place an order to get started.</p>;

@@ -13,6 +13,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `benchmark-snapshot` | prices | `lib/prices/benchmark-store` (cold-start fallback for the SPY benchmark) |
 | `price-bar` | prices | `lib/prices/store` — every bar, dividend and T-bill read goes through it |
 | `price-series-meta` | prices | `lib/prices/store` |
+| `price-quote` | prices | `lib/prices/quote-store` — the quote sheet: one row a symbol, the newest quote received, read by every page that values a holding and written by a refresh, a fill, the snapshot job and a plan |
 | `strategy-run` | strategies | `lib/strategies/store` (the daily job), `page-store` (the pages) |
 | `strategy-state` | strategies | `lib/strategies/store` |
 | `strategy-backtest` | strategies | `lib/strategies/store`, `page-store` |

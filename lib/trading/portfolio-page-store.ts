@@ -10,7 +10,7 @@ import {getLuckOrSkill} from "@/lib/trading/learn/luck-store";
 import {getTradingHabits} from "@/lib/trading/learn/habits-store";
 import {pickActiveAccount} from "@/lib/trading/active-account";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
-import {marketStatus} from "@/lib/prices/market-hours";
+import {lastSessionClose, marketStatus} from "@/lib/prices/market-hours";
 import {tradedBy as readTradedBy, type TradedBy} from "@/lib/trading/traded-by";
 import {getFollowDecisionsForDates} from "@/lib/culture/follow-store";
 import {cultureFillDates, replaysFromDecisions, type FillReplay} from "@/lib/culture/page-store";
@@ -80,6 +80,7 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
         replaysRead,
     ]);
 
+    const status = marketStatus();
     return toPortfolioPageView({
         all,
         active: activeEntry,
@@ -89,7 +90,8 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
         income,
         luck,
         habits,
-        marketOpen: marketStatus().state === 'open',
+        marketOpen: status.state === 'open',
+        quoteTimes: {lastClose: lastSessionClose(new Date(status.at)), now: status.at},
         tradedBy,
         fillReplays,
     });

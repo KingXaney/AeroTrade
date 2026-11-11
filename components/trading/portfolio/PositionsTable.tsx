@@ -14,7 +14,11 @@ import type {EnrichedPosition} from '@/lib/trading/types';
 // many shares to sell. /portfolio has no order panel, so the empty state links to the Trade Desk.
 // lotNotes: the learner's notes on the shares still held, by symbol (pages only).
 const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPosition[]; accountId: string; lotNotes?: Readonly<Record<string, readonly Lot[]>>}) => {
-    const [sellTarget, setSellTarget] = useState<EnrichedPosition | null>(null);
+    // The dialog belongs to the account it was opened on: once the page is another account's,
+    // it is gone (its position, quantity and price were the old account's).
+    const [selling, setSelling] = useState<{accountId: string; position: EnrichedPosition} | null>(null);
+    const sellTarget = selling?.accountId === accountId ? selling.position : null;
+    const setSellTarget = (position: EnrichedPosition | null) => setSelling(position ? {accountId, position} : null);
 
     if (positions.length === 0) {
         return (

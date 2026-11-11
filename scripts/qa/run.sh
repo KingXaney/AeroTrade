@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Browser QA in one command. Starts a throwaway harness — an in-memory MongoDB on :27117, a
-# stand-in for Tiingo on :8787, the app (`next dev`) on :3000 with inline environment variables,
-# the Inngest dev server on :8288 — runs
+# stand-in for Tiingo on :8787 and one for Finnhub on :8791, the app (`next dev`) on :3000 with
+# inline environment variables, the Inngest dev server on :8288 — runs
 # the named suites one after another (every suite when none is named), stops everything it
 # started, and prints a summary. Nothing here needs a .env, an API key or a real database.
 #
@@ -10,13 +10,13 @@
 #   npm run qa -- visual-sweep        any other script in scripts/qa, inside the same harness
 #   npm run qa -- --up [name ...]     run the names (if any), then keep the harness up until Ctrl-C
 #
-# Logs: scripts/qa/output/logs/<name>.log, the harness's own in _mongo.log, _tiingo.log, _dev.log
-# and _inngest.log. The summary is scripts/qa/output/logs/SUMMARY; its last line starts with "DONE".
+# Logs: scripts/qa/output/logs/<name>.log, the harness's own in _mongo.log, _tiingo.log,
+# _finnhub.log, _dev.log and _inngest.log. The summary is scripts/qa/output/logs/SUMMARY; its last line starts with "DONE".
 # The ports must be free: the script refuses to start rather than stop someone else's server. To run
 # beside another harness, move every port with its QA_*_PORT variable below, e.g.
 #   QA_APP_PORT=3100 QA_MONGO_PORT=27127 QA_INNGEST_PORT=8298 QA_INNGEST_GATEWAY_PORT=8299 \
 #   QA_INNGEST_GRPC_PORT=50062 QA_INNGEST_EXECUTOR_PORT=50063 QA_TIINGO_PORT=8797 QA_ALPACA_PORT=8798 \
-#   QA_AGENT_WORLD_PORT=8799 QA_PAPERCLIP_PORT=8800 npm run qa
+#   QA_AGENT_WORLD_PORT=8799 QA_PAPERCLIP_PORT=8800 QA_FINNHUB_PORT=8801 npm run qa
 set -u
 
 QA_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -32,12 +32,13 @@ TIINGO_PORT=${QA_TIINGO_PORT:-8787}
 ALPACA_PORT=${QA_ALPACA_PORT:-8788}
 AGENT_WORLD_PORT=${QA_AGENT_WORLD_PORT:-8789}
 PAPERCLIP_PORT=${QA_PAPERCLIP_PORT:-8790}
+FINNHUB_PORT=${QA_FINNHUB_PORT:-8791}
 APP_URL=http://localhost:$APP_PORT
 # What the suites and the stand-ins read (lib.mjs, tiingo-series.mjs, start-*.mjs), so they follow
 # the ports wherever they were moved.
 export QA_BASE_URL=$APP_URL QA_MONGO_URL="mongodb://127.0.0.1:$MONGO_PORT/aerotrade" QA_INNGEST_URL="http://localhost:$INNGEST_PORT"
-export QA_MONGO_PORT=$MONGO_PORT QA_TIINGO_PORT=$TIINGO_PORT QA_ALPACA_PORT=$ALPACA_PORT QA_AGENT_WORLD_PORT=$AGENT_WORLD_PORT QA_PAPERCLIP_PORT=$PAPERCLIP_PORT
-PORTS="$APP_PORT $MONGO_PORT $INNGEST_PORT $INNGEST_GATEWAY_PORT $INNGEST_GRPC_PORT $INNGEST_EXECUTOR_PORT $TIINGO_PORT $ALPACA_PORT $AGENT_WORLD_PORT $PAPERCLIP_PORT"
+export QA_MONGO_PORT=$MONGO_PORT QA_TIINGO_PORT=$TIINGO_PORT QA_ALPACA_PORT=$ALPACA_PORT QA_AGENT_WORLD_PORT=$AGENT_WORLD_PORT QA_PAPERCLIP_PORT=$PAPERCLIP_PORT QA_FINNHUB_PORT=$FINNHUB_PORT
+PORTS="$APP_PORT $MONGO_PORT $INNGEST_PORT $INNGEST_GATEWAY_PORT $INNGEST_GRPC_PORT $INNGEST_EXECUTOR_PORT $TIINGO_PORT $ALPACA_PORT $AGENT_WORLD_PORT $PAPERCLIP_PORT $FINNHUB_PORT"
 # The app's owners in this harness: every address scripts/qa/owners.mjs lists (LAB_OWNER_EMAILS).
 OWNER_EMAILS=$(cd "$QA_DIR" && node --input-type=module -e "import {OWNER_EMAILS} from './owners.mjs'; process.stdout.write(OWNER_EMAILS.join(','))")
 [ -n "$OWNER_EMAILS" ] || { echo "could not read the owners from scripts/qa/owners.mjs"; exit 2; }
@@ -47,7 +48,7 @@ OWNER_EMAILS=$(cd "$QA_DIR" && node --input-type=module -e "import {OWNER_EMAILS
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
+ALL=(auth styles shell home landing chat topics-refresh trading steady-prices topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
 
 KEEP_UP=0
 NAMES=()
@@ -191,9 +192,19 @@ PIDS+=($!)
 for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_agent-world.log" 2>/dev/null && break; sleep 1; done
 grep -q READY "$LOGS/_agent-world.log" || harness_failed "the agent world stand-in did not start" "$LOGS/_agent-world.log"
 
+# 1f. A stand-in for Finnhub (start-finnhub-stub.mjs). The app gets a key and this address, so the
+# quote sheet runs here too; until qa-steady-prices gives it prices it answers every path with its
+# empty shape — a quote with no price, which is what the app read when it had no key.
+(cd "$QA_DIR" && exec node start-finnhub-stub.mjs) >"$LOGS/_finnhub.log" 2>&1 &
+PIDS+=($!)
+for _ in $(seq 1 30); do grep -q 'READY\|FAILED' "$LOGS/_finnhub.log" 2>/dev/null && break; sleep 1; done
+grep -q READY "$LOGS/_finnhub.log" || harness_failed "the Finnhub stand-in did not start" "$LOGS/_finnhub.log"
+
 # 2. The app. A .next left by `next build` breaks Turbopack's next/font in dev, so start clean.
-# The empty keys keep a local .env's Finnhub, mail and Ably settings out: no quotes, no mail sent,
-# and every poker night table polls. NEXT_PUBLIC_PN_RT_FAKE=1 opens poker night's realtime seam
+# The Finnhub key and address are the stand-in's, so a local .env's own never reach Finnhub;
+# QUOTE_SESSION=open has the quote sheet treat every instant as in session, so a run at night
+# walks the per-minute path too (lib/prices/quote-store.ts). The empty keys keep a local .env's
+# mail and Ably settings out: no mail sent, and every poker night table polls. NEXT_PUBLIC_PN_RT_FAKE=1 opens poker night's realtime seam
 # (components/poker-night/realtime-client, compiled out of a production build): a page that defines
 # window.__PN_RT_FAKE__ takes its realtime messages from that object — the poker night suite's
 # relay — and every other page polls as before.
@@ -214,7 +225,8 @@ rm -rf "$ROOT/.next"
     PAPERCLIP_URL="http://localhost:$PAPERCLIP_PORT" PAPERCLIP_API_KEY=qa-paperclip-key PAPERCLIP_COMPANY_ID=11111111-1111-4111-8111-111111111111 \
     PAPERCLIP_BOARD_URL="http://localhost:$PAPERCLIP_PORT" \
     INNGEST_DEV=1 INNGEST_BASE_URL="http://localhost:$INNGEST_PORT" JOB_CRONS=off \
-    FINNHUB_API_KEY= NEXT_PUBLIC_FINNHUB_API_KEY= NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
+    FINNHUB_API_KEY=qa-finnhub-key NEXT_PUBLIC_FINNHUB_API_KEY= FINNHUB_API_URL="http://localhost:$FINNHUB_PORT" QUOTE_SESSION=open \
+    NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
     ABLY_API_KEY= POKER_NIGHT_REALTIME= NEXT_PUBLIC_PN_RT_FAKE=1 \
     npm run dev) >"$LOGS/_dev.log" 2>&1 &
 PIDS+=($!)

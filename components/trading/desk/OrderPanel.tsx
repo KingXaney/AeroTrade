@@ -18,6 +18,7 @@ import Panel from '@/components/primitives/Panel';
 import TextField from '@/components/primitives/TextField';
 import SectionHeading from "@/components/primitives/SectionHeading";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {useAccountSwitch} from "@/components/trading/accounts/useSwitchAccount";
 
 type OrderPanelProps = {
     defaultSymbol?: string;
@@ -51,6 +52,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const [priceLoading, setPriceLoading] = useState(false);
     const [results, setResults] = useState<Stock[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    const {pending: switching} = useAccountSwitch(accountId);
     // The learner's own "why"; the server sanitises it (sanitizeTradeNote) and stores it on the fill.
     const [note, setNote] = useState('');
     const [committed, setCommitted] = useState(defaultSymbol.toUpperCase());
@@ -142,7 +144,9 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
     const onSubmit = async (e?: FormEvent) => {
         e?.preventDefault();
-        if (submitting) return;
+        // While another account is being opened this ticket is still the old account's: an
+        // order placed now would land in the account on its way out.
+        if (submitting || switching) return;
         if (!symbol) { toast.error('Enter a stock symbol'); return; }
         if (!check.ok) { toast.error(check.message ?? 'Check the order'); return; }
 
@@ -308,7 +312,7 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
 
             <button
                 type="submit"
-                disabled={submitting || blocked}
+                disabled={submitting || blocked || switching}
                 className={cn(
                     'control-type w-full py-3 rounded-lg text-sm transition-all active:scale-[0.98] disabled:opacity-50',
                     side === 'buy' ? 'bg-brand-strong text-on-brand' : 'bg-negative text-on-negative',

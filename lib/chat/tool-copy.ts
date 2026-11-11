@@ -8,7 +8,7 @@ import {numberWord} from '@/lib/text';
 
 export const TOOL_DESCRIPTIONS: Record<ChatToolName, string> = {
     searchStock: 'Search for stocks by company name or ticker symbol. Use this when the user mentions a company or symbol you want to confirm exists. Returns up to 25 matches with isInWatchlist flags.',
-    getStockQuote: 'Get the current price and percent change for a single stock symbol. Always use this before quoting any price number.',
+    getStockQuote: 'Get the latest quoted price and percent change for a single stock symbol, with the time the quote was fetched (asOf; null when there is no quote). Quotes refresh about once a minute while the market is open, so say the time when it matters. Always use this before quoting any price number.',
     getStockProfile: 'Get a company profile (name, market capitalization). Use to identify a company by symbol and fetch its market cap.',
     getStockFinancials: 'Get P/E ratios for a stock. Use when the user asks what a P/E is or how a company is priced relative to its earnings. Describe what the ratio measures; never call a stock over- or undervalued.',
     getWatchlist: "List the stocks currently in the user's watchlist. Returns symbol, company name, and when it was added.",

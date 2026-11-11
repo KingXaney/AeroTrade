@@ -17,6 +17,7 @@ export type EnrichedPosition = PaperPosition & {
     unrealizedPnlPct: number; // unrealizedPnl / costBasis * 100
     priceStale: boolean;      // no price at all: marketValue is the cost basis and the P&L above is a placeholder
     closeDate?: string;       // set when currentPrice is the newest stored daily close, not a live quote
+    quoteAt?: number;         // epoch ms the quote behind currentPrice was fetched; absent at a stored close or at cost
 };
 
 export type PortfolioSummary = {

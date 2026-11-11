@@ -444,6 +444,13 @@ html[data-mode="light"] {
 }
 /* A panel arrives rather than appears. One short rise, in the style's own tempo. */
 .glass-panel { animation: panel-in var(--motion-base) var(--motion-ease) both; }
+/* The active account's panels while another account is being opened
+   (components/trading/accounts/AccountRegion): each panel's content fades, never the panel —
+   an ancestor at less than full opacity would become the backdrop root and cut the blur the
+   glass styles draw behind a panel. Timed on the fast token, so both reduced-motion guards and
+   brutalist, which zero it, make the fade a cut. */
+.account-region .glass-panel > * { transition: opacity var(--motion-fast) var(--motion-ease); }
+.account-region[data-pending] .glass-panel > * { opacity: 0.45; }
 /* Lab › Today being arranged (components/lab/LabHud): each card's own Panel sits inside the
    shell's editing frame, so it draws no frame of its own there — one box per card, not two.
    Unlayered like .glass-panel, and more specific than any style's rule for it. */

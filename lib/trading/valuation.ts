@@ -1,15 +1,16 @@
-// What an account is worth: live, every holding priced from one shared quote map, or stored, a
-// day's closing snapshot. computePortfolio and aggregatePortfolios are pure; the rest read.
+// What an account is worth: now, every holding priced from one shared quote map (the quote
+// sheet, lib/prices/quote-store.ts), or stored, a day's closing snapshot. computePortfolio and aggregatePortfolios are pure; the rest read.
 // Server-only (NOT 'use server').
 
 import {cache} from "react";
 import {connectToDatabase} from "@/database/mongoose";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
-import {getQuote} from "@/lib/prices/finnhub";
+import {lastSessionClose, sessionCloseOf} from "@/lib/prices/market-hours";
+import {getFreshQuotes, getSheetQuotes} from "@/lib/prices/quote-store";
 import {getLatestBars} from "@/lib/prices/store";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {CLOSE_FALLBACK_DAYS} from "@/lib/trading/config";
-import {enrichPosition, symbolsWithoutPrice, withStoredCloses, type PriceInfo} from "@/lib/trading/analytics";
+import {enrichPosition, symbolsBehind, withStoredCloses, type PriceInfo} from "@/lib/trading/analytics";
 import {getAccountsForUser, getCachedAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 import type {AccountWithPortfolio, EnrichedPosition, PaperPosition, PortfolioSummary} from '@/lib/trading/types';
 
@@ -17,16 +18,21 @@ import type {AccountWithPortfolio, EnrichedPosition, PaperPosition, PortfolioSum
 // mapping, lean docs, or a synthesized default account).
 export type AccountLike = {cash: number; startingBalance: number; positions: PaperPosition[]};
 
-// Build a symbol -> live price map. One Finnhub quote call per unique symbol
-// (company names come from the stored position, so no profile/financials calls).
-export const buildPriceMap = async (symbols: string[]): Promise<Map<string, PriceInfo>> => {
+const uniqueSymbols = (symbols: readonly string[]): string[] =>
+    Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+
+// A symbol -> price map for something that ACTS on the prices — the snapshot job, the Navigator's
+// plan, a culture enrolment's first orders: every symbol asked of Finnhub at this moment
+// (lib/prices/quote-store.getFreshQuotes), never read from the sheet or a stored close. A symbol
+// with no quote stays without a price: a snapshot skips the account, a plan leaves it out.
+export const buildFreshPriceMap = async (symbols: string[]): Promise<Map<string, PriceInfo>> => {
     const map = new Map<string, PriceInfo>();
-    const unique = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(Boolean);
+    const unique = uniqueSymbols(symbols);
     if (unique.length === 0) return map;
 
-    const quotes = await Promise.all(unique.map((s) => getQuote(s)));
-    unique.forEach((symbol, i) => {
-        const q = quotes[i];
+    const quotes = await getFreshQuotes(unique);
+    unique.forEach((symbol) => {
+        const q = quotes.get(symbol) ?? {};
         map.set(symbol, {
             // c <= 0 means Finnhub doesn't know the symbol (delisted/unknown) — treat as missing,
             // never as a real $0 price.
@@ -37,22 +43,41 @@ export const buildPriceMap = async (symbols: string[]): Promise<Map<string, Pric
     return map;
 };
 
-// The quote map a page values holdings with: live quotes first, then, for each symbol Finnhub gave
-// no price (a 429 under a burst of page loads, an outage), its newest stored daily close within
-// CLOSE_FALLBACK_DAYS, dated (PriceInfo.closeDate), so a refusal shows the last close instead of
-// the cost basis. Request paths only: the snapshot job, fills and the Navigator's plan keep
-// buildPriceMap, where a missing quote must stay missing. A failed bars read is no fallback.
+// A symbol -> price map for something that SHOWS prices, from the quote sheet alone: the one
+// stored quote per symbol every page reads, dated with the moment it was fetched (`asOf`). No
+// Finnhub call a reader waits on while the sheet is recent. A symbol the sheet has no price for
+// stays without one ("had you held", a benchmark's live point).
+export const buildSheetPriceMap = async (symbols: string[]): Promise<Map<string, PriceInfo>> => {
+    const map = new Map<string, PriceInfo>();
+    const unique = uniqueSymbols(symbols);
+    if (unique.length === 0) return map;
+
+    const quotes = await getSheetQuotes(unique);
+    for (const symbol of unique) {
+        const quote = quotes.get(symbol);
+        map.set(symbol, quote ? {price: quote.price, changePercent: quote.changePercent, asOf: quote.at} : {});
+    }
+    return map;
+};
+
+// The quote map a page values holdings with: the sheet's quote, or the symbol's newest stored
+// daily close within CLOSE_FALLBACK_DAYS, dated (PriceInfo.closeDate) — whichever is the later
+// price. A close stands in for a symbol the sheet has no price for (a refusal, an outage, a
+// symbol Finnhub does not quote), and replaces a quote fetched before that close's session ended
+// when the sheet could not be refreshed since; a quote from this session is never looked up, so
+// the usual page makes no bars read. A refusal therefore never moves a holding to an older basis.
+// Pages only: whatever acts on a price reads buildFreshPriceMap. A failed bars read is no fallback.
 export const buildHoldingsPriceMap = async (symbols: string[]): Promise<Map<string, PriceInfo>> => {
-    const live = await buildPriceMap(symbols);
-    const missing = symbolsWithoutPrice(live);
-    if (missing.length === 0) return live;
+    const live = await buildSheetPriceMap(symbols);
+    const behind = symbolsBehind(live, lastSessionClose());
+    if (behind.length === 0) return live;
     const today = getEasternDateString();
-    const closes = await getLatestBars(missing, {since: addCalendarDays(today, -CLOSE_FALLBACK_DAYS), onOrBefore: today})
+    const closes = await getLatestBars(behind, {since: addCalendarDays(today, -CLOSE_FALLBACK_DAYS), onOrBefore: today})
         .catch((error) => {
             console.error('Stored closes for unquoted holdings could not be read:', error);
             return new Map<string, {date: string; close: number}>();
         });
-    return withStoredCloses(live, closes);
+    return withStoredCloses(live, closes, sessionCloseOf);
 };
 
 // Pure computation: turn a stored account + price map into a serializable portfolio summary.
@@ -80,7 +105,7 @@ export const computePortfolio = (
     };
 };
 
-// Full portfolio for one account (prices fetched fresh). Without an owned accountId this
+// Full portfolio for one account, priced from the sheet. Without an owned accountId this
 // falls back to the user's first account.
 export const getPortfolio = async (userId: string, accountId?: string): Promise<PortfolioSummary> => {
     const account = (accountId ? await getOwnedAccount(userId, accountId) : null)

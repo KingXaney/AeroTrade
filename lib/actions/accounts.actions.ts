@@ -1,18 +1,17 @@
 'use server';
 
 import {revalidatePath} from "next/cache";
-import {cookies} from "next/headers";
 import PaperAccount from "@/database/models/paper-account.model";
 import {connectToDatabase} from "@/database/mongoose";
-import {ACTIVE_ACCOUNT_COOKIE, MAX_PAPER_ACCOUNTS} from "@/lib/trading/config";
+import {MAX_PAPER_ACCOUNTS} from "@/lib/trading/config";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {getAccountsForUser, getOwnedAccount} from "@/lib/trading/accounts";
+import {clearActiveAccountCookie, setActiveAccountCookie} from "@/lib/trading/active-cookie";
 import {PAPER_STARTING_BALANCE, STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {deleteOwnedAccount, restartAccount, seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
 import type {ActionResult} from '@/lib/actions/types';
 
 const ACCOUNT_NAME_MAX_LENGTH = 40;
-const ACTIVE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 const revalidateAccountPaths = () => {
     revalidatePath('/');
@@ -20,16 +19,6 @@ const revalidateAccountPaths = () => {
     revalidatePath('/trade');
     revalidatePath('/portfolio');
     revalidatePath('/friends');
-};
-
-const setActiveAccountCookie = async (accountId: string) => {
-    const store = await cookies();
-    store.set(ACTIVE_ACCOUNT_COOKIE, accountId, {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        maxAge: ACTIVE_COOKIE_MAX_AGE_SECONDS,
-    });
 };
 
 const validateName = (name: string): string | null => {
@@ -194,36 +183,12 @@ export const deletePaperAccount = async (accountId: string): Promise<ActionResul
         const {deletedId, ...result} = await deleteOwnedAccount(userId, accountId);
         if (!deletedId) return result;
 
-        const store = await cookies();
-        if (store.get(ACTIVE_ACCOUNT_COOKIE)?.value === deletedId) {
-            store.delete(ACTIVE_ACCOUNT_COOKIE);
-        }
+        await clearActiveAccountCookie(deletedId);
 
         revalidateAccountPaths();
         return result;
     } catch (error) {
         console.error('Error deleting account:', error);
         return {success: false, message: 'Could not delete the account'};
-    }
-};
-
-// Switch which paper account the trade/portfolio pages operate on.
-export const setActiveAccount = async (accountId: string): Promise<ActionResult> => {
-    try {
-        const userId = await getCurrentUserId();
-        if (!userId) return {success: false, message: 'Not authenticated'};
-
-        const account = await getOwnedAccount(userId, accountId);
-        if (!account) return {success: false, message: 'Account not found'};
-
-        await setActiveAccountCookie(String(account._id));
-        revalidatePath('/');
-        revalidatePath('/dashboard');
-        revalidatePath('/trade');
-        revalidatePath('/portfolio');
-        return {success: true, message: `Switched to "${account.name || 'account'}"`};
-    } catch (error) {
-        console.error('Error switching account:', error);
-        return {success: false, message: 'Could not switch accounts'};
     }
 };

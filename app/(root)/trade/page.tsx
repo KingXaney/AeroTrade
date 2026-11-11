@@ -20,6 +20,7 @@ import {describeQueuedFill} from "@/lib/learn/copy/market";
 import {MARKETS_PAGE_COPY} from "@/lib/learn/copy/trade";
 import OpenPositionsStrip from "@/components/trading/desk/OpenPositionsStrip";
 import AccountSwitcher from "@/components/trading/accounts/AccountSwitcher";
+import AccountRegion from "@/components/trading/accounts/AccountRegion";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -101,6 +102,9 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 />
             </Panel>
 
+            {/* The active account's desk, last fill and positions: out of reach while another
+                account is being opened, so an order never lands in the one on its way out. */}
+            <AccountRegion activeId={activeId} className="space-y-4">
             {/* Chart + order entry — the focus of this page; one symbol drives both */}
             <TradeDesk
                 chartSymbol={chartSymbol}
@@ -126,6 +130,7 @@ const TradePage = async ({searchParams}: TradePageProps) => {
                 </div>
                 <OpenPositionsStrip positions={portfolio.positions} accountId={activeId} lotNotes={ledger ? openLotNotes(ledger) : undefined} />
             </Panel>
+            </AccountRegion>
 
             {/* The scan: the four views the overview page had, one at a time, keeping the desk's symbol and account in every link. */}
             <MarketScan active={scanView} params={{symbol: raw, account: accountParam}} />

@@ -8,10 +8,11 @@ import {unpricedText} from "@/lib/learn/copy/unpriced";
 export const toReturnPct = (value: number, base: number): number =>
     base > 0 ? (value / base - 1) * 100 : 0;
 
-// One symbol's price for a valuation. `closeDate` is set when `price` is not a live quote but the
+// One symbol's price for a valuation. `asOf` is when a quote was fetched (epoch ms; the quote
+// sheet's, lib/prices/quote-store.ts). `closeDate` is set when `price` is not a quote but the
 // symbol's newest stored daily close, standing in for a quote Finnhub did not give (a refusal, an
 // outage): a real price, dated, with no day change.
-export type PriceInfo = {price?: number; changePercent?: number; closeDate?: string};
+export type PriceInfo = {price?: number; changePercent?: number; closeDate?: string; asOf?: number};
 
 // One held position priced against the quote map.
 //
@@ -36,6 +37,7 @@ export const enrichPosition = (p: PaperPosition, info: PriceInfo | undefined): E
         currentPrice,
         changePercent: info?.changePercent,
         closeDate: priceStale ? undefined : info?.closeDate,
+        ...(!priceStale && info?.closeDate === undefined && typeof info?.asOf === 'number' ? {quoteAt: info.asOf} : {}),
         costBasis,
         marketValue,
         unrealizedPnl,
@@ -47,24 +49,36 @@ export const enrichPosition = (p: PaperPosition, info: PriceInfo | undefined): E
 export const countUnpriced = (positions: readonly {priceStale: boolean}[]): number =>
     positions.reduce((n, p) => n + (p.priceStale ? 1 : 0), 0);
 
-// The symbols a quote map left without a price, in its order: what a stored close may stand in for.
-export const symbolsWithoutPrice = (prices: ReadonlyMap<string, PriceInfo>): string[] =>
-    Array.from(prices.entries()).filter(([, info]) => typeof info.price !== 'number').map(([symbol]) => symbol);
+// The symbols a stored close could be newer than: those the quotes left without a price, and
+// those whose quote was fetched before the last session closed (`lastClose`, epoch ms). A quote
+// from this session or after it is newer than any stored close, so it is never looked up.
+export const symbolsBehind = (prices: ReadonlyMap<string, PriceInfo>, lastClose: number): string[] =>
+    Array.from(prices.entries())
+        .filter(([, info]) => typeof info.price !== 'number' || (typeof info.asOf === 'number' && info.asOf < lastClose))
+        .map(([symbol]) => symbol);
 
-// The quote map with each symbol it left without a price filled from that symbol's newest stored
-// close, dated — never a live quote replaced, never a symbol added that was not asked about, never
-// a close that is not a positive number. The same map back when nothing is filled.
+// The quote map with a symbol's newest stored close, dated, standing in where it is the newer
+// price: for each symbol the quotes left without one, and — when `closeAt` says when a day's
+// session ended — for a quote fetched before its close's session did. So a refusal never moves a
+// holding to an older basis: today's quote outlasts yesterday's close, and yesterday's close
+// replaces a quote from the day before. Never a symbol added that was not asked about, never a
+// close that is not a positive number. The same map back when nothing changes.
 export const withStoredCloses = (
     prices: Map<string, PriceInfo>,
     closes: ReadonlyMap<string, {date: string; close: number}>,
+    closeAt?: (date: string) => number,
 ): Map<string, PriceInfo> => {
-    const fills = symbolsWithoutPrice(prices)
-        .map((symbol) => [symbol, closes.get(symbol)] as const)
-        .filter((entry): entry is readonly [string, {date: string; close: number}] =>
-            entry[1] !== undefined && Number.isFinite(entry[1].close) && entry[1].close > 0);
+    const fills = Array.from(prices.entries())
+        .map(([symbol, info]) => [symbol, info, closes.get(symbol)] as const)
+        .filter((entry): entry is readonly [string, PriceInfo, {date: string; close: number}] => {
+            const [, info, bar] = entry;
+            if (bar === undefined || !Number.isFinite(bar.close) || !(bar.close > 0)) return false;
+            if (typeof info.price !== 'number') return true;
+            return closeAt !== undefined && typeof info.asOf === 'number' && info.asOf < closeAt(bar.date);
+        });
     if (fills.length === 0) return prices;
     const merged = new Map(prices);
-    for (const [symbol, bar] of fills) merged.set(symbol, {price: bar.close, closeDate: bar.date});
+    for (const [symbol, , bar] of fills) merged.set(symbol, {price: bar.close, closeDate: bar.date});
     return merged;
 };
 
@@ -79,6 +93,13 @@ export const countAtClose = (positions: readonly {closeDate?: string}[]): {count
     const dates = positions.flatMap((p) => (p.closeDate ? [p.closeDate] : []));
     const days = new Set(dates);
     return {count: dates.length, date: days.size === 1 ? dates[0] : null};
+};
+
+// The oldest moment a holding's quote was fetched — what "prices as of" names — or null when no
+// holding carries a quote (all at cost or at a stored close).
+export const oldestQuoteAt = (positions: readonly {quoteAt?: number}[]): number | null => {
+    const times = positions.flatMap((p) => (typeof p.quoteAt === 'number' ? [p.quoteAt] : []));
+    return times.length > 0 ? Math.min(...times) : null;
 };
 
 // Compact marker for rows that quote a return (leaderboard, strategy comparison,

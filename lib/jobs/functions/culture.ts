@@ -73,7 +73,7 @@ import {addCalendarDays, calendarDaysBetween} from "@/lib/dates";
 import {BENCHMARK_SYMBOL, PRICE_CHUNK_SIZE} from "@/lib/prices/config";
 import {ensureRateBars, quoteMissed} from "@/lib/strategies/job";
 import {executeOrder, FUNDING_SELL_FAILED} from "@/lib/trading/orders";
-import {buildPriceMap} from "@/lib/trading/valuation";
+import {buildFreshPriceMap} from "@/lib/trading/valuation";
 import type {CultureFold} from "@/lib/culture/types";
 
 // The culture brain's three jobs (lib/culture/ingest.ts, lib/culture/update.ts, lib/culture/job.ts,
@@ -535,7 +535,7 @@ export const bootstrapCultureFollow = inngest.createFunction(
             const held = await getHeldSymbolsForAccounts([follow.accountId]);
             const missing = [...new Set([...targets.map((t) => t.symbol), ...held])].filter((symbol) => !(symbol in priceBySymbol));
             if (missing.length > 0) {
-                for (const [symbol, info] of await buildPriceMap(missing)) {
+                for (const [symbol, info] of await buildFreshPriceMap(missing)) {
                     if (typeof info.price === 'number' && info.price > 0) priceBySymbol[symbol] = info.price;
                 }
             }

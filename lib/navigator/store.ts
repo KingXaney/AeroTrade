@@ -23,7 +23,7 @@ import {ALWAYS_ELIGIBLE_SYMBOLS, ELIGIBILITY_LOOKBACK_DAYS} from "@/lib/navigato
 import {SECTOR_KEY_PREFIX} from "@/lib/brain/config";
 import {ETF_TO_SECTOR_KEY} from "@/lib/prices/sectors";
 import {getOwnedAccount} from "@/lib/trading/accounts";
-import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {buildFreshPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {getEasternDateString} from "@/lib/dates";
 import type {NavigatorStatus, SuggestionItem} from '@/lib/navigator/types';
 
@@ -183,7 +183,8 @@ export const planAccountOrders = async (
     if (!account) return null;
 
     const positionSymbols = account.positions.map((p) => p.symbol);
-    const priceMap = await buildPriceMap([...positionSymbols, ...targets.map((t) => t.symbol)]);
+    // The plan sizes orders: its prices are asked of Finnhub now, never read from the sheet.
+    const priceMap = await buildFreshPriceMap([...positionSymbols, ...targets.map((t) => t.symbol)]);
     const portfolio = computePortfolio(
         {cash: account.cash, startingBalance: account.startingBalance, positions: account.positions.map((p) => ({symbol: p.symbol, company: p.company, quantity: p.quantity, avgCost: p.avgCost}))},
         priceMap,

@@ -10,7 +10,7 @@ import {getPortfolio} from "@/lib/trading/valuation";
 import {STARTING_BALANCE_ERROR, resolveStartingBalance} from "@/lib/trading/starting-balance";
 import {restartAccount} from "@/lib/trading/lifecycle";
 import {executeOrder} from "@/lib/trading/orders";
-import {getQuote} from "@/lib/prices/finnhub";
+import {getFreshQuote} from "@/lib/prices/quote-store";
 import {AI_NAVIGATOR_ACCOUNT_NAME} from "@/lib/navigator/config";
 import {inngest} from "@/lib/jobs/client";
 import {JOBS} from "@/lib/jobs/registry";
@@ -183,7 +183,7 @@ export const applySuggestion = async (
             return {success: result.success, message: result.message};
         }
 
-        const quote = await getQuote(symbol.toUpperCase());
+        const quote = await getFreshQuote(symbol.toUpperCase());
         const price = quote.c;
         if (typeof price !== 'number' || !(price > 0)) return {success: false, message: `No live price for ${symbol}`};
         const currentValue = held?.marketValue ?? 0;

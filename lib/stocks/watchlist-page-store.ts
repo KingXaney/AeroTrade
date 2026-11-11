@@ -1,7 +1,7 @@
 // The /watchlist page's one read (app/(root)/watchlist/page.tsx): the saved rows, then their
 // quotes, merged by lib/stocks/watchlist.ts. Server only.
 
-import {getStocksWithData} from "@/lib/prices/finnhub";
+import {getStocksWithData} from "@/lib/stocks/stock-data-store";
 import {marketStatus} from "@/lib/prices/market-hours";
 import {getWatchlistForUser} from "@/lib/stocks/watchlist-store";
 import {mergeWatchlistRows} from "@/lib/stocks/watchlist";

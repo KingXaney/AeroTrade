@@ -59,7 +59,7 @@ export const LIMIT_PROVIDERS: readonly LimitProvider[] = [
         id: 'finnhub', label: 'Finnhub', uses: 'live quotes, company profiles and financials, symbol search, company news, the earnings calendar',
         cap: 'free plan: 60 API calls a minute, 30 a second', capAsOf: '2026-10-12',
         docsUrl: 'https://finnhub.io/docs/api/rate-limit',
-        planned: 'the quant strategies and the culture pickers quote their universes in chunks of 25 with a pause; every fill and the trade desk quote once',
+        planned: 'pages read one stored quote a symbol, kept for its clock minute and the next and refreshed on a budget of 40 calls in any sixty seconds, less what fills and jobs have counted; a job\'s batch waits a minute when those sixty seconds are full; the quant strategies and the culture pickers quote their universes in chunks of 25 with a pause; every fill quotes once',
         jobs: ['strategies-daily', 'culture-brain-weekly', 'ai-navigator-weekly', 'ai-navigator-bootstrap', 'culture-follow-bootstrap', 'daily-news-summary'],
     },
     {

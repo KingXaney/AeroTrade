@@ -11,15 +11,16 @@ const stubs = vi.hoisted(() => ({
     getNews: vi.fn(),
     getLatestSuggestions: vi.fn(),
     getWatchlistForUser: vi.fn(),
+    getSheetQuote: vi.fn(),
 }));
 
 vi.mock('@/lib/prices/finnhub', () => ({
     searchStocks: stubs.searchStocks,
-    getQuote: vi.fn(),
     getCompanyProfile: vi.fn(),
     getFinancials: vi.fn(),
     getNews: stubs.getNews,
 }));
+vi.mock('@/lib/prices/quote-store', () => ({getSheetQuote: stubs.getSheetQuote}));
 vi.mock('@/lib/actions/watchlist.actions', () => ({
     addToWatchlist: vi.fn(),
     removeFromWatchlist: vi.fn(),
