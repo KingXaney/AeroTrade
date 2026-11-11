@@ -3,11 +3,11 @@ import {TOOL_DESCRIPTIONS} from "@/lib/chat/tool-copy";
 import {z} from "zod";
 import {
     searchStocks,
-    getQuote,
     getCompanyProfile,
     getFinancials,
     getNews,
 } from "@/lib/prices/finnhub";
+import {getSheetQuote} from "@/lib/prices/quote-store";
 import {addToWatchlist, removeFromWatchlist} from "@/lib/actions/watchlist.actions";
 import {getWatchlistForUser, getWatchlistSymbolsByUserId} from "@/lib/stocks/watchlist-store";
 import {getLatestSuggestions, type SuggestionSetView} from "@/lib/navigator/store";
@@ -84,8 +84,9 @@ const allTools = (userId: string) => ({
             symbol: z.string().describe('Ticker symbol, e.g. "AAPL"'),
         }),
         execute: async ({symbol}) => {
-            const q = await getQuote(symbol);
-            return {symbol: symbol.toUpperCase(), price: q.c, changePercent: q.dp};
+            // The sheet's price for this window (the one the pages show), fetched first if it is older.
+            const q = await getSheetQuote(symbol, {wait: 'current'});
+            return {symbol: symbol.toUpperCase(), price: q?.price, changePercent: q?.changePercent, asOf: q ? new Date(q.at).toISOString() : null};
         },
     }),
 

@@ -5,7 +5,8 @@
 
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {getQuote, getCompanyProfile} from "@/lib/prices/finnhub";
+import {getCompanyProfile} from "@/lib/prices/finnhub";
+import {getFreshQuote} from "@/lib/prices/quote-store";
 import {getOwnedAccount, toPlainPositions} from "@/lib/trading/accounts";
 import {applyFill, type FillRejection} from "@/lib/trading/fill";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
@@ -63,7 +64,9 @@ export const executeOrder = async (
             }
         }
 
-        const [quote, profile] = await Promise.all([getQuote(sym), getCompanyProfile(sym)]);
+        // The fill's price is Finnhub's at this moment, never the sheet's or a cached one; it is
+        // written into the sheet, so the page that follows shows the price that filled.
+        const [quote, profile] = await Promise.all([getFreshQuote(sym), getCompanyProfile(sym)]);
         const price = quote.c;
         if (typeof price !== 'number' || !(price > 0)) {
             return {success: false, message: `Couldn't fetch a live price for ${sym}`};

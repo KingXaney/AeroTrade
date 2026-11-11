@@ -11,7 +11,8 @@ import {getAggregatedNews} from "@/lib/news/aggregate";
 import {BRAIN_SOURCE_CAPS, BRAIN_TOTAL_CAP} from "@/lib/news/config";
 import {hashId, normalizeUrl} from "@/lib/text";
 import {getEasternDateString} from "@/lib/dates";
-import {getQuote, searchStocks} from "@/lib/prices/finnhub";
+import {searchStocks} from "@/lib/prices/finnhub";
+import {getFreshQuote} from "@/lib/prices/quote-store";
 import {injectJson} from "@/lib/ai/prompt-utils";
 import {getTopEntities, getTopVerifiedTickers} from "@/lib/brain/store";
 import {type ArticleFold} from "@/lib/brain/update";
@@ -227,7 +228,7 @@ export const verifyNewTickers = async (folds: readonly ArticleFold[], articles: 
         if (budget <= 0) continue;   // stays unverified — never tradable, harmless
         budget--;
         try {
-            const [hits, quote] = await Promise.all([searchStocks(ticker), getQuote(ticker)]);
+            const [hits, quote] = await Promise.all([searchStocks(ticker), getFreshQuote(ticker)]);
             const exact = hits.some((h) => h.symbol.toUpperCase() === ticker);
             if (exact && typeof quote.c === 'number' && quote.c > 0) verified.push(ticker);
         } catch (error) {

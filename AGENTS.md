@@ -218,15 +218,45 @@ and friends keep none beyond Shared and the invariants).
   `MARKETS_PAGE_COPY` in `lib/learn/copy/trade`. ⌘K finds the page by its section's name and by
   its tab's (`NavDestination.tab`), so "trade" and "markets" both land on it.
 - `lib/trading/valuation.buildHoldingsPriceMap` is the quote map a page values holdings with:
-  live Finnhub quotes, then, for a symbol Finnhub gave no price (a 429 under a burst of page
-  loads, an outage), its newest stored daily close within `CLOSE_FALLBACK_DAYS`
-  (`lib/trading/config`) — priced, not stale, and dated (`PriceInfo.closeDate`,
-  `EnrichedPosition.closeDate`, the chat's `priceAsOf`), said once in the holdings line
-  (`HOLDINGS_COPY.summary` over `analytics.countAtClose`) and in the price cell's title, never a
-  per-row flag. A benchmark's live point reads `analytics.livePrice`, never a stored close. The
-  snapshot job, fills and the Navigator's plan keep `buildPriceMap`, where a missing quote stays
-  missing. `lib/prices/finnhub.getQuote` is one call per symbol per server render (React `cache`,
-  a pass-through in jobs), so a refusal is logged and filed once.
+  the quote sheet's price (### prices), or the symbol's newest stored daily close within
+  `CLOSE_FALLBACK_DAYS` (`lib/trading/config`) — whichever is the later price
+  (`lib/trading/analytics.withStoredCloses`, a close standing for the end of its session,
+  `lib/prices/market-hours.sessionCloseOf`). So a close stands in for a symbol the sheet has no
+  price for, replaces a quote from before that close's session, and never replaces a quote from
+  this session: a refusal cannot move a holding to an older basis. A close is priced, not stale,
+  and dated (`PriceInfo.closeDate`, `EnrichedPosition.closeDate`, the chat's `priceAsOf`); a quote
+  carries when it was fetched (`PriceInfo.asOf`, `EnrichedPosition.quoteAt`). Both are said once,
+  in the holdings line (`HOLDINGS_COPY.summary` over `analytics.countAtClose` and
+  `analytics.oldestQuoteAt`: "prices as of 2:15 PM ET", never "live"; "valued at last close" only
+  when the market is closed and every quote was fetched after the bell), and a close in the price
+  cell's title, never a per-row flag. A benchmark's live point reads `analytics.livePrice`, never a
+  stored close. `lib/trading/valuation.buildSheetPriceMap` is the sheet alone, where a miss stays a
+  miss ("had you held"); `lib/trading/valuation.buildFreshPriceMap` asks Finnhub at that moment,
+  for whatever acts on a price — the snapshot job, the Navigator's plan, a culture enrolment's first
+  orders; a fill reads `lib/prices/quote-store.getFreshQuote` — and there a missing quote stays
+  missing.
+- Switching the active account is one write that renders nothing and one page request.
+  `components/trading/accounts/useSwitchAccount` posts to `app/api/accounts/active/route.ts` (same
+  origin by `lib/same-origin.sameOriginRequest`, the session, `getOwnedAccount`, then the HTTP-only
+  cookie through `lib/trading/active-cookie`), then asks for the page once: `router.refresh()`, or,
+  where `?account=` named the old account, `router.replace` to the address without it with
+  `{scroll: false}` (`lib/trading/account-switch.switchHref`). Never a server action for this and
+  never a `revalidatePath`: a cookie set in an action re-renders the page inside the action's own
+  response, and a revalidation makes every cached fetch of the path a miss. The account being
+  opened lives outside React (`components/trading/accounts/switch-store`), so the menu, the
+  comparison rows, `components/trading/accounts/AccountHeading` and
+  `components/trading/accounts/AccountRegion` show one answer from the click on
+  (`lib/trading/account-switch.switchView`): the row picked is `aria-current`, the heading names it
+  over "Opening …" (`SWITCH_COPY` in `lib/learn/copy/portfolio`), and the old account's panels are
+  `aria-busy`, `inert` and faded — `.account-region[data-pending]` in `app/globals.css` fades each
+  panel's content on `--motion-fast`, never the panel, whose backdrop blur an ancestor's opacity
+  would cut — until the page arrives. The controls that switch are never `disabled` (a disabled
+  button drops the focus the click gave it): a pick made mid-switch is ignored. The order ticket and
+  the sell dialog refuse to submit while a switch is pending, and a sell dialog belongs to the
+  account it was opened on (it is gone once the page is another's), so an order never lands in the
+  account on its way out. The hook instance that was asked owns its switch: it ends it when the page
+  arrives, after `PAGE_PATIENCE_MS`, and when it unmounts, and only a failed write toasts — the
+  write is awaited outside any transition, which would hold every other navigation behind it.
 - `lib/trading/ledger.getTradeLedger` is the one cached PaperTrade read a page makes. Every
   per-account trade read — the ledger, bounded history, the CSV, the comparison table, `/history`'s
   feed, the chat's sell totals — starts at the account's `inceptionAt` through the ledger's
@@ -1731,8 +1761,44 @@ and friends keep none beyond Shared and the invariants).
   are asked for `BRK-B` (`yahooTicker`, `stooqTicker`). `PriceSeriesMeta.listedOn` is the company's
   first session from Yahoo's chart: a history that starts there is deep enough (`decideFetchWindow`)
   and its dividends are needed only from there (`lib/prices/coverage.coversWindow`).
-- `lib/prices/finnhub` (quotes, profiles, financials, search, company news) is a plain module;
-  client components reach search and quotes through `lib/actions/stocks.actions`.
+- `lib/prices/finnhub` (profiles, financials, search, company news, and the raw quote call
+  `fetchQuote`) is a plain module; client components reach search and quotes through
+  `lib/actions/stocks.actions`. `FINNHUB_API_URL` points it, and the culture earnings calendar, at
+  the browser QA's stand-in.
+- The quote sheet is the one way a quote reaches the app: `lib/prices/quote-store` over one row
+  per symbol (`database/models/price-quote.model.ts`), its rules pure in `lib/prices/quotes`
+  (`windowStart`, `planRead`, `servable`, `askedPrice`, `grantedOfMinute`, `readQuoteAnswer`), its
+  numbers in `lib/prices/config`. `lib/prices/quote-store.getSheetQuotes` is what a page SHOWS:
+  answered from the rows, one answer per symbol per server render (a React `cache`d map, so the
+  layout, the page and a page's second price map cannot disagree). A row is kept for the clock
+  minute it was fetched in and the next — everything fetched in one minute falls due together,
+  and no symbol is asked twice inside sixty seconds — then once after the close has settled until
+  the next open (`lib/prices/market-hours.lastSessionClose`; the 16:10 snapshot's quotes qualify).
+  The refresh runs behind the answer (`after()`) when every due price is under
+  `QUOTE_SERVE_STALE_MS` old, or is one Finnhub just answered nothing for
+  (`QUOTE_REFUSAL_MEMORY_MS`: an outage never holds every page up); before the answer for a symbol
+  never asked about, a first page after idle, or `wait: 'current'` — one asked symbol (the order
+  ticket's Last Price, the chat's quote), which is answered only with this window's price or a
+  recent one, never an older row. A refresh takes the minute's budget first — one counter for
+  every instance (`lib/rate-limit.bumpCounter`), read over the last sixty seconds: pages under
+  `QUOTE_PAGE_CEILING`, an asked symbol under `QUOTE_ASKED_CEILING` — then claims the rows it may
+  ask (two requests never fetch one symbol; a symbol the budget leaves out is never claimed, and
+  one never seen gets no row), starts its calls through the instance's one pacer (`QUOTE_BURST`
+  in any second), writes a price only over an older one, and reads an empty or zero answer, a
+  refusal or a timeout as no price: the stored price stays, the symbol waits `QUOTE_BACKOFF_MS`,
+  the refusal is filed once a refresh, and a failed write never costs the page the rows it read.
+  Only a ticker-shaped string is a symbol (`normalizeSymbols`), and the ticket's action answers
+  the signed-in reader alone. `lib/prices/quote-store.getFreshQuotes` (and `getFreshQuote`) is
+  what a fill, the snapshot job or a plan ACTS on: Finnhub asked at that moment, uncached (Next's
+  fetch cache serves a stale entry of any age, and any `revalidatePath` makes it a miss), counted
+  before it is asked and never refused — a batch the last sixty seconds have no room for waits a
+  minute first (`QUOTE_ACTING_CEILING`), one quote never — then written into the sheet. A page
+  that comes after it takes less; a page that came first has already taken its share.
+  `lib/prices/__tests__/quote-guard.test.ts` keeps `fetchQuote` to the store alone. The store
+  builds the model's unique index itself, after connecting (`Model.init()` is rejected for good on
+  a process whose model was compiled while the connection was opening). Without a key the sheet
+  answers nothing and reads nothing. `QUOTE_SESSION=open` is the browser QA's: every instant in
+  session. The design and its measurements: `docs/specs/2026-11-10-steady-prices.md`.
 
 ### stocks
 

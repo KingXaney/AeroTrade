@@ -9,7 +9,7 @@ import StrategyRun from "@/database/models/strategy-run.model";
 import {getJobHealth, type JobHealth} from "@/lib/jobs/health";
 import {JOBS} from "@/lib/jobs/registry";
 import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
-import {buildHoldingsPriceMap, buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {buildHoldingsPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {getTradeHistory, getTradeLedger} from "@/lib/trading/ledger";
 import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
 import {countUnpriced, livePrice, mergeLivePoint} from "@/lib/trading/analytics";
@@ -331,7 +331,7 @@ export const getStrategyDetail = cache(async (slug: string, userId: string | nul
     // The same basis as the account's live valuation: SPY's quote if held, else one quote.
     const spyLive = analytics
         ? (analytics.summary.positions.find((p) => p.symbol === BENCHMARK_SYMBOL && p.closeDate === undefined)?.currentPrice
-            ?? (await buildPriceMap([BENCHMARK_SYMBOL])).get(BENCHMARK_SYMBOL)?.price)
+            ?? livePrice((await buildHoldingsPriceMap([BENCHMARK_SYMBOL])).get(BENCHMARK_SYMBOL)))
         : undefined;
     const benchmarkReturns = inception ? await benchmarkReturnsSince([inception], spyLive) : new Map<string, number | null>();
     // A second, bounded read: it needs the fills, which the pass above produced.

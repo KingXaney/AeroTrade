@@ -5,7 +5,7 @@
 
 import {drawdownBand, HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
 import {toComparisonRows, toSwitcherAccounts, type ComparisonRow, type ComparisonStat, type SwitcherAccount} from "@/lib/trading/active-account";
-import {countAtClose, countUnpriced} from "@/lib/trading/analytics";
+import {countAtClose, countUnpriced, oldestQuoteAt} from "@/lib/trading/analytics";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import {accountExportHref} from "@/lib/trading/csv";
 import {buildReturnBridge, type ReturnBridge} from "@/lib/trading/learn/bridge";
@@ -29,6 +29,9 @@ export type PortfolioPageReads = {
     luck: LuckRead | null;
     habits: HabitsRead | null;
     marketOpen: boolean;
+    // The close of the last session that had ended, and the moment of the render (epoch ms):
+    // with the holdings' own quote times they let the header line name what its prices are as of.
+    quoteTimes?: {lastClose: number; now: number};
     // Who trades in this account besides its owner (null: nobody), and, for an account a culture
     // picker trades, the decision item behind each of its fills on the log.
     tradedBy?: TradedBy;
@@ -76,7 +79,13 @@ export const toPortfolioPageView = (
         account,
         portfolio,
         tradedBy: reads.tradedBy ?? null,
-        summaryLine: HOLDINGS_COPY.summary(portfolio.positions.length, countUnpriced(portfolio.positions), reads.marketOpen, countAtClose(portfolio.positions)),
+        summaryLine: HOLDINGS_COPY.summary(
+            portfolio.positions.length,
+            countUnpriced(portfolio.positions),
+            reads.marketOpen,
+            countAtClose(portfolio.positions),
+            reads.quoteTimes ? {oldestAt: oldestQuoteAt(portfolio.positions), ...reads.quoteTimes} : undefined,
+        ),
         multiAccount: all.length > 1,
         switcherAccounts: toSwitcherAccounts(all),
         comparisonRows: toComparisonRows(all, reads.comparisonStats),

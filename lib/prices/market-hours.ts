@@ -144,6 +144,20 @@ export const previousTradingDay = (date: string): string => {
 
 export const closeMinutesFor = (date: string): number => (NYSE_HALF_DAYS.has(date) ? HALF_DAY_CLOSE_MINUTES : CLOSE_MINUTES);
 
+// The instant a day's regular session ends (13:00 on a half day): the time a stored daily
+// close stands for, so a quote and a close can be told apart by which is later.
+export const sessionCloseOf = (date: string): number => {
+    const close = closeMinutesFor(date);
+    return easternToInstant(date, Math.floor(close / 60), close % 60);
+};
+
+// The close of the last regular session that had ended by `at`: today's from the bell on, else
+// the previous trading day's. What a quote must postdate to be "the last close" (lib/prices/quotes.ts).
+export const lastSessionClose = (at: Date = new Date()): number => {
+    const {date, minutes} = easternParts(at);
+    return sessionCloseOf(isTradingDay(date) && minutes >= closeMinutesFor(date) ? date : previousTradingDay(date));
+};
+
 // Next regular open strictly after `fromDate` at `fromMinutes` (or today's, if it is
 // still ahead). Null only if the calendar has no trading day within the search window.
 const nextOpenFrom = (date: string, minutes: number): number | null => {

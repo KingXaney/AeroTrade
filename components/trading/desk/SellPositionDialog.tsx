@@ -12,6 +12,7 @@ import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import ActionButton from "@/components/primitives/ActionButton";
 import TextField from "@/components/primitives/TextField";
+import {useAccountSwitch} from "@/components/trading/accounts/useSwitchAccount";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import type {EnrichedPosition} from '@/lib/trading/types';
 
@@ -23,6 +24,8 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
     const router = useRouter();
     const [qty, setQty] = useState(String(position.quantity));
     const [submitting, setSubmitting] = useState(false);
+    // The dialog's position is the old account's while another account is being opened.
+    const {pending: switching} = useAccountSwitch(accountId);
 
     const owned = position.quantity;
     const qtyNum = qty === '' ? 0 : parseInt(qty, 10);
@@ -38,7 +41,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
     ];
 
     const onConfirm = async () => {
-        if (submitting || !valid) return;
+        if (submitting || !valid || switching) return;
         setSubmitting(true);
         try {
             const result = await placeOrder({symbol: position.symbol, side: 'sell', quantity: qtyNum, accountId});
@@ -136,7 +139,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         </div>
                     )}
 
-                    <ActionButton type="submit" variant="destructive" size="block" glow disabled={submitting || !valid}>
+                    <ActionButton type="submit" variant="destructive" size="block" glow disabled={submitting || !valid || switching}>
                         {submitting ? 'Selling…' : `Sell ${qtyNum || 0} share${qtyNum === 1 ? '' : 's'}`}
                     </ActionButton>
                 </form>

@@ -40,6 +40,19 @@ describe('toPortfolioPageView', () => {
         expect(toPortfolioPageView(reads({active: priced, all: [priced], marketOpen: false})).summaryLine).toBe('1 holding · valued at last close');
     });
 
+    it('names the time of the oldest quote behind the holdings, given the render\'s clock', () => {
+        const now = Date.parse('2026-11-10T19:15:50Z');   // Tuesday 14:15 ET, market open
+        const quoteTimes = {lastClose: Date.parse('2026-11-09T21:00:00Z'), now};
+        const quoted = entry('main', [
+            {...position('AAPL', false), quoteAt: now - 30_000},
+            {...position('MSFT', false), quoteAt: now - 95_000},
+        ]);
+        expect(toPortfolioPageView(reads({active: quoted, all: [quoted], quoteTimes})).summaryLine).toBe('2 holdings · prices as of 2:14 PM ET');
+        // One holding at cost: the other's quote is still dated.
+        const mixed = entry('main', [{...position('AAPL', false), quoteAt: now - 30_000}, position('MSFT', true)]);
+        expect(toPortfolioPageView(reads({active: mixed, all: [mixed], quoteTimes})).summaryLine).toBe('2 holdings · 1 of 2 valued at cost · others as of 2:15 PM ET');
+    });
+
     it('compares accounts only when there is more than one', () => {
         expect(toPortfolioPageView(reads()).multiAccount).toBe(false);
         const view = toPortfolioPageView(reads({all: [entry('main'), entry('second')]}));

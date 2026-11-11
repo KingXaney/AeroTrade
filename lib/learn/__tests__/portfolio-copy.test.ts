@@ -17,6 +17,7 @@ import {
     RISK_COPY,
     shortDate,
     signedMoney,
+    SWITCH_COPY,
     TRADED_BY_COPY,
 } from '@/lib/learn/copy/portfolio';
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from '@/lib/navigator/config';
@@ -102,7 +103,7 @@ describe('drawdownLine', () => {
 describe('HOLDINGS_COPY.summary', () => {
     it('counts the holdings and names the basis they are valued on', () => {
         expect(HOLDINGS_COPY.summary(0, 0, true)).toBe('No open positions yet');
-        expect(HOLDINGS_COPY.summary(1, 0, true)).toBe('1 holding · live valuation');
+        expect(HOLDINGS_COPY.summary(1, 0, true)).toBe('1 holding · valued at the last quote');
         expect(HOLDINGS_COPY.summary(3, 0, false)).toBe('3 holdings · valued at last close');
         expect(HOLDINGS_COPY.summary(3, 3, true)).toBe('3 holdings · valued at cost');
         expect(HOLDINGS_COPY.summary(5, 2, false)).toBe('5 holdings · 2 of 5 valued at cost');
@@ -114,7 +115,53 @@ describe('HOLDINGS_COPY.summary', () => {
         expect(HOLDINGS_COPY.summary(8, 0, true, {count: 8, date: '2026-10-14'})).toBe('8 holdings · valued at the Oct 14 close');
         expect(HOLDINGS_COPY.summary(8, 1, true, oct14)).toBe('8 holdings · 1 of 8 valued at cost · 3 of 8 at the Oct 14 close');
         expect(HOLDINGS_COPY.summary(8, 0, true, {count: 2, date: null})).toBe('8 holdings · 2 of 8 at their last close');
-        expect(HOLDINGS_COPY.summary(8, 0, true, {count: 0, date: null})).toBe('8 holdings · live valuation');
+        expect(HOLDINGS_COPY.summary(8, 0, true, {count: 0, date: null})).toBe('8 holdings · valued at the last quote');
+    });
+
+    // Tuesday 2026-11-10, EST: the session runs 9:30 to 16:00 ET; Monday's closed at 21:00Z.
+    const ms = (iso: string) => Date.parse(iso);
+    const mondayClose = ms('2026-11-09T21:00:00Z');
+    const tuesdayClose = ms('2026-11-10T21:00:00Z');
+
+    it('says what the quotes are as of, in Eastern time', () => {
+        const midSession = {oldestAt: ms('2026-11-10T19:15:20Z'), lastClose: mondayClose, now: ms('2026-11-10T19:15:50Z')};
+        expect(HOLDINGS_COPY.summary(13, 0, true, undefined, midSession)).toBe('13 holdings · prices as of 2:15 PM ET');
+        expect(HOLDINGS_COPY.summary(1, 0, true, {count: 0, date: null}, midSession)).toBe('1 holding · prices as of 2:15 PM ET');
+    });
+
+    it('names the day when the oldest quote is not today\'s', () => {
+        const stale = {oldestAt: ms('2026-11-09T20:50:00Z'), lastClose: mondayClose, now: ms('2026-11-10T19:15:50Z')};
+        expect(HOLDINGS_COPY.summary(3, 0, true, undefined, stale)).toBe('3 holdings · prices as of Nov 9, 3:50 PM ET');
+    });
+
+    it('calls quotes fetched after the bell the last close, and quotes from before it by their time', () => {
+        const evening = ms('2026-11-11T01:00:00Z');   // 8 PM ET
+        expect(HOLDINGS_COPY.summary(3, 0, false, undefined, {oldestAt: ms('2026-11-10T21:10:00Z'), lastClose: tuesdayClose, now: evening}))
+            .toBe('3 holdings · valued at last close');
+        expect(HOLDINGS_COPY.summary(3, 0, false, undefined, {oldestAt: ms('2026-11-10T20:50:00Z'), lastClose: tuesdayClose, now: evening}))
+            .toBe('3 holdings · prices as of 3:50 PM ET');
+        // A Saturday: Friday's quotes, fetched after Friday's close.
+        expect(HOLDINGS_COPY.summary(3, 0, false, undefined, {oldestAt: ms('2026-11-13T21:10:00Z'), lastClose: ms('2026-11-13T21:00:00Z'), now: ms('2026-11-14T15:00:00Z')}))
+            .toBe('3 holdings · valued at last close');
+    });
+
+    it('says what the rest are as of when some holdings stand at cost or at a stored close', () => {
+        const midSession = {oldestAt: ms('2026-11-10T19:15:20Z'), lastClose: mondayClose, now: ms('2026-11-10T19:15:50Z')};
+        expect(HOLDINGS_COPY.summary(13, 0, true, {count: 5, date: '2026-11-09'}, midSession))
+            .toBe('13 holdings · 5 of 13 at the Nov 9 close · others as of 2:15 PM ET');
+        expect(HOLDINGS_COPY.summary(13, 1, true, {count: 5, date: '2026-11-09'}, midSession))
+            .toBe('13 holdings · 1 of 13 valued at cost · 5 of 13 at the Nov 9 close · others as of 2:15 PM ET');
+        // Closed, the others fetched after the bell: nothing to add.
+        expect(HOLDINGS_COPY.summary(13, 1, false, undefined, {oldestAt: ms('2026-11-10T21:10:00Z'), lastClose: tuesdayClose, now: ms('2026-11-11T01:00:00Z')}))
+            .toBe('13 holdings · 1 of 13 valued at cost');
+    });
+
+    it('never says live: with no quote time to name, an open market reads "the last quote"', () => {
+        const none = {oldestAt: null, lastClose: mondayClose, now: ms('2026-11-10T19:15:50Z')};
+        expect(HOLDINGS_COPY.summary(3, 3, true, undefined, none)).toBe('3 holdings · valued at cost');
+        expect(HOLDINGS_COPY.summary(8, 0, true, {count: 8, date: '2026-10-14'}, none)).toBe('8 holdings · valued at the Oct 14 close');
+        expect(HOLDINGS_COPY.summary(2, 0, true, undefined, none)).toBe('2 holdings · valued at the last quote');
+        expect(HOLDINGS_COPY.summary(0, 0, true, undefined, none)).toBe('No open positions yet');
     });
 
     it('titles a price cell taken from a stored close', () => {
@@ -129,6 +176,30 @@ describe('HOLDINGS_COPY.summary', () => {
             }
         }
         clean(HOLDINGS_COPY.closeCellTitle('2026-10-14'));
+        const now = Date.parse('2026-11-10T19:15:50Z');
+        for (const oldestAt of [now - 30_000, now - 86_400_000, null]) {
+            for (const open of [true, false]) {
+                const quotes = {oldestAt, lastClose: Date.parse('2026-11-09T21:00:00Z'), now};
+                clean(HOLDINGS_COPY.summary(4, 0, open, undefined, quotes));
+                clean(HOLDINGS_COPY.summary(4, 1, open, {count: 1, date: '2026-11-09'}, quotes));
+            }
+        }
+    });
+});
+
+describe('SWITCH_COPY', () => {
+    it('says which account is being opened, and which one is shown once it is', () => {
+        expect(SWITCH_COPY.opening('Culture · Spike')).toBe('Opening Culture · Spike…');
+        expect(SWITCH_COPY.showing('Culture · Spike')).toBe('Showing Culture · Spike');
+    });
+
+    // The name is the reader's own; the words around it are the app's.
+    it('never advises', () => {
+        for (const name of ['Main account', 'Culture · Quiet', 'AI Navigator']) {
+            clean(SWITCH_COPY.opening(name));
+            clean(SWITCH_COPY.showing(name));
+        }
+        clean(SWITCH_COPY.failed);
     });
 });
 

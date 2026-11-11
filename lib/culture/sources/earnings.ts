@@ -6,15 +6,19 @@
 
 import {addCalendarDays} from "@/lib/dates";
 
-const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+const FINNHUB_DEFAULT_URL = 'https://finnhub.io/api/v1';
+// FINNHUB_API_URL points the calendar at the browser QA's stand-in, as it does the quote client
+// (lib/prices/finnhub.finnhubBaseUrl — restated here so this source stays import-light).
+const baseUrl = (env: Record<string, string | undefined>): string =>
+    (env.FINNHUB_API_URL ?? '').trim().replace(/\/+$/, '') || FINNHUB_DEFAULT_URL;
 // How far back a report counts as "the last": a quarter and some.
 export const EARNINGS_LOOKBACK_DAYS = 120;
 export const EARNINGS_LOOKAHEAD_DAYS = 45;
 
 export type ReportDates = {lastReportDate: string | null; nextReportDate: string | null};
 
-export const earningsCalendarUrl = (key: string, from: string, to: string): string =>
-    `${FINNHUB_BASE_URL}/calendar/earnings?from=${from}&to=${to}&token=${encodeURIComponent(key)}`;
+export const earningsCalendarUrl = (key: string, from: string, to: string, base: string = FINNHUB_DEFAULT_URL): string =>
+    `${base}/calendar/earnings?from=${from}&to=${to}&token=${encodeURIComponent(key)}`;
 
 type CalendarRow = {symbol: string; date: string};
 
@@ -61,7 +65,7 @@ export const fetchReportDates = async (
     if (!key) return {dates: new Map(), ok: true, skipped: true, rows: 0};
     try {
         const response = await fetchImpl(
-            earningsCalendarUrl(key, addCalendarDays(today, -EARNINGS_LOOKBACK_DAYS), addCalendarDays(today, EARNINGS_LOOKAHEAD_DAYS)),
+            earningsCalendarUrl(key, addCalendarDays(today, -EARNINGS_LOOKBACK_DAYS), addCalendarDays(today, EARNINGS_LOOKAHEAD_DAYS), baseUrl(env)),
             {cache: 'no-store'},
         );
         if (!response.ok) return {dates: new Map(), ok: false, skipped: false, rows: 0};

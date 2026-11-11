@@ -9,9 +9,11 @@ import {rowCard} from "@/components/primitives/RowCard";
 import MicroLabel from "@/components/primitives/MicroLabel";
 
 // The "which account wins" view: every one of the user's paper accounts side by side.
-// Clicking a row makes that account the active one.
+// Clicking a row makes that account the active one: the row takes the selected tone at the
+// click, and the page follows (useSwitchAccount). A row is never disabled — a disabled button
+// drops the focus the click gave it — so a pick made mid-switch is simply not acted on.
 const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; activeId: string}) => {
-    const {switching, switchTo} = useSwitchAccount(activeId);
+    const {shownId, pending, switchTo} = useSwitchAccount(activeId);
 
     const ranked = [...rows].sort((a, b) => b.totalReturnPct - a.totalReturnPct);
 
@@ -30,16 +32,19 @@ const AccountComparisonTable = ({rows, activeId}: {rows: ComparisonRow[]; active
                     key={row.id}
                     type="button"
                     onClick={() => void switchTo(row.id)}
-                    disabled={switching}
+                    aria-current={row.id === shownId ? 'true' : undefined}
+                    aria-disabled={pending || undefined}
+                    aria-busy={(pending && row.id === shownId) || undefined}
+                    data-account-row={row.id}
                     className={rowCard({
-                        tone: row.id === activeId ? 'selected' : 'plain',
-                        interactive: row.id !== activeId,
-                        className: 'w-full grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-1.5 md:gap-4 items-center rounded-xl text-left transition-colors disabled:opacity-60',
+                        tone: row.id === shownId ? 'selected' : 'plain',
+                        interactive: row.id !== shownId && !pending,
+                        className: 'w-full grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-1.5 md:gap-4 items-center rounded-xl text-left transition-colors aria-disabled:cursor-progress',
                     })}
                 >
                     <div className="flex items-center gap-2">
                         <span className="text-xs w-4 text-fg-muted font-mono">{i + 1}</span>
-                        <span className={cn('font-heading text-sm font-semibold', row.id === activeId ? 'text-brand' : 'text-fg')}>
+                        <span className={cn('font-heading text-sm font-semibold', row.id === shownId ? 'text-brand' : 'text-fg')}>
                             {row.name}
                         </span>
                     </div>

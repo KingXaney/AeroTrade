@@ -13,7 +13,8 @@ import {
     enrichPosition,
     livePrice,
     mergeLivePoint,
-    symbolsWithoutPrice,
+    oldestQuoteAt,
+    symbolsBehind,
     toReturnPct,
     unpricedLabel,
     winStatsFromCounts,
@@ -367,6 +368,14 @@ describe('enrichPosition', () => {
         expect(enrichPosition(held, {price: 120}).closeDate).toBeUndefined();
         expect(enrichPosition(held, {closeDate: '2026-10-14'})).toMatchObject({priceStale: true, closeDate: undefined});
     });
+
+    it('carries the moment a quote was fetched, and none on a stored close or a row with no price', () => {
+        const asOf = Date.parse('2026-11-10T19:15:20Z');
+        expect(enrichPosition(held, {price: 120, asOf}).quoteAt).toBe(asOf);
+        expect(enrichPosition(held, {price: 120}).quoteAt).toBeUndefined();
+        expect(enrichPosition(held, {price: 118, closeDate: '2026-10-14', asOf}).quoteAt).toBeUndefined();
+        expect(enrichPosition(held, {asOf}).quoteAt).toBeUndefined();
+    });
 });
 
 describe('the stored-close fallback', () => {
@@ -382,11 +391,6 @@ describe('the stored-close fallback', () => {
         ['XLY', {date: '2026-10-13', close: 0}],
         ['AMZN', {date: '2026-10-14', close: 210}],
     ]);
-
-    it('names the symbols the quotes left without a price', () => {
-        expect(symbolsWithoutPrice(live)).toEqual(['XLF', 'XLY', 'ZZZZ']);
-        expect(symbolsWithoutPrice(new Map())).toEqual([]);
-    });
 
     it('fills only those, from a usable close, and marks each with its date', () => {
         const merged = withStoredCloses(live, closes);
@@ -404,6 +408,52 @@ describe('the stored-close fallback', () => {
         const allLive = new Map([['NVDA', {price: 120}]]);
         expect(withStoredCloses(allLive, closes)).toBe(allLive);
         expect(withStoredCloses(live, new Map())).toBe(live);
+    });
+
+    // A stored close stands for the end of its session; a quote fetched before that moment is the
+    // older of the two, a quote fetched after it the newer.
+    const closeAt = (date: string) => Date.parse(`${date}T21:00:00Z`);
+
+    it('names the symbols a stored close could be newer than: no price, or a quote from before the last close', () => {
+        const lastClose = closeAt('2026-10-14');
+        const prices = new Map([
+            ['FRESH', {price: 120, asOf: lastClose + 60_000}],
+            ['OLD', {price: 50, asOf: lastClose - 1}],
+            ['NONE', {}],
+            ['UNDATED', {price: 9}],
+        ]);
+        expect(symbolsBehind(prices, lastClose)).toEqual(['OLD', 'NONE']);
+        expect(symbolsBehind(new Map([['FRESH', {price: 1, asOf: lastClose}]]), lastClose)).toEqual([]);
+    });
+
+    it('lets a newer close replace an older quote, and keeps a quote newer than the close', () => {
+        const prices = new Map([
+            ['OLD', {price: 50, changePercent: 2, asOf: closeAt('2026-10-14') - 600_000}],     // 15:50 that day
+            ['NEWER', {price: 120, changePercent: 1.5, asOf: closeAt('2026-10-14') + 60_000}],
+            ['NONE', {}],
+        ]);
+        const bars = new Map([
+            ['OLD', {date: '2026-10-14', close: 51}],
+            ['NEWER', {date: '2026-10-14', close: 119}],
+            ['NONE', {date: '2026-10-13', close: 7}],
+        ]);
+        const merged = withStoredCloses(prices, bars, closeAt);
+        expect(merged.get('OLD')).toEqual({price: 51, closeDate: '2026-10-14'});
+        expect(merged.get('NEWER')).toEqual({price: 120, changePercent: 1.5, asOf: closeAt('2026-10-14') + 60_000});
+        expect(merged.get('NONE')).toEqual({price: 7, closeDate: '2026-10-13'});
+    });
+
+    it('keeps yesterday\'s quote over the close of the day before, and never replaces a quote without being told when a close falls', () => {
+        const quote = {price: 50, asOf: closeAt('2026-10-14') - 600_000};
+        const prices = new Map([['OLD', quote]]);
+        expect(withStoredCloses(prices, new Map([['OLD', {date: '2026-10-13', close: 49}]]), closeAt)).toBe(prices);
+        expect(withStoredCloses(prices, new Map([['OLD', {date: '2026-10-14', close: 51}]]))).toBe(prices);
+    });
+
+    it('finds the oldest fetched quote among holdings, and none when no holding carries one', () => {
+        expect(oldestQuoteAt([{quoteAt: 300}, {quoteAt: 100}, {}, {quoteAt: 200}])).toBe(100);
+        expect(oldestQuoteAt([{}, {}])).toBeNull();
+        expect(oldestQuoteAt([])).toBeNull();
     });
 
     it('reads a live price only from a live quote', () => {

@@ -28,7 +28,7 @@ export type ShellView = {
 export const getShellView = async (userId: string): Promise<ShellView> => {
     // Pre-load the popular-stocks list once for the SearchCommand fallback.
     // All the user's accounts power the compact sidebar card, priced from one shared
-    // quote map (getQuote caches 30s, so this stays cheap across navigations).
+    // quote map (the quote sheet, lib/prices/quote-store.ts: no Finnhub call while it is current).
     // The News card must never take the whole shell down with it.
     const [initialStocks, watchlistSymbols, accountPortfolios, savedTheme, topicsOverview, friendRequests, briefing, reader] = await Promise.all([
         searchStocks(),

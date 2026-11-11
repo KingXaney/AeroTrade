@@ -11,7 +11,8 @@ import {
 } from "@/lib/stocks/tradingview";
 import KeyNumbers from "@/components/stocks/KeyNumbers";
 import RulesSee from "@/components/stocks/RulesSee";
-import {getCompanyProfile, getFinancials, getQuote} from "@/lib/prices/finnhub";
+import {getCompanyProfile, getFinancials} from "@/lib/prices/finnhub";
+import {getSheetQuote} from "@/lib/prices/quote-store";
 import {requireUser} from "@/lib/auth/session";
 import {isLabOwner} from "@/lib/lab/owner";
 import {isInWatchlist} from "@/lib/stocks/watchlist-store";
@@ -68,16 +69,16 @@ const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) =
     const watching = isLabOwner(user.email) ? strategiesWatching(symbol) : [];
     const [profile, quote, inWatchlist, topics, financials, boardRows] = await Promise.all([
         getCompanyProfile(symbol),
-        getQuote(symbol),
+        getSheetQuote(symbol),
         isInWatchlist(userId, symbol),
         getTopicsForUser(userId),
         getFinancials(symbol),
         watching.length > 0 ? readBoardRows(symbol) : Promise.resolve([] as SymbolBoardRead[]),
     ]);
 
-    // Finnhub returns an empty object for unknown symbols; treat that as 404 — unless a strategy
-    // watches the symbol: its stored board rows are content of the page's own, key or no key.
-    if (!profile.name && typeof quote.c !== 'number' && watching.length === 0) notFound();
+    // A symbol Finnhub neither names nor prices is a 404 — unless a strategy watches it: its
+    // stored board rows are content of the page's own, key or no key.
+    if (!profile.name && quote === null && watching.length === 0) notFound();
 
     const keyNumbers = readKeyNumbers({marketCapMillions: profile.marketCapitalization, metric: financials.metric});
     const rulesSee = boardRows ? buildRulesSee(symbol, watching, boardRows) : null;
@@ -90,8 +91,8 @@ const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) =
             <StockHeader
                 symbol={symbol}
                 company={company}
-                currentPrice={quote.c}
-                changePercent={quote.dp}
+                currentPrice={quote?.price}
+                changePercent={quote?.changePercent}
                 isInWatchlist={inWatchlist}
                 followedTopic={followedTopic ? {id: followedTopic.id, slug: followedTopic.slug} : null}
             />

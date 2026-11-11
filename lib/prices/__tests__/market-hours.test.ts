@@ -4,7 +4,9 @@ import {
     easternParts,
     easternToInstant,
     isTradingDay,
+    lastSessionClose,
     marketStatus,
+    sessionCloseOf,
 } from '@/lib/prices/market-hours';
 
 // All fixtures are ISO instants; the Eastern wall time is stated in the test name.
@@ -86,5 +88,44 @@ describe('marketStatus', () => {
         expect(marketStatus(at('2026-03-09T13:29:00Z')).state).toBe('closed');
         expect(marketStatus(at('2026-11-02T14:30:00Z')).state).toBe('open');    // first EST Monday, 9:30
         expect(marketStatus(at('2026-11-02T14:29:00Z')).state).toBe('closed');
+    });
+});
+
+describe('lastSessionClose', () => {
+    it('is the previous session\'s close while today\'s is still open or has not begun', () => {
+        // Tue 2026-11-10 14:15 EST, market open: Monday's 16:00.
+        expect(lastSessionClose(at('2026-11-10T19:15:00Z'))).toBe(Date.parse('2026-11-09T21:00:00Z'));
+        // Tue 08:00 EST, before the open.
+        expect(lastSessionClose(at('2026-11-10T13:00:00Z'))).toBe(Date.parse('2026-11-09T21:00:00Z'));
+    });
+
+    it('is today\'s close from the bell on', () => {
+        expect(lastSessionClose(at('2026-11-10T20:59:59Z'))).toBe(Date.parse('2026-11-09T21:00:00Z'));
+        expect(lastSessionClose(at('2026-11-10T21:00:00Z'))).toBe(Date.parse('2026-11-10T21:00:00Z'));
+        expect(lastSessionClose(at('2026-11-11T03:00:00Z'))).toBe(Date.parse('2026-11-10T21:00:00Z'));   // 22:00 EST
+    });
+
+    it('reaches back over a weekend and a holiday', () => {
+        expect(lastSessionClose(at('2026-11-14T15:00:00Z'))).toBe(Date.parse('2026-11-13T21:00:00Z'));   // Saturday
+        expect(lastSessionClose(at('2026-11-16T13:00:00Z'))).toBe(Date.parse('2026-11-13T21:00:00Z'));   // Monday 08:00
+        expect(lastSessionClose(at('2026-11-26T17:00:00Z'))).toBe(Date.parse('2026-11-25T21:00:00Z'));   // Thanksgiving
+    });
+
+    it('rings at 13:00 on a half day', () => {
+        expect(lastSessionClose(at('2026-11-27T15:00:00Z'))).toBe(Date.parse('2026-11-25T21:00:00Z'));   // 10:00, session open
+        expect(lastSessionClose(at('2026-11-27T18:00:00Z'))).toBe(Date.parse('2026-11-27T18:00:00Z'));   // 13:00
+    });
+
+    it('holds across the DST change', () => {
+        // Mon 2026-11-02 08:00 EST: Friday 30 Oct closed at 16:00 EDT.
+        expect(lastSessionClose(at('2026-11-02T13:00:00Z'))).toBe(Date.parse('2026-10-30T20:00:00Z'));
+    });
+});
+
+describe('sessionCloseOf', () => {
+    it('is the instant a day\'s regular session ends', () => {
+        expect(sessionCloseOf('2026-11-09')).toBe(Date.parse('2026-11-09T21:00:00Z'));
+        expect(sessionCloseOf('2026-11-27')).toBe(Date.parse('2026-11-27T18:00:00Z'));
+        expect(sessionCloseOf('2026-07-02')).toBe(Date.parse('2026-07-02T20:00:00Z'));
     });
 });

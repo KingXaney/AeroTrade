@@ -7,9 +7,9 @@ import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import AccountSnapshot from "@/database/models/account-snapshot.model";
 import BenchmarkSnapshot from "@/database/models/benchmark-snapshot.model";
-import {getQuote} from "@/lib/prices/finnhub";
+import {getFreshQuote} from "@/lib/prices/quote-store";
 import {BENCHMARK_SYMBOL} from "@/lib/prices/config";
-import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {buildFreshPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {type PriceInfo} from "@/lib/trading/analytics";
 import {accountEpoch} from "@/lib/trading/epoch";
 import type {PaperPosition} from '@/lib/trading/types';
@@ -27,7 +27,7 @@ type SnapshotAccount = {
 
 // `date` is the job's ET day (lib/jobs/steps.eventDay), the same on every replay.
 export const snapshotBenchmark = async (date: string): Promise<{recorded: boolean}> => {
-    const quote = await getQuote(BENCHMARK_SYMBOL);
+    const quote = await getFreshQuote(BENCHMARK_SYMBOL);
     if (typeof quote.c !== 'number' || !(quote.c > 0)) {
         console.warn(`Benchmark snapshot skipped: no quote for ${BENCHMARK_SYMBOL}`);
         return {recorded: false};
@@ -71,7 +71,7 @@ export const snapshotSymbols = (accounts: readonly SnapshotAccount[]): string[] 
     )).filter(Boolean);
 
 export const quoteEntries = async (symbols: string[]): Promise<Array<[string, PriceInfo]>> =>
-    Array.from((await buildPriceMap(symbols)).entries());
+    Array.from((await buildFreshPriceMap(symbols)).entries());
 
 export const writeSnapshots = async (accounts: readonly SnapshotAccount[], priceEntries: Array<[string, PriceInfo]>, date: string): Promise<number> => {
     await connectToDatabase();

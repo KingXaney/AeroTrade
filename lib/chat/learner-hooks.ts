@@ -14,25 +14,25 @@ import type {PaperAccountDoc} from "@/database/models/paper-account.model";
 import type {LearnerAccountValue, LearnerFigure, LearnerValue} from "@/lib/chat/explain";
 import type {GlossaryKey} from "@/lib/learn/glossary";
 import {readAccountsForUser, toAccountSummary} from "@/lib/trading/accounts";
-import {buildPriceMap, computePortfolio} from "@/lib/trading/valuation";
+import {buildHoldingsPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {epochTradesOf} from "@/lib/trading/ledger";
 import {countUnpriced, drawdownWindow, mergeLivePoint, winStatsFromCounts} from "@/lib/trading/analytics";
 import {getEasternDateString} from "@/lib/dates";
 
-// buildPriceMap is one Finnhub quote per unique symbol with no ceiling. A chat answer
-// doesn't need every tail position priced to the cent, so price the largest holdings and
-// report how many were left at cost. (getQuote caches 30s, so repeat calls in one
-// conversation are close to free — this bounds the first one.)
+// A chat answer doesn't need every tail position priced to the cent, so price the largest
+// holdings and report how many were left at cost: it bounds what a first read of the sheet may
+// have to fetch (lib/prices/quote-store.ts).
 const CHAT_MAX_PRICED_SYMBOLS = 25;
 
-// The largest holdings by cost across the given accounts, quoted; the rest fall back to cost
-// basis in computePortfolio and are counted as unpriced.
+// The largest holdings by cost across the given accounts, priced as /portfolio prices them —
+// the sheet's quote, or a stored close where it is the newer price (dated, so the answer can
+// say so) — and the rest fall back to cost basis in computePortfolio and are counted as unpriced.
 export const priceLargestHoldings = (docs: readonly PaperAccountDoc[]) => {
     const ranked = docs
         .flatMap((d) => d.positions ?? [])
         .sort((a, b) => b.avgCost * b.quantity - a.avgCost * a.quantity)
         .map((p) => p.symbol);
-    return buildPriceMap(Array.from(new Set(ranked)).slice(0, CHAT_MAX_PRICED_SYMBOLS));
+    return buildHoldingsPriceMap(Array.from(new Set(ranked)).slice(0, CHAT_MAX_PRICED_SYMBOLS));
 };
 
 type Reader = (userId: string, docs: PaperAccountDoc[]) => Promise<LearnerAccountValue[]>;

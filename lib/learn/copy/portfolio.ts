@@ -8,6 +8,7 @@
 // into a client file (StrategyPerformance). The Navigator's rails are read from its config
 // so the comparison cannot drift from what the allocator does.
 
+import {getEasternDateString} from "@/lib/dates";
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
 import type {BridgeLineKey} from "@/lib/trading/learn/bridge";
 import {unpricedText} from "@/lib/learn/copy/unpriced";
@@ -113,28 +114,68 @@ export const PERFORMANCE_COPY = {
 
 // PositionsTable with nothing held. /portfolio has no order panel, so the second sentence is
 // the link to /trade, the page that has one.
+// When the quotes behind a valuation were fetched (the quote sheet, lib/prices/quote-store.ts):
+// the oldest among the holdings that carry one (null: none does), the close of the last session
+// that had ended, and the moment of the render — all epoch ms.
+export type QuoteTimes = {oldestAt: number | null; lastClose: number; now: number};
+
 export const HOLDINGS_COPY = {
     empty: 'No open positions.',
     toTradeDesk: 'Orders are placed on the Trade Desk.',
     // The /portfolio header's line under the account name: how many holdings, and on what basis
-    // they are valued — live, at the last close, some or all at cost, and some or all at a stored
-    // close where no live quote answered (`atClose`, analytics.countAtClose: the day when they
-    // share one).
+    // they are valued — quotes as of a stated time, the last close, some or all at cost, and some
+    // or all at a stored close where it is the newer price (`atClose`, analytics.countAtClose:
+    // the day when they share one). Said once, here; no row repeats it (invariant 8).
+    //
+    // `quotes` is what lets the line name a time instead of calling the valuation live: with
+    // every holding on a quote it reads "prices as of 2:15 PM ET" — or "valued at last close"
+    // when the market is closed and every quote was fetched after the bell — and where some
+    // holdings stand at cost or at a stored close it says what the others are as of.
     summary: (
         holdings: number,
         unpriced: number,
         marketOpen: boolean,
         atClose: {count: number; date: string | null} = {count: 0, date: null},
+        quotes?: QuoteTimes,
     ): string => {
         if (holdings === 0) return 'No open positions yet';
         const parts = [unpricedText(unpriced, holdings), atCloseText(atClose.count, holdings, atClose.date)]
             .filter((part): part is string => part !== null);
-        const basis = parts.length > 0 ? parts.join(' · ') : (marketOpen ? 'live valuation' : 'valued at last close');
+        const quoted = quotes && quotes.oldestAt !== null ? quotedText(quotes.oldestAt, quotes, marketOpen, parts.length > 0) : undefined;
+        const basis = parts.length > 0
+            ? [...parts, ...(quoted ? [quoted] : [])].join(' · ')
+            : quoted ?? (marketOpen ? 'valued at the last quote' : 'valued at last close');
         return `${holdings} ${holdings === 1 ? 'holding' : 'holdings'} · ${basis}`;
     },
     // The tooltip on a price cell that shows a stored close because no live quote answered.
     closeCellTitle: (date: string): string => `No live quote — the ${shortDate(date)} close`,
 };
+
+const QUOTE_TIME = new Intl.DateTimeFormat('en-US', {timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit'});
+
+// '2:15 PM ET', or 'Nov 9, 3:50 PM ET' when that was not today (ET).
+const quoteTime = (at: number, now: number): string => {
+    const day = getEasternDateString(new Date(at));
+    const time = `${QUOTE_TIME.format(at)} ET`;
+    return day === getEasternDateString(new Date(now)) ? time : `${shortDate(day)}, ${time}`;
+};
+
+// What the holdings on a quote are valued as of. Closed, with every quote fetched after the
+// bell, they are the last close: the whole line when nothing else needs saying, nothing to add
+// beside holdings at cost or at a stored close. Otherwise the oldest quote's time.
+const quotedText = (oldestAt: number, {lastClose, now}: QuoteTimes, marketOpen: boolean, beside: boolean): string | null => {
+    if (!marketOpen && oldestAt >= lastClose) return beside ? null : 'valued at last close';
+    return `${beside ? 'others' : 'prices'} as of ${quoteTime(oldestAt, now)}`;
+};
+
+// The switch between paper accounts (components/trading/accounts): the line under the heading
+// while the account picked is on its way, what a screen reader hears once it is shown, and the
+// toast when the switch could not be made.
+export const SWITCH_COPY = {
+    opening: (name: string): string => `Opening ${name}…`,
+    showing: (name: string): string => `Showing ${name}`,
+    failed: 'Could not switch accounts',
+} as const;
 
 // How many holdings stand at a stored daily close instead of a live quote, beside a figure.
 const atCloseText = (atClose: number, holdings: number, date: string | null): string | null => {

@@ -31,7 +31,7 @@ import {getAttentionSeries, getCultureEntities} from "@/lib/culture/store";
 import {catalogHash, type CultureTicker, type VerifiedSymbol} from "@/lib/culture/universe";
 import {addCalendarDays} from "@/lib/dates";
 import type {HeldPosition} from "@/lib/navigator/allocator";
-import {getQuote} from "@/lib/prices/finnhub";
+import {getFreshQuotes} from "@/lib/prices/quote-store";
 import {ensureBars, getBarsForSymbols} from "@/lib/prices/store";
 import {getHeldSymbolsByUserId, getOwnedAccount} from "@/lib/trading/accounts";
 import {seedDayZeroSnapshot} from "@/lib/trading/lifecycle";
@@ -157,19 +157,21 @@ const toVerified = (doc: LeanUniverse): VerifiedSymbol => ({symbol: doc.symbol, 
 export const verifyUniverseChunk = async (symbols: readonly string[], weekKey: string): Promise<{rows: VerifiedSymbol[]; fetched: number}> => {
     await connectToDatabase();
     const known = new Map((await CultureUniverse.find({weekKey, symbol: {$in: symbols}}).lean<LeanUniverse[]>()).map((doc) => [doc.symbol, toVerified(doc)]));
-    const fresh: VerifiedSymbol[] = [];
-    for (const symbol of symbols) {
-        if (known.has(symbol)) continue;
-        try {
-            const quote = await getQuote(symbol);
-            const price = typeof quote.c === 'number' ? quote.c : null;
-            fresh.push(price === null ? {symbol, quoted: false, price: null, reason: 'no quote'}
-                : price > 0 ? {symbol, quoted: true, price, reason: 'ok'}
-                : {symbol, quoted: false, price: null, reason: 'zero price'});
-        } catch {
-            fresh.push({symbol, quoted: false, price: null, reason: 'error'});
-        }
-    }
+    // One batch a chunk: counted against the minute before it is asked, and held a minute when
+    // a page's refresh has just filled it (lib/prices/quote-store.getFreshQuotes) — a refusal
+    // here would be stored as "no quote" for the whole week.
+    const unknown = symbols.filter((symbol) => !known.has(symbol));
+    const quotes = unknown.length > 0
+        ? await getFreshQuotes(unknown).catch(() => null)
+        : new Map<string, {c?: number}>();
+    const fresh: VerifiedSymbol[] = unknown.map((symbol) => {
+        if (quotes === null) return {symbol, quoted: false, price: null, reason: 'error'};
+        const quote = quotes.get(symbol.trim().toUpperCase()) ?? {};
+        const price = typeof quote.c === 'number' ? quote.c : null;
+        return price === null ? {symbol, quoted: false, price: null, reason: 'no quote'}
+            : price > 0 ? {symbol, quoted: true, price, reason: 'ok'}
+            : {symbol, quoted: false, price: null, reason: 'zero price'};
+    });
     if (fresh.length > 0) {
         await CultureUniverse.bulkWrite(fresh.map((v) => ({
             updateOne: {filter: {weekKey, symbol: v.symbol}, update: {$set: {...v, checkedAt: new Date()}}, upsert: true},

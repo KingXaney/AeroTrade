@@ -7,7 +7,7 @@ import {getTradeHistory} from "@/lib/trading/ledger";
 import {getAccountAnalytics, getComparisonStats} from "@/lib/trading/analytics-store";
 import {getCachedWatchlistSymbols} from "@/lib/stocks/watchlist-store";
 import {getCachedTopicsOverview, getMergedTopicFeed} from "@/lib/topics/store";
-import {getStocksWithData} from "@/lib/prices/finnhub";
+import {getStocksWithData} from "@/lib/stocks/stock-data-store";
 import {getNewsFeed} from "@/lib/news/feed-store";
 import {NEWS_WIDGET_LIMIT} from "@/lib/news/config";
 import {getLeaderboard} from "@/lib/friends/store";
