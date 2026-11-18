@@ -4,7 +4,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {DIGEST_COPY, EMAIL_FOOTER_COPY, JOB_ALERT_COPY, oneLine, RESET_EMAIL_COPY, SUBJECT_MAX, WELCOME_EMAIL_COPY} from '@/lib/learn/copy/email';
+import {DIGEST_COPY, EMAIL_FOOTER_COPY, JOB_ALERT_COPY, oneLine, RESET_EMAIL_COPY, SUBJECT_MAX, UNSUBSCRIBE_COPY, WELCOME_EMAIL_COPY} from '@/lib/learn/copy/email';
 import type {SuggestionAction} from '@/lib/navigator/types';
 
 const strings = (value: unknown): string[] => {
@@ -35,6 +35,7 @@ const rendered = (): string[] => [
     RESET_EMAIL_COPY.body('Ada', 30),
     RESET_EMAIL_COPY.text('https://a.example.com/r', 30),
     ...strings(JOB_ALERT_COPY),
+    ...strings(UNSUBSCRIBE_COPY),
     JOB_ALERT_COPY.failed.subject('Account snapshots'),
     JOB_ALERT_COPY.failed.hero('Account snapshots'),
     JOB_ALERT_COPY.failed.preheader('Account snapshots'),

@@ -54,3 +54,11 @@ export const getNotificationPreferences = async (userId: string): Promise<Notifi
         return DEFAULT_NOTIFICATION_PREFERENCES;
     }
 };
+
+// Sets the daily brief's switch for a user id the CALLER has already authenticated: the session
+// (the settings action) or a signed unsubscribe link (app/api/email/unsubscribe). Throws on a
+// failed write, so neither reports a change that did not happen.
+export const setEmailNotifications = async (userId: string, enabled: boolean): Promise<void> => {
+    await connectToDatabase();
+    await UserPreferencesModel.updateOne({userId}, {$set: {emailNotifications: enabled, updatedAt: new Date()}}, {upsert: true});
+};

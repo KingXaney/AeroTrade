@@ -20,6 +20,7 @@ export const SUBJECT_MAX = 110;
 export const EMAIL_FOOTER_COPY = {
     openApp: `Open ${SITE_NAME}`,
     preferences: 'Email preferences',
+    unsubscribe: 'Unsubscribe',
     allNews: 'All news',
     digestWhy: `You get this email because the daily brief is on in your ${SITE_NAME} settings.`,
     accountWhy: `You get this email because of activity on your ${SITE_NAME} account.`,
@@ -143,4 +144,16 @@ export const JOB_ALERT_COPY = {
     cta: 'Open the system view',
     why: `You get this email because your address is on ${SITE_NAME}'s owner list. It is sent at most once per job per day.`,
     text: (headline: string, lines: readonly string[], url: string): string => `${headline}\n\n${lines.join('\n')}\n\n${url}`,
+} as const;
+
+// The page the daily brief's Unsubscribe link opens (app/(reset)/unsubscribe).
+export const UNSUBSCRIBE_COPY = {
+    title: 'Unsubscribe from the daily brief',
+    body: `This turns off the daily brief for the ${SITE_NAME} account this link was sent to. Nothing else about the account changes, and the brief can be turned back on in Settings.`,
+    button: 'Unsubscribe',
+    doneTitle: 'You are unsubscribed',
+    doneBody: 'The daily brief is off for this account. No more of them will be sent.',
+    invalidBody: 'This unsubscribe link is not complete or is not one of ours. The daily brief can also be turned off in Settings, under Notifications.',
+    failedBody: 'The change could not be saved just now. Open the link again in a minute.',
+    settingsLink: 'Open notification settings',
 } as const;

@@ -90,11 +90,16 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
 }
 
 // The daily brief, already composed (lib/email/digest.ts): its subject, HTML and plain text.
+// `unsubscribeUrl` is the reader's one-click address (lib/email/unsubscribe.ts): with it the
+// mail carries the two headers a mail client turns into its own Unsubscribe button (RFC 8058).
 export const sendNewsSummaryEmail = async (
-    {email, subject, html, text}: {email: string; subject: string; html: string; text: string}
+    {email, subject, html, text, unsubscribeUrl}: {email: string; subject: string; html: string; text: string; unsubscribeUrl?: string}
 ): Promise<void> => {
     if (!mailerReady('the daily news summary')) return;
-    await sendReporting({from: from(), to: email, subject, text, html});
+    await sendReporting({
+        from: from(), to: email, subject, text, html,
+        ...(unsubscribeUrl ? {headers: {'List-Unsubscribe': `<${unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'}} : {}),
+    });
 };
 
 // The owner's alert about a job (lib/jobs/functions/alerts.ts), to the owner list. False when

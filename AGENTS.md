@@ -202,6 +202,22 @@ and friends keep none beyond Shared and the invariants).
   environment (the browser QA raises it), else 10.
 - `lib/auth/validation` (import-free) holds the auth forms' email and password rules and the
   password lengths `lib/auth/server.ts` enforces.
+- Settings › Account (`components/settings/AccountSection`, `lib/actions/account.actions`, limits
+  and keys in `lib/account/limits`, sentences `ACCOUNT_COPY` in `lib/learn/copy/account`): both
+  actions take the account's password and are counted per account before it is looked at.
+  `changeMyPassword` is TWO library calls, `changePassword` without `revokeOtherSessions` and then
+  `revokeOtherSessions`: the library's own flag deletes every session and issues a new one, and
+  the action's response would re-render the page on the old cookie and send the reader away.
+  `deleteMyAccount` asks for the account's own address typed back (`confirmsDeletion`) and its
+  password, and calls the library's `deleteUser`, whose `beforeDelete` (`lib/auth/server.ts`) runs
+  `lib/account/delete-store.deleteUserData` before the user, its credentials and its sessions
+  go: a cascade that fails leaves the account in place. The page is then left by a full load.
+- `lib/account/user-data` (import-free) sorts EVERY model: a reader's own data and under which
+  field (`USER_DATA`, in deletion order: whatever trades in their accounts, the books, the rest,
+  the preferences last), or not and why (`NOT_USER_DATA`). `lib/account/__tests__/user-data.test.ts`
+  fails when a model file is in neither, so a collection added later cannot be left behind by a
+  deletion without someone deciding so. The system's own owners (`system:*`, `global`) are never
+  deleted under.
 - `lib/auth/sign-up-profile.signUpProfile` checks that country, goal, risk tolerance and industry
   are options the form offers, read before any counter is spent; only those four answers reach the
   welcome event, whose prompt `lib/email/prompts.buildWelcomePrompt` fills through a replacer function.
@@ -1806,6 +1822,14 @@ and friends keep none beyond Shared and the invariants).
   send (`event.data.email`) names one opted-in reader and takes no claim.
 - A preview build never sends mail (`lib/email/send.mailerReady`): it shares production's mailer
   and readers.
+- The daily brief carries the reader's own signed unsubscribe link (`lib/email/unsubscribe`: an
+  HMAC of the user id under `BETTER_AUTH_SECRET` and a purpose label; it does one thing, names one
+  account and does not expire): the footer's link to the public page
+  `app/(reset)/unsubscribe` (`proxy.ts` lets the path through; it reads the link and changes
+  nothing), and the `List-Unsubscribe` and `List-Unsubscribe-Post` headers a mail client turns
+  into its own button. Only `POST app/api/email/unsubscribe` changes anything — a mail scanner
+  follows every GET in a message — with no session and no same-origin check: the token is the
+  authority. Its sentences are `UNSUBSCRIBE_COPY`.
 - Today's lesson in the daily email, `lib/email/sections/lesson`: a moment dated exactly
   yesterday — the noon run must not mail a morning fill twice — else the day's concept, in the
   widget's own copy. Every string is escaped; `lessonSectionFor` sanitises it with

@@ -81,6 +81,8 @@ export type DigestViewInput = {
     culture?: CultureDigest | null;
     topicsHtml?: string;
     lessonHtml?: string;
+    // The reader's own signed unsubscribe page (lib/email/unsubscribe.ts); absent in a preview.
+    unsubscribeUrl?: string;
 };
 
 export const SECTION_ORDER: readonly DigestSectionKey[] = ['mine', 'markets', 'feed', 'filings', 'social'];
@@ -141,7 +143,7 @@ export const plainText = (markdown: string, max: number): string => {
     return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 };
 
-export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator, culture = null, topicsHtml = '', lessonHtml = ''}: DigestViewInput): DigestView => {
+export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator, culture = null, topicsHtml = '', lessonHtml = '', unsubscribeUrl}: DigestViewInput): DigestView => {
     const base = String(appUrl ?? '').replace(/\/+$/, '');
     const mine = new Set(readerSymbols.map((s) => s.toUpperCase()));
     const stockLink = (symbol: string): EmailLink => ({label: symbol, url: `${base}/stocks/${encodeURIComponent(symbol)}`});
@@ -199,6 +201,7 @@ export const buildDigestView = ({day, appUrl, summary, readerSymbols, navigator,
     const footerLinks: EmailLink[] = [
         {label: EMAIL_FOOTER_COPY.openApp, url: `${base}/`},
         {label: EMAIL_FOOTER_COPY.preferences, url: `${base}/settings#notifications`},
+        ...(unsubscribeUrl ? [{label: EMAIL_FOOTER_COPY.unsubscribe, url: unsubscribeUrl}] : []),
     ];
 
     const allowedUrls = [

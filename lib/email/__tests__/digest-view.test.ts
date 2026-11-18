@@ -128,3 +128,18 @@ describe('plainText', () => {
         expect(plainText('a'.repeat(50), 10)).toBe(`${'a'.repeat(9)}…`);
     });
 });
+
+// The reader's own signed unsubscribe page (lib/email/unsubscribe.ts), when the send has one.
+describe('the unsubscribe link', () => {
+    const url = `${FIXTURE_APP}/unsubscribe?u=user-1&t=token`;
+
+    it('is the footer\'s last link and is on the allow-list the HTML is sanitised against', () => {
+        const v = view({unsubscribeUrl: url});
+        expect(v.footerLinks.at(-1)).toEqual({label: 'Unsubscribe', url});
+        expect(v.allowedUrls).toContain(url);
+    });
+
+    it('is absent when the send has none', () => {
+        expect(view().footerLinks.map((l) => l.label)).not.toContain('Unsubscribe');
+    });
+});
