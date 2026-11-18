@@ -6,7 +6,7 @@ import {describe, expect, it} from 'vitest';
 
 import {POPULAR_STOCKS_SHOWN, type StockAnswer} from '@/lib/shell/palette';
 import {POPULAR_STOCK_NAMES, POPULAR_STOCK_SYMBOLS} from '@/lib/stocks/popular';
-import {addRows, popularStocks} from '@/lib/stocks/watchlist-add';
+import {addRows, isShouting, popularStocks} from '@/lib/stocks/watchlist-add';
 import type {Stock} from '@/lib/stocks/types';
 
 const stock = (symbol: string, name = `${symbol} Corp`): Stock => ({symbol, name, exchange: '', type: 'Common Stock'});
@@ -58,13 +58,13 @@ describe('the add dialog with nothing typed', () => {
 
     it('suggests nothing once every popular stock is on the watchlist', () => {
         const view = rows('  ', {tracked: popular.map((s) => s.symbol)});
-        expect(view).toEqual({query: '', searching: false, suggested: true, rows: []});
+        expect(view).toEqual({query: '', searching: false, unavailable: false, suggested: true, rows: []});
     });
 });
 
 describe('while the search for the text in the box is out', () => {
     it('draws no row, so Enter adds nothing', () => {
-        expect(rows('nvid')).toEqual({query: 'nvid', searching: true, suggested: false, rows: []});
+        expect(rows('nvid')).toEqual({query: 'nvid', searching: true, unavailable: false, suggested: false, rows: []});
     });
 
     it('never draws an earlier query\'s stocks under a new query', () => {
@@ -90,7 +90,29 @@ describe('once the search has answered for this query', () => {
         expect(view.rows.map((row) => [row.stock.symbol, row.tracked])).toEqual([['AAPL', true], ['APP', false]]);
     });
 
+    it('tells a search that did not answer from one that found nothing', () => {
+        const found = rows('zzzz', {answer: {query: 'zzzz', stocks: []}});
+        expect(found.unavailable).toBe(false);
+        const unanswered = rows('tesla', {answer: {query: 'tesla', stocks: null}});
+        expect(unanswered.unavailable).toBe(true);
+        expect(unanswered.searching).toBe(false);
+        expect(unanswered.rows).toEqual([]);
+    });
+
     it('draws no row when the search found nothing', () => {
-        expect(rows('zzzz', {answer: {query: 'zzzz', stocks: []}})).toEqual({query: 'zzzz', searching: false, suggested: false, rows: []});
+        expect(rows('zzzz', {answer: {query: 'zzzz', stocks: []}})).toEqual({query: 'zzzz', searching: false, unavailable: false, suggested: false, rows: []});
+    });
+});
+
+// Finnhub's search names a company in capitals ("APPLE INC"); its profile, and the app's own
+// suggestions, in the company's own case. The watchlist saves the name a row is added under, so
+// a name that is all capitals is swapped for the profile's when there is one.
+describe('isShouting', () => {
+    it('is a name with letters and none of them small', () => {
+        for (const name of ['APPLE INC', 'SPDR S&P 500 ETF TRUST', 'AT&T INC', 'ÉLECTRICITÉ DE FRANCE', 'A']) expect(isShouting(name), name).toBe(true);
+    });
+
+    it('is not a name written in its own case, nor one with no letters', () => {
+        for (const name of ['Apple Inc', 'QA Watch Alpha', 'iShares Core', '3M Co', 'eBay', '', '   ', '500']) expect(isShouting(name), name).toBe(false);
     });
 });

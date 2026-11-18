@@ -112,6 +112,30 @@ describe('signUpName', () => {
         for (const name of names) expect(signUpName(name), name).toBe(name);
     });
 
+    // Names as people write them, each refused by the first form of this rule: a suffix after a
+    // comma, a nickname in brackets, a numeral, an en dash, the joiners Persian and Sinhala are
+    // typed with, and initials run together in scripts whose initials are whole syllables.
+    it('takes a comma, brackets, a few digits, an en dash, a middle dot and a joiner inside a word', () => {
+        const names = [
+            'Sammy Davis, Jr.', 'Jane Doe, PhD', 'Robert (Bob) Smith', 'John Smith 3rd', 'Mike2', 'Agent 47', 'Henry 1066',
+            'Jean–Luc Picard', 'Gal·la Placídia', 'علی\u200cرضا', 'ශ\u0dca\u200dරී ලංකා',
+        ];
+        for (const name of names) expect(signUpName(name), name).toBe(name);
+    });
+
+    it('takes initials run together where the letters after the full stop are not two of the Latin alphabet', () => {
+        const names = ['ए.पी.जे. अब्दुल कलाम', 'एम.एस. धोनी', 'के.आर. नारायणन', 'எம்.ஜி. ராமச்சந்திரன்', 'А.С.Пушкин', 'А.С. Пушкин'];
+        for (const name of names) expect(signUpName(name), name).toBe(name);
+    });
+
+    it('reads no name from marks alone, from more than four digits, or from a joiner outside a word', () => {
+        const refused = [
+            '--', "''", '((', ', ,', '··', '1234', 'Ada 12345', 'Call 18005550100', 'Ada 555 0100',
+            'Ada\u200c', '\u200dAda', 'Ada \u200cLovelace', 'Ada\u200c Lovelace', 'Ada\u200c\u200cLovelace',
+        ];
+        for (const name of refused) expect(signUpName(name), JSON.stringify(name)).toBeNull();
+    });
+
     it('reads no name from anything but a string', () => {
         const malformed: unknown[] = [null, undefined, 42, true, [], ['Ada Lovelace'], {}, {toString: () => 'Ada Lovelace'}];
         for (const input of malformed) expect(signUpName(input), String(JSON.stringify(input))).toBeNull();
@@ -131,20 +155,21 @@ describe('signUpName', () => {
     it('reads none from a name carrying an address, a digit, markup or a line break', () => {
         const refused = [
             'Ada http://example.com', 'Ada https://example.com/prize', 'ada@example.com', 'Ada: claim now', 'Ada/Bob',
-            'Ada 555 0100', 'Agent 47', 'Ada <b>Lovelace</b>', 'Ada & Bob', 'Ada, Bob', 'Ada!', 'Ada?', 'Ada_Lovelace',
-            'Ada (Lovelace)', '"Ada"', 'Ada\nLovelace', 'Ada\tLovelace', 'Ada​Lovelace', 'Ada‮Lovelace', 'Ada 🚀',
+            'Ada 555 0100', 'Ada <b>Lovelace</b>', 'Ada & Bob', 'Ada!', 'Ada?', 'Ada_Lovelace', 'Ada [Lovelace]', 'Ada; Bob',
+            '"Ada"', 'Ada\nLovelace', 'Ada\tLovelace', 'Ada​Lovelace', 'Ada‮Lovelace', 'Ada 🚀',
         ];
         for (const name of refused) expect(signUpName(name), JSON.stringify(name)).toBeNull();
     });
 
     // Letters and full stops alone spell a web address, and a mail client links one it finds in a
-    // heading. A full stop followed at once by two letters — or by a letter and its mark, as a
-    // domain's ending in another script begins — is the middle of an address, never the end of a
-    // word or an initial.
+    // heading. A full stop followed at once by two Latin letters is the middle of one, however
+    // short the word before it ("x.com", "t.co") — so "J.Smith" is refused with it, and the
+    // sentence says to put the space in. In any other script the full stop is refused only after
+    // a word of three letters or more: an initial there is a syllable of one or two.
     it('reads none from a name whose full stop begins a domain', () => {
         const refused = [
-            'example.com', 'www.example.com', 'Visit www.example.com now', 'Claim at prize.example today', 'a.co',
-            'Ada.Lovelace', 'пример.рф', 'example.भारत', 'example.ćom',
+            'example.com', 'www.example.com', 'Visit www.example.com now', 'Claim at prize.example today', 'a.co', 'x.com', 't.co',
+            'Ada.Lovelace', 'J.Smith', 'St.John', 'пример.рф', 'example.भारत', 'example.\u0107om', 'example.c\u0301om', '\u00e9.com',
         ];
         for (const name of refused) expect(signUpName(name), JSON.stringify(name)).toBeNull();
     });
@@ -156,7 +181,7 @@ describe('FULL_NAME_RULE', () => {
         for (const name of ['Ada Lovelace', '  Ada Lovelace ', "Conan O'Brien", 'J.K. Rowling', '李小龙']) {
             expect(FULL_NAME_RULE.validate(name), name).toBe(true);
         }
-        for (const name of ['A', '   ', 'a'.repeat(MAX_FULL_NAME_LENGTH + 1), 'www.example.com', 'Agent 47', 42, null, undefined]) {
+        for (const name of ['A', '   ', 'a'.repeat(MAX_FULL_NAME_LENGTH + 1), 'www.example.com', 'Ada 555 0100', 42, null, undefined]) {
             expect(FULL_NAME_RULE.validate(name), String(JSON.stringify(name))).toBe(FULL_NAME_INVALID_MESSAGE);
             expect(signUpName(name)).toBeNull();
         }
@@ -164,6 +189,8 @@ describe('FULL_NAME_RULE', () => {
 
     it('says the lengths it holds a name to, in words the no-advice list passes', () => {
         expect(FULL_NAME_INVALID_MESSAGE).toContain(`${MIN_FULL_NAME_LENGTH} to ${MAX_FULL_NAME_LENGTH}`);
+        // A name refused for a full stop run into the next word is told how to write it.
+        expect(FULL_NAME_INVALID_MESSAGE).toContain('space after a full stop');
         expect(findBanned(FULL_NAME_INVALID_MESSAGE)).toEqual([]);
         expect(findBanned(FULL_NAME_RULE.required)).toEqual([]);
     });

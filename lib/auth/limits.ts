@@ -76,12 +76,21 @@ export const clientIpFrom = (headers: HeaderReader): string | null =>
     ?? firstEntry(headers, 'x-forwarded-for')
     ?? asIp(headers.get('x-real-ip'));
 
+// The longest address and password an account can have (lib/auth/validation.ts
+// MAX_EMAIL_LENGTH and MAX_PASSWORD_LENGTH; this file imports nothing, so its test holds the
+// two pairs equal).
+export const SIGN_IN_EMAIL_MAX = 254;
+export const SIGN_IN_PASSWORD_MAX = 128;
+
 // A server action's argument is whatever the client posted, whatever its type says. Sign-in
-// reads two strings and nothing else; anything else reads as no credentials at all.
+// reads two strings and nothing else; anything else reads as no credentials at all. Neither is
+// read past the longest one an account can have: the address becomes a counter's key, written
+// whole into a unique index, and the password is hashed — and sign-in is reachable signed out.
 export const signInCredentials = (input: unknown): {email: string; password: string} | null => {
     if (typeof input !== 'object' || input === null) return null;
     const {email, password} = input as {email?: unknown; password?: unknown};
-    return typeof email === 'string' && typeof password === 'string' ? {email, password} : null;
+    if (typeof email !== 'string' || typeof password !== 'string') return null;
+    return email.length <= SIGN_IN_EMAIL_MAX && password.length <= SIGN_IN_PASSWORD_MAX ? {email, password} : null;
 };
 
 // One counter step, as takeRateLimit takes it: true while `key` is within `limit` for its window.

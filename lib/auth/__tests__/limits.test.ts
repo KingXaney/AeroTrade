@@ -5,8 +5,10 @@ import {
     PASSWORD_RESET_WINDOW_MS,
     SIGN_IN_CLIENT_LIMIT,
     SIGN_IN_EMAIL_LIMIT,
+    SIGN_IN_EMAIL_MAX,
     SIGN_IN_INVALID_MESSAGE,
     SIGN_IN_LIMITED_MESSAGE,
+    SIGN_IN_PASSWORD_MAX,
     SIGN_IN_WINDOW_MS,
     SIGN_UP_CLIENT_LIMIT,
     SIGN_UP_LIMITED_MESSAGE,
@@ -24,6 +26,7 @@ import {
     withinSignUpLimit,
     type TakeCounter,
 } from '@/lib/auth/limits';
+import {MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH} from '@/lib/auth/validation';
 
 const headersOf = (entries: Record<string, string>) => new Headers(entries);
 
@@ -125,6 +128,20 @@ describe('signInCredentials', () => {
     it('reads two strings as posted, and nothing else from the payload', () => {
         expect(signInCredentials({email: 'A@b.co ', password: ' pw'})).toEqual({email: 'A@b.co ', password: ' pw'});
         expect(signInCredentials({email: 'a@b.co', password: 'pw', role: 'admin'})).toEqual({email: 'a@b.co', password: 'pw'});
+    });
+
+    // The address becomes a counter's key, written whole into a unique index, and the password
+    // is hashed: neither is read past the longest one an account can have.
+    it('reads none from an address or a password longer than an account can have', () => {
+        expect(SIGN_IN_EMAIL_MAX).toBe(MAX_EMAIL_LENGTH);
+        expect(SIGN_IN_PASSWORD_MAX).toBe(MAX_PASSWORD_LENGTH);
+        const address = `${'a'.repeat(SIGN_IN_EMAIL_MAX - 5)}@b.co`;
+        expect(signInCredentials({email: address, password: 'pw'})).toEqual({email: address, password: 'pw'});
+        expect(signInCredentials({email: `a${address}`, password: 'pw'})).toBeNull();
+        expect(signInCredentials({email: 'a'.repeat(1_000_000), password: 'pw'})).toBeNull();
+        const longest = 'p'.repeat(SIGN_IN_PASSWORD_MAX);
+        expect(signInCredentials({email: 'a@b.co', password: longest})).toEqual({email: 'a@b.co', password: longest});
+        expect(signInCredentials({email: 'a@b.co', password: `${longest}p`})).toBeNull();
     });
 
     it('reads no credentials from anything but two strings', () => {

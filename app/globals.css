@@ -1826,6 +1826,19 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .search-list-indicator {
     @apply px-5 py-2;
   }
+  /* ⌘K's topic row is the list's last, after every stock found. It stays at the foot of the
+     list while the rows above scroll under it, and the list's scroll padding keeps the row the
+     arrow keys reach clear of it. */
+  .search-topic {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background-color: var(--chrome);
+    border-top: 1px solid color-mix(in srgb, var(--line-strong) 30%, transparent);
+  }
+  .search-list:has(.search-topic) {
+    scroll-padding-bottom: 6.5rem;
+  }
   .search-input {
     @apply border-0 text-base h-14 pr-10 focus:ring-0;
     background-color: transparent !important;

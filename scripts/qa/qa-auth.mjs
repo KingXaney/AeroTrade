@@ -22,7 +22,7 @@
 // Run: npm run qa -- auth   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, HOME_URL, MONGO, PASSWORD, check, outDir, summary} from './lib.mjs';
+import {BASE, HOME_URL, MONGO, PASSWORD, check, hydrated, outDir, summary} from './lib.mjs';
 
 const OUT = outDir('auth');
 
@@ -34,7 +34,7 @@ const LIMITED = 'Too many sign-in attempts. Try again in a few minutes.';
 const SIGN_UP_LIMITED = 'Too many sign-up attempts from this network. Try again later.';
 // lib/auth/validation.ts: FULL_NAME_INVALID_MESSAGE, and a name its rule refuses (letters and full
 // stops alone spell an address a mail client would link in the welcome email's heading).
-const NAME_INVALID = 'Name must be 2 to 60 characters: letters, spaces, apostrophes, hyphens, and full stops that end a word or an initial.';
+const NAME_INVALID = 'Name must be 2 to 60 characters: letters, spaces, apostrophes, hyphens, commas, brackets, full stops and up to four digits. Put a space after a full stop that ends a word.';
 const LINK_NAME = 'www.example.com';
 const EMAIL_LIMIT = 10;
 const CLIENT_LIMIT = 30;
@@ -144,8 +144,14 @@ try {
     // which before hydration is a plain anchor's. A slow landing is a FAIL line, not a throw
     // that ends the suite before the reset checks.
     await page.waitForLoadState('load', {timeout: 30000}).catch(() => {});
-    await page.getByRole('tab', {name: 'Crypto'}).click();
-    await page.waitForURL(/\/trade\?view=crypto/, {timeout: 30000}).catch(() => {});
+    // …and until React has the tab. The page still moves for a second after that: the ticker
+    // tape's frame arrives and pushes everything under it down, and a click aimed at where the
+    // tab was lands in an embed's frame and goes nowhere. So the tab is pressed until it takes.
+    await hydrated(page.getByRole('tab', {name: 'Crypto'})).catch(() => {});
+    for (let i = 0; i < 5 && !/view=crypto/.test(page.url()); i++) {
+        await page.getByRole('tab', {name: 'Crypto'}).click({timeout: 5000}).catch(() => {});
+        await page.waitForURL(/\/trade\?view=crypto/, {timeout: 4000}).catch(() => {});
+    }
     check('picking a view updates the URL', /view=crypto/.test(page.url()), page.url());
     await page.reload({waitUntil: 'domcontentloaded'});
     check('the tab survives a reload', (await page.getByRole('tab', {name: 'Crypto'}).getAttribute('aria-selected')) === 'true');

@@ -34,7 +34,16 @@ export const placeOrder = async (
 ): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
-    if (!(await withinOrderLimit(userId, takeRateLimit))) return {success: false, message: ORDER_COPY.tooFast};
+    // A counter that cannot be written (a failover, a dropped connection) is an order that did
+    // not go through, and is said as one: both tickets wait on this answer with no catch of their own.
+    let within: boolean;
+    try {
+        within = await withinOrderLimit(userId, takeRateLimit);
+    } catch (error) {
+        console.error('The order counter could not be read:', error);
+        return {success: false, message: 'Order failed. Please try again.'};
+    }
+    if (!within) return {success: false, message: ORDER_COPY.tooFast};
 
     const reason = sanitizeTradeNote(note);
     const result = await executeOrder(userId, {accountId, symbol, side, quantity, source: 'user', ...(reason ? {reason} : {})});

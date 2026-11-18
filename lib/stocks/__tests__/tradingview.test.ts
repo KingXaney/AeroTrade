@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {MARKET_EMBEDS, TRADE_CHART_HEIGHT, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from '@/lib/stocks/tradingview';
+import {MARKET_EMBEDS, TRADE_CHART_HEIGHT, TRADE_CHART_PLACE_CLASS, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from '@/lib/stocks/tradingview';
 
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
 
@@ -42,6 +42,17 @@ describe('the trade desk chart', () => {
 
     it('has no height until the browser has said how wide it is', () => {
         expect(tradeChartHeight(null)).toBeNull();
+    });
+
+    // The embed's frame arrives a second after the page, and until then its container has no
+    // height: everything under the desk jumps down by the chart's height. The place is held in
+    // CSS from the first paint, at the two heights the number will be — on the container, since
+    // the stylesheet sizes the widget's own box to 100% of it and overrides any height given there.
+    it('holds the chart\'s place, at both heights, on the embed\'s container', () => {
+        expect(TRADE_CHART_PLACE_CLASS).toBe(`h-[${TRADE_CHART_HEIGHT.narrow}px] xl:h-[${TRADE_CHART_HEIGHT.wide}px]`);
+        expect(read('components/trading/desk/TradeDesk.tsx')).toContain('className={TRADE_CHART_PLACE_CLASS}');
+        expect(read('components/stocks/TradingViewWidget.tsx')).toMatch(/cn\('tradingview-widget-container', className\)/);
+        expect(read('app/globals.css')).toMatch(/\.tradingview-widget-container__widget \{[^}]*height: 100% !important;/);
     });
 
     // The height is chosen in JS and the columns in CSS: they must turn at the same width.

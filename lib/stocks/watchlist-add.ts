@@ -23,11 +23,16 @@ export const popularStocks = (): Stock[] =>
         type: 'Common Stock',
     }));
 
+// Finnhub's search names a company in capitals ("APPLE INC"). A name with letters and none of
+// them small is one of those: lib/actions/watchlist.actions.ts saves the profile's instead.
+export const isShouting = (name: string): boolean => /\p{Lu}/u.test(name) && !/\p{Ll}/u.test(name);
+
 export type AddRow = {stock: Stock; tracked: boolean};   // tracked: already on the watchlist
 
 export type AddRows = {
     query: string;        // the text in the box, trimmed
     searching: boolean;   // the search for this query has not answered yet
+    unavailable: boolean; // it was asked for this query and did not answer: not "found nothing"
     suggested: boolean;   // nothing typed: the rows are the suggestions
     rows: AddRow[];
 };
@@ -47,6 +52,7 @@ export const addRows = ({term, answer, tracked, popular}: {
     return {
         query: view.query,
         searching: view.searching,
+        unavailable: view.unavailable,
         suggested: !view.query,
         rows: view.stocks.map((stock) => ({stock, tracked: isTracked(stock)})),
     };

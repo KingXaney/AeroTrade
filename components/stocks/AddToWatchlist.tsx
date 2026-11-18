@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {toast} from "sonner";
 import {Check, Loader2, Plus, X} from "lucide-react";
 import {Command, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
@@ -58,11 +58,12 @@ const Picker = ({tracked, onAdded}: {tracked: readonly string[]; onAdded: () => 
         if (!query) return;
 
         const request = ++asked.current;
-        let stocks: Stock[];
+        // null: the search did not answer (refused, failed, or the call itself was dropped).
+        let stocks: Stock[] | null;
         try {
-            stocks = (await searchStocks(query)) ?? [];
+            stocks = (await searchStocks(query)) ?? null;
         } catch {
-            stocks = [];
+            stocks = null;
         }
         if (request === asked.current) setAnswer({query, stocks});
     };
@@ -90,6 +91,7 @@ const Picker = ({tracked, onAdded}: {tracked: readonly string[]; onAdded: () => 
     };
 
     const status = view.searching ? copy.searching
+        : view.unavailable ? copy.unanswered
         : view.rows.length > 0 ? ''
         : view.suggested ? copy.hint : copy.none(view.query);
 
@@ -160,6 +162,17 @@ const AddToWatchlist = ({place, tracked = [], variant = 'primary'}: Props) => {
         event.preventDefault();
         (trigger.current ?? document.querySelector<HTMLElement>('[data-watchlist-add]'))?.focus();
     };
+
+    // The dialog can close before the page has redrawn: the focus then goes back to the empty
+    // panel's button, which leaves with its panel a moment later. Before it does (a layout
+    // cleanup runs while the button is still in the document) the focus moves to the title's.
+    useLayoutEffect(() => {
+        const button = trigger.current;
+        return () => {
+            if (place !== 'empty' || !button || document.activeElement !== button) return;
+            document.querySelector<HTMLElement>('[data-watchlist-add="title"]')?.focus();
+        };
+    }, [place]);
 
     return (
         <>

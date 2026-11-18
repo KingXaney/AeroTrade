@@ -6,7 +6,7 @@
 
 import {getCurrentUserId} from "@/lib/auth/session";
 import {searchQuery, withinSearchLimit} from "@/lib/prices/action-limits";
-import {searchStocks as fetchStocks} from "@/lib/prices/finnhub";
+import {findStocks as fetchStocks} from "@/lib/prices/finnhub";
 import {getSheetQuote} from "@/lib/prices/quote-store";
 import {takeRateLimit} from "@/lib/rate-limit";
 import type {QuoteData} from '@/lib/prices/types';
@@ -16,14 +16,18 @@ import type {Stock} from '@/lib/stocks/types';
 // of them inside the signed-in shell. Each new query is a Finnhub call on the plan's one shared
 // minute, so it is the signed-in reader's alone, for a query short enough to be a name
 // (lib/prices/action-limits.ts searchQuery, read before anything is spent), and counted per
-// reader by the minute. Refused, it answers as a search that found nothing: the boxes draw no
-// row. Nothing typed is the popular list, which asks Finnhub nothing and is not counted.
-export const searchStocks = async (query?: string): Promise<Stock[]> => {
+// reader, by the minute and by the hour. Nothing typed is the popular list, which asks Finnhub
+// nothing and is not counted.
+//
+// It answers the stocks found — none is [] — or null when the search did not answer: no session,
+// the reader's count spent, or Finnhub gave nothing back. The boxes tell the two apart
+// (lib/shell/palette.ts): "no stocks found" is said only of a search that looked.
+export const searchStocks = async (query?: string): Promise<Stock[] | null> => {
     const asked = searchQuery(query);
     if (asked === null) return [];
     const userId = await getCurrentUserId();
-    if (!userId) return [];
-    if (asked && !(await withinSearchLimit(userId, takeRateLimit))) return [];
+    if (!userId) return null;
+    if (asked && !(await withinSearchLimit(userId, takeRateLimit))) return null;
     return fetchStocks(asked);
 };
 

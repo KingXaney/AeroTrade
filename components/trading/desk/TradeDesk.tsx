@@ -5,7 +5,7 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import OrderPanel from "@/components/trading/desk/OrderPanel";
 import type {PositionLike} from "@/lib/trading/order-math";
-import {TRADE_CHART_WIDGET_CONFIG, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from "@/lib/stocks/tradingview";
+import {TRADE_CHART_PLACE_CLASS, TRADE_CHART_WIDGET_CONFIG, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from "@/lib/stocks/tradingview";
 import {useDebounce} from "@/hooks/useDebounce";
 import Panel from "@/components/primitives/Panel";
 
@@ -81,6 +81,7 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
                     scriptUrl={tvScript('advanced-chart')}
                     config={TRADE_CHART_WIDGET_CONFIG(symbol)}
                     height={chartHeight}
+                    className={TRADE_CHART_PLACE_CLASS}
                 />
             </Panel>
         </div>

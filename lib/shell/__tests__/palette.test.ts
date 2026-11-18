@@ -15,7 +15,7 @@ const rows = (term: string, answer: StockAnswer<string> | null = null) =>
 describe('the palette with nothing typed', () => {
     it('draws the popular stocks, cut to the first ten, and no topic row', () => {
         const view = rows('');
-        expect(view).toEqual({query: '', searching: false, stocks: popular.slice(0, POPULAR_STOCKS_SHOWN), topic: 'none'});
+        expect(view).toEqual({query: '', searching: false, unavailable: false, stocks: popular.slice(0, POPULAR_STOCKS_SHOWN), topic: 'none'});
         expect(view.stocks).toHaveLength(10);
     });
 
@@ -26,7 +26,7 @@ describe('the palette with nothing typed', () => {
 
 describe('while the stock search for the query in the box is out', () => {
     it('draws no stock row and keeps the topic row waiting, before any answer', () => {
-        expect(rows('AAPL')).toEqual({query: 'AAPL', searching: true, stocks: [], topic: 'waiting'});
+        expect(rows('AAPL')).toEqual({query: 'AAPL', searching: true, unavailable: false, stocks: [], topic: 'waiting'});
     });
 
     it('never draws an earlier query\'s stocks under a new query', () => {
@@ -49,17 +49,63 @@ describe('while the stock search for the query in the box is out', () => {
 describe('once the search has answered for this query', () => {
     it('draws its stocks, all of them, and lets the topic row run', () => {
         const stocks = Array.from({length: 25}, (_, i) => `HIT${i}`);
-        expect(rows('nvidia', {query: 'nvidia', stocks})).toEqual({query: 'nvidia', searching: false, stocks, topic: 'ready'});
+        expect(rows('nvidia', {query: 'nvidia', stocks})).toEqual({query: 'nvidia', searching: false, unavailable: false, stocks, topic: 'ready'});
     });
 
     it('matches the answer to the trimmed text, so a trailing space is the same query', () => {
         const view = rows(' AAPL ', {query: 'AAPL', stocks: ['AAPL']});
-        expect(view).toEqual({query: 'AAPL', searching: false, stocks: ['AAPL'], topic: 'ready'});
+        expect(view).toEqual({query: 'AAPL', searching: false, unavailable: false, stocks: ['AAPL'], topic: 'ready'});
     });
 
     it('lets the topic row run alone when the search found nothing', () => {
         expect(rows('climate policy', {query: 'climate policy', stocks: []}))
-            .toEqual({query: 'climate policy', searching: false, stocks: [], topic: 'ready'});
+            .toEqual({query: 'climate policy', searching: false, unavailable: false, stocks: [], topic: 'ready'});
+    });
+});
+
+// The search can fail to answer: the reader's count for the minute is spent, or Finnhub gave
+// nothing back. That is not "no stocks found" — and with no stock row the topic row would be
+// Enter's, so a ticker and Enter would follow a topic of its name after all.
+describe('when the search did not answer for this query', () => {
+    it('says so, draws no stock row and keeps the topic row waiting', () => {
+        expect(rows('AAPL', {query: 'AAPL', stocks: null}))
+            .toEqual({query: 'AAPL', searching: false, unavailable: true, stocks: [], topic: 'waiting'});
+    });
+
+    it('is still searching for a newer query than the one that went unanswered', () => {
+        const view = rows('AAPL', {query: 'AAP', stocks: null});
+        expect(view.searching).toBe(true);
+        expect(view.unavailable).toBe(false);
+    });
+
+    it('offers no topic row for a query too short to be one', () => {
+        expect(rows('TS', {query: 'TS', stocks: null})).toEqual({query: 'TS', searching: false, unavailable: true, stocks: [], topic: 'none'});
+    });
+});
+
+describe('while the glossary is still on its way', () => {
+    // ⌘K fetches the glossary when it opens (components/shell/SearchCommand.tsx). Until it lands
+    // there are no Learn rows, and Enter on a term must not follow a topic of its name instead.
+    const late = (term: string, answer: StockAnswer<string> | null) =>
+        paletteRows({term, answer, popular, topicMax: TOPIC_MAX, glossaryReady: false});
+
+    it('keeps the topic row waiting though the stock search has answered', () => {
+        expect(late('drawdown', {query: 'drawdown', stocks: []}).topic).toBe('waiting');
+    });
+
+    it('still draws the stocks the search found: only the row that writes waits', () => {
+        const view = late('nvidia', {query: 'nvidia', stocks: ['NVDA']});
+        expect(view).toEqual({query: 'nvidia', searching: false, unavailable: false, stocks: ['NVDA'], topic: 'waiting'});
+    });
+
+    it('offers no topic row for a query too short to be one, as ever', () => {
+        expect(late('TS', {query: 'TS', stocks: []}).topic).toBe('none');
+    });
+
+    it('lets the row run once the glossary is ready, which is the default', () => {
+        const answer = {query: 'drawdown', stocks: []};
+        expect(paletteRows({term: 'drawdown', answer, popular, topicMax: TOPIC_MAX, glossaryReady: true}).topic).toBe('ready');
+        expect(rows('drawdown', answer).topic).toBe('ready');
     });
 });
 

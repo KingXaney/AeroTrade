@@ -20,6 +20,8 @@ export const WATCHLIST_COPY = {
         // Nothing typed, and every suggestion is on the list already.
         hint: 'Type a company name or a ticker to search.',
         none: (query: string): string => `No stocks found for “${query}”.`,
+        // The search was asked and did not answer: never said as "no stocks found".
+        unanswered: 'The stock search did not answer. Type it again in a moment.',
         tracked: 'On your watchlist',
         adding: 'Adding…',
         // WatchlistButton's own words for the same thing.

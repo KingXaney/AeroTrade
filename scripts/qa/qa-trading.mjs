@@ -293,18 +293,21 @@ try {
     check('a stock already on the list is marked in a search, cannot be run, and the next one is selected',
         await marked.getAttribute('aria-disabled').catch(() => null) === 'true' && /on your watchlist/i.test(await marked.innerText().catch(() => ''))
         && await addDialog.locator('[data-watchlist-hit="QTWB"]').getAttribute('aria-selected').catch(() => null) === 'true');
-    // The search is counted per reader by the minute (lib/prices/action-limits.ts). With the
-    // counter set to its limit of 30, the next query — "QT", which both listings match — is
-    // refused before Finnhub is asked, and answers as a search that found nothing.
+    // The search is counted per reader, by the minute and by the hour
+    // (lib/prices/action-limits.ts). With the minute's counter set to its limit of 60, the next
+    // query — "QT", which both listings match — is refused before Finnhub is asked. A search
+    // that did not answer has not found that there is no such stock, and the dialog says which.
     const searchKey = `search:${userId}`;
     await db.collection('ratelimits').updateOne({key: searchKey},
-        {$set: {count: 30, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+        {$set: {count: 60, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
     await page.keyboard.press('Backspace');
-    const refusedSearch = addDialog.locator('[data-watchlist-add-status]').filter({hasText: 'No stocks found for “QT”.'});
+    const addStatus = addDialog.locator('[data-watchlist-add-status]');
+    const refusedSearch = addStatus.filter({hasText: 'The stock search did not answer. Type it again in a moment.'});
     await refusedSearch.waitFor({timeout: 15000}).catch(() => {});
-    check('a search past the reader\'s count for the minute answers no stock',
-        await refusedSearch.count() === 1 && await hits.count() === 0, `${await hits.count()} rows`);
-    await db.collection('ratelimits').deleteMany({key: searchKey});
+    check('a search past the reader\'s count for the minute draws no stock and is said as unanswered, not as "No stocks found"',
+        await refusedSearch.count() === 1 && await hits.count() === 0 && !/No stocks found/i.test(await addStatus.innerText().catch(() => '')),
+        `${await hits.count()} rows`);
+    await db.collection('ratelimits').deleteMany({key: {$in: [searchKey, `search:hour:${userId}`]}});
     await page.keyboard.press('Escape');
     await addDialog.waitFor({state: 'detached', timeout: 5000}).catch(() => {});
     // The checks below read the watchlist this suite seeded: AAPL alone.

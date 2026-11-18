@@ -11,6 +11,8 @@ interface TradingViewWidgetProps {
     config: Record<string, unknown>;
     // null: not known yet. The title and the frame render; the embed waits for a number.
     height?: number | null;
+    // Classes for the embed's container. A height here holds the embed's place before its frame
+    // arrives (the widget's own box is 100% of the container, by the stylesheet).
     className?: string;
 }
 

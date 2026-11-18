@@ -4,10 +4,13 @@ import {describe, expect, it} from 'vitest';
 import {
     ACTION_WINDOW_MS,
     ORDER_USER_LIMIT,
+    SEARCH_HOUR_MS,
     SEARCH_QUERY_MAX,
+    SEARCH_USER_HOUR_LIMIT,
     SEARCH_USER_LIMIT,
     orderUserKey,
     searchQuery,
+    searchUserHourKey,
     searchUserKey,
     withinOrderLimit,
     withinSearchLimit,
@@ -28,15 +31,22 @@ const recording = (answer: boolean) => {
 };
 
 describe('the limits on the actions that ask Finnhub for a reader', () => {
-    it('counts 30 searches and 20 orders a reader, by the minute', () => {
-        expect(SEARCH_USER_LIMIT).toBe(30);
+    it('counts 60 searches and 20 orders a reader by the minute, and 300 searches by the hour', () => {
+        expect(SEARCH_USER_LIMIT).toBe(60);
+        expect(SEARCH_USER_HOUR_LIMIT).toBe(300);
+        expect(SEARCH_HOUR_MS).toBe(3_600_000);
         expect(ORDER_USER_LIMIT).toBe(20);
         expect(ACTION_WINDOW_MS).toBe(60_000);
     });
 
-    // A search is one call; an order is a quote and, for a symbol not asked about that day, a profile.
-    it('leaves either one, alone, under the plan\'s minute', () => {
-        expect(SEARCH_USER_LIMIT).toBeLessThan(FINNHUB_CALLS_A_MINUTE);
+    // Typing is a burst: every pause is one search, so the longest topic name typed slowly, with
+    // its corrections, is some fifty of them inside a minute. A loop is a rate: by the hour it
+    // gets a twelfth of the plan's calls.
+    it('lets a reader type the longest query a key at a time, and holds a loop to a fraction of the plan', () => {
+        expect(SEARCH_USER_LIMIT).toBeGreaterThanOrEqual(SEARCH_QUERY_MAX + 10);
+        expect(SEARCH_USER_LIMIT).toBeLessThanOrEqual(FINNHUB_CALLS_A_MINUTE);
+        expect(SEARCH_USER_HOUR_LIMIT / 60).toBeLessThanOrEqual(FINNHUB_CALLS_A_MINUTE / 12);
+        // An order is a quote and, for a symbol not asked about that day, a profile.
         expect(ORDER_USER_LIMIT * 2).toBeLessThan(FINNHUB_CALLS_A_MINUTE);
     });
 
@@ -45,6 +55,7 @@ describe('the limits on the actions that ask Finnhub for a reader', () => {
         expect(orderUserKey('u1')).toBe('order:u1');
         expect(searchUserKey('u1')).not.toBe(searchUserKey('u2'));
         expect(searchUserKey('u1')).not.toBe(orderUserKey('u1'));
+        expect(searchUserHourKey('u1')).toBe('search:hour:u1');
     });
 });
 
@@ -77,14 +88,29 @@ describe('searchQuery', () => {
 });
 
 describe('withinSearchLimit', () => {
-    it('spends one step of the reader\'s search counter and answers as it does', async () => {
+    it('spends the minute\'s counter, then the hour\'s, and answers true when both hold', async () => {
         const within = recording(true);
         expect(await withinSearchLimit('u1', within.take)).toBe(true);
-        expect(within.steps).toEqual([{key: 'search:u1', limit: 30, windowMs: 60_000}]);
+        expect(within.steps).toEqual([
+            {key: 'search:u1', limit: 60, windowMs: 60_000},
+            {key: 'search:hour:u1', limit: 300, windowMs: 3_600_000},
+        ]);
+    });
 
+    it('spends nothing of the hour once the minute refuses', async () => {
         const over = recording(false);
         expect(await withinSearchLimit('u1', over.take)).toBe(false);
-        expect(over.steps).toHaveLength(1);
+        expect(over.steps).toEqual([{key: 'search:u1', limit: 60, windowMs: 60_000}]);
+    });
+
+    it('refuses when the hour does, though the minute held', async () => {
+        const steps: string[] = [];
+        const take: TakeCounter = async (key) => {
+            steps.push(key);
+            return key === 'search:u1';
+        };
+        expect(await withinSearchLimit('u1', take)).toBe(false);
+        expect(steps).toEqual(['search:u1', 'search:hour:u1']);
     });
 });
 

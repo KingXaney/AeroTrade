@@ -161,14 +161,10 @@ try {
     await page.keyboard.type('QSH');
     // Inside the search's debounce: nothing has answered for "QSH" yet.
     const searching = await paletteRows();
-    await page.keyboard.press('Enter');
     check('while the stock search is out ⌘K draws no stock row, its Follow row waits and no row is selected',
         searching.kinds === 'topic' && searching.topic === 'waiting, disabled' && searching.selected === null, JSON.stringify(searching));
     await page.locator('[data-stock-hit="QSHA"]').waitFor({timeout: 15000}).catch(() => {});
     const answered = await paletteRows();
-    check('…so Enter then runs nothing: the palette stays open on Home and no topic is followed',
-        await page.locator('[cmdk-input]').isVisible() && HOME_URL.test(page.url())
-        && await db.collection('topics').countDocuments({name: 'QSH'}) === 0, page.url());
     check('once it answers, the stocks stand before the Follow row and the first stock is selected',
         answered.kinds === 'stock,stock,topic' && answered.topic === 'ready' && answered.selected === 'QSHA', JSON.stringify(answered));
     await shot('01-palette-keyboard');
@@ -180,6 +176,81 @@ try {
     await page.waitForURL(/\/stocks\/QSHA$/, {timeout: 10000}).catch(() => {});
     check('the arrows move the selection and Enter opens the first stock',
         moved === 'QSHB' && /\/stocks\/QSHA$/.test(page.url()), `${moved} ${page.url()}`);
+
+    // An Enter pressed while the search is out is kept for it, not dropped: a ticker typed and
+    // entered in one go opens its stock once the search answers, and follows no topic of its name.
+    await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
+    for (let i = 0; i < 5 && !(await page.locator('[cmdk-input]').isVisible()); i++) {
+        await page.keyboard.press('Meta+k');
+        await page.waitForSelector('[cmdk-input]', {timeout: 3000}).catch(() => {});
+    }
+    await page.keyboard.type('QSHB');
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/stocks\/QSHB$/, {timeout: 15000}).catch(() => {});
+    check('an Enter pressed while the stock search is out opens the first stock once it answers, and follows no topic',
+        /\/stocks\/QSHB$/.test(page.url()) && await db.collection('topics').countDocuments({name: {$in: ['QSH', 'QSHB']}}) === 0, page.url());
+
+    // --- a long list of stocks, and a search that does not answer ---------------
+    // The topic row is the list's last, after as many as 25 stocks in a list 400 px tall with no
+    // scrollbar: it is pinned to the list's foot, and the row the arrows reach is never under it.
+    const many = Array.from({length: 12}, (_, i) => `QST${String.fromCharCode(65 + i)}`);
+    await fetch(`${FINNHUB_STUB}/__search?${many.map((s) => `${s}=QA%20Long%20${s.slice(-1)}`).join('&')}`);
+    await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
+    // A press before Home has hydrated is lost, and a second press closes the palette again.
+    for (let i = 0; i < 5 && !(await page.locator('[cmdk-input]').isVisible()); i++) {
+        await page.keyboard.press('Meta+k');
+        await page.waitForSelector('[cmdk-input]', {timeout: 3000}).catch(() => {});
+    }
+    await page.keyboard.type('QST');
+    await page.locator('[data-stock-hit="QSTL"]').waitFor({state: 'attached', timeout: 15000}).catch(() => {});
+    const pinned = () => page.evaluate(() => {
+        const list = document.querySelector('[cmdk-list]');
+        const topic = document.querySelector('[cmdk-list] [data-topic-row]');
+        const selected = document.querySelector('[cmdk-list] [cmdk-item][aria-selected="true"]');
+        if (!list || !topic) return null;
+        const box = (el) => el.getBoundingClientRect();
+        const foot = topic.closest('.search-topic') ?? topic;
+        return {
+            stocks: document.querySelectorAll('[cmdk-list] [data-stock-hit]').length,
+            scrolls: list.scrollHeight > list.clientHeight + 1,
+            topicInSight: box(topic).top >= box(list).top - 1 && box(topic).bottom <= box(list).bottom + 1,
+            selected: selected?.getAttribute('data-stock-hit') ?? null,
+            selectedClear: selected ? box(selected).bottom <= box(foot).top + 1 : null,
+        };
+    });
+    const longList = await pinned();
+    check('with twelve stocks found the list scrolls and the topic row is still in sight',
+        longList?.stocks === 12 && longList.scrolls && longList.topicInSight && longList.selected === 'QSTA', JSON.stringify(longList));
+    for (let i = 0; i < 11; i++) await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(250);
+    const lastStock = await pinned();
+    check('…and the last stock the arrows reach is clear of it',
+        lastStock?.selected === 'QSTL' && lastStock.selectedClear === true && lastStock.topicInSight, JSON.stringify(lastStock));
+    await shot('01b-palette-long-list');
+
+    // A search past the reader's count does not answer (lib/prices/action-limits.ts). That is
+    // not "No stocks found": the palette says so and the Follow row goes on waiting — with no
+    // stock row it would be Enter's, and a ticker and Enter would follow a topic of its name.
+    const first = await db.collection('user').findOne({email: firstEmail});
+    const searchKey = `search:${String(first?._id)}`;
+    await db.collection('ratelimits').updateOne({key: searchKey},
+        {$set: {count: 60, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('QSU');
+    const unanswered = page.locator('[data-search-unanswered]');
+    await unanswered.waitFor({timeout: 15000}).catch(() => {});
+    const refused = await paletteRows();
+    const listText = await page.locator('[cmdk-list]').innerText().catch(() => '');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    check('a search past the reader\'s count is said as unanswered, never as "No stocks found", and the Follow row waits',
+        await unanswered.count() === 1 && !/No stocks found/i.test(listText)
+        && refused.kinds === 'topic' && refused.topic === 'waiting, disabled' && refused.selected === null, `${JSON.stringify(refused)} ${listText.slice(0, 120)}`);
+    check('…so Enter follows no topic of that name',
+        await page.locator('[cmdk-input]').isVisible() && await db.collection('topics').countDocuments({name: 'QSU'}) === 0);
+    await db.collection('ratelimits').deleteMany({key: {$in: [searchKey, `search:hour:${String(first?._id)}`]}});
+    await page.keyboard.press('Escape');
+    await fetch(`${FINNHUB_STUB}/__search?QSHA=QA%20Shell%20Alpha&QSHB=QA%20Shell%20Beta`);
 
     // --- below lg: the drawer stands in for the rail ---------------------------
     await page.setViewportSize({width: 390, height: 844});

@@ -190,6 +190,13 @@ export const TRADE_CHART_WIDGET_CONFIG = (symbol: string) => ({
 export const TRADE_DESK_WIDE_QUERY = '(min-width: 80rem)';
 export const TRADE_CHART_HEIGHT = {wide: 560, narrow: 360} as const;
 
+// The chart's place, held in CSS at the same two heights from the first paint, so nothing under
+// the desk moves when the embed's frame arrives a second later. It goes on the embed's container:
+// the stylesheet sizes the widget's own box to 100% of that (`.tradingview-widget-container__widget`
+// in app/globals.css), so a height on the inner box, a class or an inline style, holds nothing.
+// Written out whole: Tailwind reads class names as text.
+export const TRADE_CHART_PLACE_CLASS = 'h-[360px] xl:h-[560px]';
+
 // The chart's height in px for what the browser said of that query. null — the server and the
 // hydrating render cannot know the width — is no height yet: the embed waits for the answer.
 export const tradeChartHeight = (wide: boolean | null): number | null =>
