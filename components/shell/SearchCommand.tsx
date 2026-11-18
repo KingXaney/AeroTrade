@@ -1,9 +1,9 @@
 "use client"
 
-import {useEffect, useState, useTransition} from "react";
+import {useEffect, useRef, useState, useTransition} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
-import {CommandDialog, CommandEmpty, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
+import {CommandDialog, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Button} from "@/components/ui/button";
 import {BookOpen, Loader2, Search, Sparkles, TrendingUp} from "lucide-react";
 import {searchStocks} from "@/lib/actions/stocks.actions";
@@ -12,6 +12,7 @@ import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
 import {searchGlossaryFor} from "@/lib/learn/where";
 import {NAV_PAGES, searchPages, type NavDestination} from "@/lib/shell/navigation";
+import {paletteRows, type StockAnswer} from "@/lib/shell/palette";
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicLink} from '@/lib/topics/types';
 
@@ -24,9 +25,6 @@ type SearchCommandProps = {
     owner?: boolean;   // the owner (lib/lab/owner.ts): the Learn rows then reach the terms homed on the owner's pages too
 };
 
-// Anything shorter reads as a ticker prefix, not a topic.
-const TOPIC_MIN_CHARS = 3;
-
 export default function SearchCommand({
     renderAs = 'button',
     label = 'Add stock',
@@ -38,18 +36,20 @@ export default function SearchCommand({
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [stocks, setStocks] = useState<Stock[]>(initialStocks);
+    // The stock search's newest answer and the query it answered for. Rows are drawn from it only
+    // while that is the query in the box: Enter runs the selected row, so an earlier query's
+    // stocks must never stand in for this one's (lib/shell/palette.ts).
+    const [answer, setAnswer] = useState<StockAnswer<Stock> | null>(null);
+    const asked = useRef(0);
     const [following, startFollow] = useTransition();
 
-    const isSearchMode = !!searchTerm.trim();
-    const displayStocks = isSearchMode ? stocks : stocks?.slice(0, 10);
+    const rows = paletteRows({term: searchTerm, answer, popular: initialStocks, topicMax: NAME_MAX});
+    const isSearchMode = !!rows.query;
 
     // "Follow topic" row: any query long enough to be a subject. If it names a
     // topic the user already follows, open that instead of creating a duplicate.
-    const topicQuery = searchTerm.trim();
-    const canFollow = topicQuery.length >= TOPIC_MIN_CHARS && topicQuery.length <= NAME_MAX;
-    const existingTopic = canFollow ? initialTopics.find((t) => t.name.toLowerCase() === topicQuery.toLowerCase()) : undefined;
+    const topicQuery = rows.query;
+    const existingTopic = rows.topic !== 'none' ? initialTopics.find((t) => t.name.toLowerCase() === topicQuery.toLowerCase()) : undefined;
     // Glossary rows are matched client-side against a pure registry: no request, no key. Only the
     // entries the reader's /glossary renders (glossaryGroupsFor), so no row opens a missing anchor.
     const learnHits = searchGlossaryFor(topicQuery, 4, {owner});
@@ -68,18 +68,20 @@ export default function SearchCommand({
         return () => window.removeEventListener("keydown", onKeyDown);
     }, []);
 
+    // Asks for the query in the box when the debounce fires. An answer that comes back after a
+    // newer search was asked is dropped, so a slow reply never takes the newer one's place.
     const handleSearch = async () => {
-        if (!isSearchMode) return setStocks(initialStocks);
+        const query = rows.query;
+        if (!query) return;
 
-        setLoading(true);
+        const request = ++asked.current;
+        let stocks: Stock[];
         try {
-            const results = await searchStocks(searchTerm.trim());
-            setStocks(results);
+            stocks = (await searchStocks(query)) ?? [];
         } catch {
-            setStocks([]);
-        } finally {
-            setLoading(false);
+            stocks = [];
         }
+        if (request === asked.current) setAnswer({query, stocks});
     };
 
     const debouncedSearch = useDebounce(handleSearch, 300);
@@ -91,7 +93,7 @@ export default function SearchCommand({
     const closePalette = () => {
         setOpen(false);
         setSearchTerm("");
-        setStocks(initialStocks);
+        setAnswer(null);
     };
 
     const goTo = (href: string) => {
@@ -140,7 +142,7 @@ export default function SearchCommand({
                         placeholder="Search stocks, a page, a term to learn, or a topic to follow..."
                         className="search-input"
                     />
-                    {loading && <Loader2 className="search-loader" />}
+                    {rows.searching && <Loader2 className="search-loader" />}
                 </div>
                 <CommandList className="search-list">
                     {pageHits.length > 0 && (
@@ -190,34 +192,13 @@ export default function SearchCommand({
                             ))}
                         </>
                     )}
-                    {canFollow && (
-                        <>
-                            <div className="search-count">Topics</div>
-                            <CommandItem
-                                value={`topic-${topicQuery}`}
-                                disabled={following}
-                                onSelect={existingTopic
-                                    ? () => goTo(`/topics/${existingTopic.slug}`)
-                                    : handleFollowTopic}
-                                className="search-item-link"
-                            >
-                                {following
-                                    ? <Loader2 className="h-4 w-4 animate-spin text-brand"/>
-                                    : <Sparkles className="h-4 w-4 text-brand"/>}
-                                <div className="flex-1">
-                                    <div className="search-item-name">
-                                        {existingTopic ? `Open topic: ${existingTopic.name}` : `Follow topic: “${topicQuery}”`}
-                                    </div>
-                                    <div className="text-sm text-fg-muted font-mono" style={{fontSize: '11px', letterSpacing: '0.02em'}}>
-                                        {existingTopic ? 'You already follow this' : 'News about anything — markets, tech, politics, sport'}
-                                    </div>
-                                </div>
-                            </CommandItem>
-                        </>
-                    )}
-                    {loading ? (
-                        <CommandEmpty className="search-list-empty">Loading stocks...</CommandEmpty>
-                    ) : displayStocks?.length === 0 ? (
+                    {/* Stocks before the topic row: cmdk selects the first row that can be run, and
+                        Enter runs it. While the search for this query is out there is no stock row
+                        at all — a plain line where "No stocks found" would stand, since cmdk's Empty
+                        shows only when no row is mounted and the waiting topic row is one. */}
+                    {rows.searching ? (
+                        <div className="search-list-indicator">Loading stocks...</div>
+                    ) : rows.stocks.length === 0 ? (
                         <div className="search-list-indicator">
                             {isSearchMode ? 'No stocks found' : 'No stocks available'}
                         </div>
@@ -225,14 +206,15 @@ export default function SearchCommand({
                         <>
                             <div className="search-count">
                                 {isSearchMode ? 'Stocks' : 'Popular stocks'}
-                                {` `}({displayStocks?.length || 0})
+                                {` `}({rows.stocks.length})
                             </div>
-                            {displayStocks?.map((stock) => (
+                            {rows.stocks.map((stock) => (
                                 <CommandItem
                                     key={stock.symbol}
                                     value={stock.symbol}
                                     onSelect={() => goTo(`/stocks/${stock.symbol}`)}
                                     className="search-item-link"
+                                    data-stock-hit={stock.symbol}
                                 >
                                     <TrendingUp className="h-4 w-4 text-brand-dim" />
                                     <div className="flex-1">
@@ -246,6 +228,38 @@ export default function SearchCommand({
                                     </div>
                                 </CommandItem>
                             ))}
+                        </>
+                    )}
+                    {/* The topic row is last, and waits (disabled) until the stock search has answered:
+                        following is a write, so it is Enter's row only when nothing else was found. */}
+                    {rows.topic !== 'none' && (
+                        <>
+                            <div className="search-count">Topics</div>
+                            {/* Keyed on waiting/ready. cmdk selects a row after a keystroke, or when one
+                                mounts with nothing selected — never when a row stops being disabled.
+                                The remount is what makes this row Enter's when the search found nothing. */}
+                            <CommandItem
+                                key={rows.topic}
+                                value={`topic-${topicQuery}`}
+                                disabled={following || rows.topic === 'waiting'}
+                                onSelect={existingTopic
+                                    ? () => goTo(`/topics/${existingTopic.slug}`)
+                                    : handleFollowTopic}
+                                className="search-item-link"
+                                data-topic-row={rows.topic}
+                            >
+                                {following
+                                    ? <Loader2 className="h-4 w-4 animate-spin text-brand"/>
+                                    : <Sparkles className="h-4 w-4 text-brand"/>}
+                                <div className="flex-1">
+                                    <div className="search-item-name">
+                                        {existingTopic ? `Open topic: ${existingTopic.name}` : `Follow topic: “${topicQuery}”`}
+                                    </div>
+                                    <div className="text-sm text-fg-muted font-mono" style={{fontSize: '11px', letterSpacing: '0.02em'}}>
+                                        {existingTopic ? 'You already follow this' : 'News about anything — markets, tech, politics, sport'}
+                                    </div>
+                                </div>
+                            </CommandItem>
                         </>
                     )}
                 </CommandList>

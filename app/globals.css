@@ -1826,11 +1826,6 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .search-list-indicator {
     @apply px-5 py-2;
   }
-  .search-list-empty {
-    @apply py-6 text-center;
-    background-color: transparent !important;
-    color: var(--fg-muted);
-  }
   .search-input {
     @apply border-0 text-base h-14 pr-10 focus:ring-0;
     background-color: transparent !important;

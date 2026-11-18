@@ -10,8 +10,12 @@
 //   /__prices?AAPL=150&MSFT=300&step=0.5   replaces the table; with a step, each call for a symbol
 //                                     answers `step` higher than the one before, so a price that
 //                                     moved on screen proves a second call.
+//   /__search?QSHA=QA%20Shell%20Alpha  replaces the listings (symbol=name) /search answers from: the
+//                                     rows whose symbol or name holds q, in the order given, in any
+//                                     mode. With none (the start, and a bare /__search) /search finds
+//                                     nothing. qa-shell lists two symbols for ⌘K's stock rows.
 //   /__stats                          calls per path and per quoted symbol, the last token seen.
-//   /__reset                          mode empty, no table, counts at zero.
+//   /__reset                          mode empty, no table, no listings, counts at zero.
 import http from 'node:http';
 
 const PORT = Number(process.env.QA_FINNHUB_PORT ?? 8791);
@@ -20,6 +24,7 @@ const fresh = () => ({requests: 0, paths: {}, quotes: {}, refused: 0, lastToken:
 let mode = 'empty';
 let table = new Map();
 let step = 0;
+let listings = new Map();
 let stats = fresh();
 
 const json = (res, status, body) => {
@@ -49,6 +54,17 @@ const quote = (symbol) => {
     return {c, d: 0.5, dp: 0.5, h: c, l: c, o: c, pc: c, t: Math.floor(Date.now() / 1000)};
 };
 
+// Finnhub's symbol lookup: {count, result: [{description, displaySymbol, symbol, type}]}.
+const search = (q) => {
+    const needle = q.trim().toUpperCase();
+    const result = needle
+        ? [...listings]
+            .filter(([symbol, name]) => symbol.includes(needle) || name.toUpperCase().includes(needle))
+            .map(([symbol, description]) => ({description, displaySymbol: symbol, symbol, type: 'Common Stock'}))
+        : [];
+    return {count: result.length, result};
+};
+
 const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
     if (url.pathname === '/__mode') {
@@ -67,11 +83,16 @@ const server = http.createServer((req, res) => {
         }
         return json(res, 200, {mode, step, symbols: [...table.keys()]});
     }
+    if (url.pathname === '/__search') {
+        listings = new Map([...url.searchParams].map(([symbol, name]) => [symbol.toUpperCase(), name]));
+        return json(res, 200, {mode, listings: [...listings.keys()]});
+    }
     if (url.pathname === '/__stats') return json(res, 200, {...stats, mode, step, symbols: [...table.keys()]});
     if (url.pathname === '/__reset') {
         mode = 'empty';
         table = new Map();
         step = 0;
+        listings = new Map();
         stats = fresh();
         return json(res, 200, {mode});
     }
@@ -88,6 +109,7 @@ const server = http.createServer((req, res) => {
         }
         return json(res, 200, mode === 'prices' ? quote(symbol) : EMPTY['/quote']);
     }
+    if (url.pathname === '/search') return json(res, 200, search(url.searchParams.get('q') ?? ''));
     return json(res, 200, EMPTY[url.pathname] ?? {});
 });
 

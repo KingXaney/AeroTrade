@@ -1,7 +1,9 @@
 // The app shell (components/shell, lib/shell): the icon rail lists the five sections every account
 // has (the owner's seven: Strategies and Brain are theirs alone, lib/lab/owner.ts) and names each
 // on hover, Portfolio and News open their cards, a section's other pages are tabs on the page,
-// ⌘K works by keyboard alone and finds a page by name, the mobile drawer stands in for the rail
+// ⌘K works by keyboard alone and finds a page by name (Enter runs nothing while the stock search for
+// the typed query is out, and opens the first stock once it has answered — never the Follow row
+// while anything else was found), the mobile drawer stands in for the rail
 // and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
 // friends: a sent request is listed with its age, and the recipient sees a dot on the avatar and
 // a count in the account menu. Anyone but the owner meets none of the owner's pages: each sends
@@ -12,6 +14,8 @@ import {MongoClient} from 'mongodb';
 import {BASE, HOME_URL, MONGO, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('shell');
+// The harness's Finnhub stand-in (start-finnhub-stub.mjs): ⌘K's stock search answers from it.
+const FINNHUB_STUB = `http://localhost:${process.env.QA_FINNHUB_PORT ?? 8791}`;
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -136,14 +140,44 @@ try {
     await page.keyboard.type('act');
     check('…and finds a page by name', await page.locator('[data-page-hit="/history"]').count() === 1);
     for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
-    await page.keyboard.type('AAPL');
-    await page.waitForTimeout(1200); // debounced server search
-    // Arrow + Enter alone — never a mouse. This is what the raw <li>/<Link> rows broke.
-    await page.keyboard.press('ArrowDown');
+    // A stock query by keyboard alone. Enter runs the selected row, and cmdk selects the first row
+    // that can be run after every keystroke: a ticker and Enter once followed a topic of that name,
+    // the Follow row standing before the stocks and before the search had answered. The stand-in
+    // lists two symbols no other suite searches for (the search is cached by its address).
+    await fetch(`${FINNHUB_STUB}/__search?QSHA=QA%20Shell%20Alpha&QSHB=QA%20Shell%20Beta`);
+    const paletteRows = () => page.evaluate(() => {
+        const kind = (el) => ['page', 'learn', 'stock'].find((k) => el.hasAttribute(`data-${k}-hit`)) ?? (el.hasAttribute('data-topic-row') ? 'topic' : 'other');
+        const items = [...document.querySelectorAll('[cmdk-list] [cmdk-item]')];
+        const selected = items.find((el) => el.getAttribute('aria-selected') === 'true');
+        const topic = document.querySelector('[cmdk-list] [data-topic-row]');
+        return {
+            kinds: items.map(kind).join(','),
+            topic: topic ? `${topic.getAttribute('data-topic-row')}${topic.getAttribute('aria-disabled') === 'true' ? ', disabled' : ''}` : null,
+            selected: selected ? selected.getAttribute('data-stock-hit') ?? kind(selected) : null,
+        };
+    });
+    await page.keyboard.type('QSH');
+    // Inside the search's debounce: nothing has answered for "QSH" yet.
+    const searching = await paletteRows();
     await page.keyboard.press('Enter');
-    await page.waitForURL(/\/(stocks|topics)\//, {timeout: 10000}).catch(() => {});
-    check('arrow + Enter navigates from the palette', /\/(stocks|topics)\//.test(page.url()), page.url());
+    check('while the stock search is out ⌘K draws no stock row, its Follow row waits and no row is selected',
+        searching.kinds === 'topic' && searching.topic === 'waiting, disabled' && searching.selected === null, JSON.stringify(searching));
+    await page.locator('[data-stock-hit="QSHA"]').waitFor({timeout: 15000}).catch(() => {});
+    const answered = await paletteRows();
+    check('…so Enter then runs nothing: the palette stays open on Home and no topic is followed',
+        await page.locator('[cmdk-input]').isVisible() && HOME_URL.test(page.url())
+        && await db.collection('topics').countDocuments({name: 'QSH'}) === 0, page.url());
+    check('once it answers, the stocks stand before the Follow row and the first stock is selected',
+        answered.kinds === 'stock,stock,topic' && answered.topic === 'ready' && answered.selected === 'QSHA', JSON.stringify(answered));
     await shot('01-palette-keyboard');
+    // Arrows + Enter alone — never a mouse. This is what the raw <li>/<Link> rows broke.
+    await page.keyboard.press('ArrowDown');
+    const moved = (await paletteRows()).selected;
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/stocks\/QSHA$/, {timeout: 10000}).catch(() => {});
+    check('the arrows move the selection and Enter opens the first stock',
+        moved === 'QSHB' && /\/stocks\/QSHA$/.test(page.url()), `${moved} ${page.url()}`);
 
     // --- below lg: the drawer stands in for the rail ---------------------------
     await page.setViewportSize({width: 390, height: 844});
@@ -332,6 +366,7 @@ try {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
+    await fetch(`${FINNHUB_STUB}/__search`).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }
