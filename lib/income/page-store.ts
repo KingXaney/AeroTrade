@@ -7,7 +7,7 @@ import AccountIncome from "@/database/models/account-income.model";
 import {getEasternDateString} from "@/lib/dates";
 import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import {apyFromDiscount, distinctIncomeRows, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/income/accrual";
-import {getOwnedAccount} from "@/lib/trading/accounts";
+import {getCachedOwnedAccount} from "@/lib/trading/accounts";
 import {getTradeLedger} from "@/lib/trading/ledger";
 import {restateDividend, toAppliedSplits} from "@/lib/trading/splits";
 import {accountEpoch} from "@/lib/trading/epoch";
@@ -42,7 +42,7 @@ export const getIncomeSummary = async (account: {incomeTotals?: {interest?: numb
 // rate series and no price metas: every interest receipt rebuilds from its own rows.
 export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeView | null> => {
     try {
-        const account = await getOwnedAccount(userId, accountId);
+        const account = await getCachedOwnedAccount(userId, accountId);
         if (!account) return null;
         if (!account.incomeThrough) return {interestByMonth: [], dividends: [], missed: []};
         const inceptionAt = accountEpoch(account);

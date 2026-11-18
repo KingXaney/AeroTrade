@@ -4,11 +4,10 @@
 // row is still to be inserted, and in today's shares after a split. Server-only (NOT 'use server').
 
 import {cache} from "react";
-import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import PaperAccount from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
-import {DEFAULT_ACCOUNT_NAME, getOwnedAccount} from "@/lib/trading/accounts";
+import {DEFAULT_ACCOUNT_NAME, getCachedOwnedAccount, getOwnedAccount} from "@/lib/trading/accounts";
 import type {CsvTrade} from "@/lib/trading/csv";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import {pendingTradeRow, withPendingRows, type PendingFillLike} from "@/lib/trading/pending";
@@ -50,12 +49,10 @@ const toTradeRecord = (t: LeanTrade, splits: readonly AppliedSplit[], accountNam
 type TradeEpoch = {since: Date | null; pending: LeanTrade | null; splits: AppliedSplit[]};
 
 const tradeEpoch = cache(async (userId: string, accountId: string): Promise<TradeEpoch | undefined> => {
-    if (!Types.ObjectId.isValid(accountId)) return undefined;
-    await connectToDatabase();
-    const account = await PaperAccount.findOne({_id: accountId, userId}).select('inceptionAt pendingFill splits')
-        .lean<{inceptionAt?: Date; pendingFill?: PendingFillLike; splits?: StoredSplits} | null>();
+    // The render's own copy of the account: the page's analytics and its income panel hold it too.
+    const account = await getCachedOwnedAccount(userId, accountId);
     return account
-        ? {since: account.inceptionAt ?? null, pending: pendingTradeRow(accountId, account.pendingFill), splits: toAppliedSplits(account.splits)}
+        ? {since: account.inceptionAt ?? null, pending: pendingTradeRow(String(account._id), account.pendingFill), splits: toAppliedSplits(account.splits)}
         : undefined;
 });
 

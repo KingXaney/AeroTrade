@@ -80,7 +80,9 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
     const [ledger, analytics, comparisonStats, income, luck, habits, tradedBy, fillReplays, goneSymbols] = await Promise.all([
         ledgerRead,
         getAccountAnalytics(userId, account.id),
-        getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
+        // The comparison table is drawn only for more than one account; with one, its two reads
+        // of every trade and every snapshot of the user would feed nothing.
+        all.length > 1 ? getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))) : Promise.resolve({}),
         getIncomeActivity(userId, account.id),
         luckRead,
         habitsRead,
