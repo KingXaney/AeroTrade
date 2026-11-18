@@ -37,15 +37,22 @@ export const toPlainPositions = (account: {positions: PaperPosition[]}): PaperPo
         avgCost: p.avgCost,
     }));
 
+// The users this server instance has already probed for pre-migration trades (below). Bounded:
+// past the cap it starts over, which costs each user one more probe.
+const LEGACY_CHECKED_MAX = 20_000;
+const legacyChecked = new Set<string>();
+
 // All paper accounts for a user, oldest first. Creates DEFAULT_ACCOUNT_NAME on first use
 // (preserves the original lazy-create behavior).
 export const getAccountsForUser = async (userId: string): Promise<PaperAccountDoc[]> => {
     await connectToDatabase();
     const existing = await PaperAccount.find({userId}).sort({createdAt: 1});
-    if (existing.length === 1) {
+    if (existing.length === 1 && !legacyChecked.has(userId)) {
         // Lazy backfill for pre-migration trades (no accountId): a single-account user's
-        // legacy trades all belong to that account. Self-extinguishing — after the first
-        // updateMany the exists() probe never matches again.
+        // legacy trades all belong to that account. The backfill happens once; the probe that
+        // looks for it used to run before every page's other reads for good, so it is asked
+        // once per user per server instance (`npm run migrate:accounts` does the same backfill
+        // for a whole database).
         const hasLegacy = await PaperTrade.exists({userId, accountId: {$exists: false}});
         if (hasLegacy) {
             await PaperTrade.updateMany(
@@ -53,6 +60,8 @@ export const getAccountsForUser = async (userId: string): Promise<PaperAccountDo
                 {$set: {accountId: String(existing[0]._id)}},
             );
         }
+        if (legacyChecked.size >= LEGACY_CHECKED_MAX) legacyChecked.clear();
+        legacyChecked.add(userId);
     }
     if (existing.length > 0) return existing;
 
@@ -88,6 +97,12 @@ export const getOwnedAccount = async (userId: string, accountId: string): Promis
     await connectToDatabase();
     return PaperAccount.findOne({_id: accountId, userId});
 };
+
+// One read of an owned account per server render: a page's analytics, its income panel and its
+// ledger each resolve the same account, and each used to read it again. cache() is a
+// pass-through outside React, so an action or a job still reads the account at that moment —
+// which is what something about to WRITE must do (lib/trading/orders.loadAccountForFill does).
+export const getCachedOwnedAccount = cache(getOwnedAccount);
 
 // Distinct symbols held across ALL of a user's accounts (news digest personalization).
 export const getHeldSymbolsByUserId = async (userId: string): Promise<string[]> => {
