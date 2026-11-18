@@ -3,9 +3,13 @@
 // are the app's only limits on them; lib/rate-limit.ts takeRateLimit does the counting.
 //
 // Import-free so the keys, the client-address reading, the sign-in input check and the order
-// the two sign-in counters are spent in are unit-tested like chat-limits.
+// sign-in's and password reset's two counters are spent in are unit-tested like chat-limits.
 
+// A reset request is counted twice, as sign-in is: per address, so nobody's inbox is flooded,
+// and per client, because the address is the caller's own to choose — a new one each time is a
+// new key the per-address counter never refuses, and every key is a row in the database.
 export const PASSWORD_RESET_LIMIT = 3;
+export const PASSWORD_RESET_CLIENT_LIMIT = 10;
 export const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
 
 // Sign-in is counted twice: per address, so no one can guess one account's password from
@@ -32,6 +36,11 @@ export const SIGN_IN_INVALID_MESSAGE = 'Invalid email or password';
 const normaliseEmail = (email: string): string => email.trim().toLowerCase();
 
 export const passwordResetKey = (email: string): string => `pwreset:${normaliseEmail(email)}`;
+// Counted even when no header names a client, every such request on one key: unlike sign-in's,
+// the per-address counter behind it stops no one who never names an address twice. An address
+// the action keys carries an @ (lib/auth/validation.ts passwordResetEmail) and this key never
+// does, so the two counters cannot meet.
+export const passwordResetClientKey = (ip: string | null): string => `pwreset:ip:${ip ?? 'unknown'}`;
 export const signInEmailKey = (email: string): string => `signin:email:${normaliseEmail(email)}`;
 export const signInClientKey = (ip: string): string => `signin:ip:${ip}`;
 // Sign-in can skip its client counter when no header names a client (its per-address counter
@@ -59,8 +68,9 @@ const firstEntry = (headers: HeaderReader, name: string): string | null =>
 // overwrite, hence first. Anywhere else the client chooses its own key: Next's server fills
 // x-forwarded-for from the socket only when the request carries none (`??=` in its
 // base-server), so the per-address limit is the one that holds there.
-// Null when no header names an address — the caller then skips the per-client limit rather
-// than counting every such request against one shared key.
+// Null when no header names an address — sign-in then skips its per-client limit rather than
+// counting every such request against one shared key; sign-up and password reset, which have
+// no counter behind it that holds, count them on one.
 export const clientIpFrom = (headers: HeaderReader): string | null =>
     firstEntry(headers, 'x-vercel-forwarded-for')
     ?? firstEntry(headers, 'x-forwarded-for')
@@ -87,6 +97,16 @@ export const withinSignInLimits = async (
 ): Promise<boolean> => {
     if (ip && !(await take(signInClientKey(ip), SIGN_IN_CLIENT_LIMIT, SIGN_IN_WINDOW_MS))) return false;
     return take(signInEmailKey(email), SIGN_IN_EMAIL_LIMIT, SIGN_IN_WINDOW_MS);
+};
+
+// Client first, then address, as at sign-in: a client over its limit writes no key for the
+// address it names and spends nothing of that address's budget.
+export const withinPasswordResetLimits = async (
+    {ip, email}: {ip: string | null; email: string},
+    take: TakeCounter,
+): Promise<boolean> => {
+    if (!(await take(passwordResetClientKey(ip), PASSWORD_RESET_CLIENT_LIMIT, PASSWORD_RESET_WINDOW_MS))) return false;
+    return take(passwordResetKey(email), PASSWORD_RESET_LIMIT, PASSWORD_RESET_WINDOW_MS);
 };
 
 // The sign-up limit in force: SIGN_UP_CLIENT_LIMIT from the environment when it is a positive

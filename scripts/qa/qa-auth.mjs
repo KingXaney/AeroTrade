@@ -1,7 +1,9 @@
 // Accounts and sign-in (lib/auth, app/(auth), app/(reset)): password reset end to end — the
 // emailed link opens logged out (proxy matcher), the token is read out of the throwaway Mongo (no
 // SMTP in the harness), the request answers identically for every address, the rate limiter stops
-// the fourth request, old sessions are revoked, a token is single-use.
+// the fourth request, old sessions are revoked, a token is single-use. A reset request is counted
+// per client address too (10), before its address; one whose address is longer than a mailbox's
+// can be gets the same answer and spends no counter. Every pwreset:* row is removed at the end.
 // Sign-in is limited per address (10 in 15 minutes, every spelling of it counted together) and
 // per client address (30): the refusal is one fixed sentence, identical for an address with an
 // account and one without, it holds even for the right password, and another address is not
@@ -29,6 +31,9 @@ const LIMITED = 'Too many sign-in attempts. Try again in a few minutes.';
 const SIGN_UP_LIMITED = 'Too many sign-up attempts from this network. Try again later.';
 const EMAIL_LIMIT = 10;
 const CLIENT_LIMIT = 30;
+// lib/auth/limits.ts: PASSWORD_RESET_CLIENT_LIMIT; lib/auth/validation.ts: MAX_EMAIL_LENGTH.
+const RESET_CLIENT_LIMIT = 10;
+const MAX_EMAIL_LENGTH = 254;
 
 const browser = await chromium.launch({channel: 'chrome'});
 const mongo = new MongoClient(MONGO);
@@ -159,6 +164,8 @@ try {
     const tokensFor = () => verification.countDocuments({identifier: /^reset-password:/, value: userId});
     check('sign-in offers a way to recover', (await page.goto(`${BASE}/sign-in`, {waitUntil: 'load'}), await page.locator('a[href="/forgot-password"]').count() === 1));
 
+    // An earlier run against the same database may have left this client's reset window open.
+    await limits.deleteMany({key: /^pwreset:ip:/});
     const m1 = await requestReset(email);
     check('a known address gets the neutral message', m1 === NEUTRAL, m1);
     check('…and a reset token', (await tokensFor()) === 1);
@@ -174,6 +181,30 @@ try {
     check('three requests in a window are honoured', (await tokensFor()) === 3);
     const m4 = await requestReset(email);
     check('the fourth is silently rate-limited with the same message', m4 === NEUTRAL && (await tokensFor()) === 3);
+
+    // The address is whatever the caller posts, and it becomes a counter's key. The form's
+    // pattern has no length in it, so the page itself can send one longer than a mailbox's can
+    // be: the answer is the same and no counter is spent, of the client or of the address.
+    const resetRows = async () => (await limits.find({key: /^pwreset:/}).toArray()).map((r) => `${r.key}=${r.count}`).sort().join(', ');
+    const rowsBefore = await resetRows();
+    const m5 = await requestReset(`${'a'.repeat(MAX_EMAIL_LENGTH)}@example.com`);
+    const rowsAfter = await resetRows();
+    check(`an address past ${MAX_EMAIL_LENGTH} characters gets the identical message`, m5 === NEUTRAL, m5);
+    check('…and spends no counter, of the client or of the address', rowsAfter === rowsBefore, `${rowsBefore} → ${rowsAfter.slice(0, 200)}`);
+
+    // Per client, before the address: `next dev` fills x-forwarded-for from the socket when the
+    // browser sends none, so this run has one key — the five requests above that named an address.
+    const resetClientRows = await limits.find({key: /^pwreset:ip:/}).toArray();
+    check('a reset request is counted against its client too', resetClientRows.length === 1 && resetClientRows[0].count === 5,
+        resetClientRows.map((r) => `${r.key}=${r.count}`).join(', '));
+    if (resetClientRows.length === 1) {
+        await limits.updateOne({_id: resetClientRows[0]._id}, {$set: {count: RESET_CLIENT_LIMIT}});
+        // The address's own window starts again, so only the client's limit can refuse it.
+        await limits.deleteMany({key: `pwreset:${email}`});
+        const m6 = await requestReset(email);
+        check(`a client over ${RESET_CLIENT_LIMIT} reset requests gets the same message and no token`, m6 === NEUTRAL && (await tokensFor()) === 3, m6);
+        check('…before its address is counted', (await limits.countDocuments({key: `pwreset:${email}`})) === 0);
+    }
 
     const doc = await verification.find({identifier: /^reset-password:/, value: userId}).sort({_id: -1}).limit(1).next();
     const token = doc.identifier.slice('reset-password:'.length);
@@ -293,8 +324,9 @@ try {
     check(`threw: ${err.message}`, false);
     if (page) await shot('99-error').catch(() => {});
 } finally {
-    // Later suites sign in and sign up from this same client: leave no window open behind.
-    if (limits) await limits.deleteMany({key: /^sign(in|up):/}).catch(() => {});
+    // Later suites sign in and sign up from this same client, and a second run of this one asks
+    // for resets from it: leave no window open behind.
+    if (limits) await limits.deleteMany({key: /^(sign(in|up)|pwreset):/}).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }

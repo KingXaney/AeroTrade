@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
+    PASSWORD_RESET_CLIENT_LIMIT,
     PASSWORD_RESET_LIMIT,
     PASSWORD_RESET_WINDOW_MS,
     SIGN_IN_CLIENT_LIMIT,
@@ -11,12 +12,14 @@ import {
     SIGN_UP_LIMITED_MESSAGE,
     SIGN_UP_WINDOW_MS,
     clientIpFrom,
+    passwordResetClientKey,
     passwordResetKey,
     resolveSignUpLimit,
     signInClientKey,
     signInCredentials,
     signInEmailKey,
     signUpClientKey,
+    withinPasswordResetLimits,
     withinSignInLimits,
     withinSignUpLimit,
     type TakeCounter,
@@ -199,6 +202,82 @@ describe('withinSignInLimits', () => {
         }
         expect(lockedOut.length).toBeGreaterThan(0);
         expect(lockedOut.length).toBeLessThanOrEqual(Math.floor(SIGN_IN_CLIENT_LIMIT / SIGN_IN_EMAIL_LIMIT));
+    });
+});
+
+// A reset request is reachable signed out and its address is the caller's to choose, so the
+// per-address counter alone refuses nobody who sends a new address each time: the client is
+// counted first, as at sign-in.
+describe('the password-reset limits', () => {
+    it('limits a client above an address, in the same 15-minute window', () => {
+        expect(PASSWORD_RESET_CLIENT_LIMIT).toBe(10);
+        expect(PASSWORD_RESET_CLIENT_LIMIT).toBeGreaterThan(PASSWORD_RESET_LIMIT);
+    });
+
+    it('keys on the client, apart from the address counter and from sign-in and sign-up', () => {
+        expect(passwordResetClientKey('203.0.113.7')).toBe('pwreset:ip:203.0.113.7');
+        expect(passwordResetClientKey('::1')).toBe('pwreset:ip:::1');
+        expect(passwordResetClientKey('203.0.113.7')).not.toBe(signInClientKey('203.0.113.7'));
+        expect(passwordResetClientKey('203.0.113.7')).not.toBe(signUpClientKey('203.0.113.7'));
+        // An address carries an @ and a client key never does, so the two counters cannot meet.
+        expect(passwordResetClientKey('203.0.113.7')).not.toContain('@');
+        expect(passwordResetKey('ip:203.0.113.7@example.com')).not.toBe(passwordResetClientKey('203.0.113.7'));
+    });
+
+    // Sign-in may skip its client counter, because nobody chooses a password. Here the address
+    // is the caller's own, so a request no header names a client for is still counted: on one key.
+    it('counts every request no header names a client for against one shared key', () => {
+        expect(passwordResetClientKey(null)).toBe('pwreset:ip:unknown');
+        expect(passwordResetClientKey(null)).not.toContain('null');
+    });
+
+    it('spends the client counter, then the address counter, each at its own limit', async () => {
+        const {take, spent} = memoryCounter();
+        expect(await withinPasswordResetLimits({ip: '203.0.113.7', email: ' Owner@Example.com'}, take)).toBe(true);
+        expect(spent).toEqual([
+            [passwordResetClientKey('203.0.113.7'), PASSWORD_RESET_CLIENT_LIMIT, PASSWORD_RESET_WINDOW_MS],
+            [passwordResetKey('owner@example.com'), PASSWORD_RESET_LIMIT, PASSWORD_RESET_WINDOW_MS],
+        ]);
+    });
+
+    it('spends the shared client key first when no header names a client', async () => {
+        const {take, spent} = memoryCounter();
+        expect(await withinPasswordResetLimits({ip: null, email: 'a@b.co'}, take)).toBe(true);
+        expect(spent.map(([key]) => key)).toEqual(['pwreset:ip:unknown', passwordResetKey('a@b.co')]);
+    });
+
+    it('refuses an address past its limit, whichever client asks', async () => {
+        const {take} = memoryCounter();
+        for (let i = 0; i < PASSWORD_RESET_LIMIT; i++) {
+            expect(await withinPasswordResetLimits({ip: `198.51.100.${i}`, email: 'a@b.co'}, take)).toBe(true);
+        }
+        expect(await withinPasswordResetLimits({ip: '198.51.100.99', email: ' A@B.co'}, take)).toBe(false);
+        expect(await withinPasswordResetLimits({ip: null, email: 'a@b.co'}, take)).toBe(false);
+    });
+
+    // What the address counter could never do: a new address each time is a new key.
+    it('refuses a client past its limit however many addresses it names, and writes no key for them', async () => {
+        const {take, counts} = memoryCounter();
+        const ip = '203.0.113.7';
+        for (let i = 0; i < PASSWORD_RESET_CLIENT_LIMIT; i++) {
+            expect(await withinPasswordResetLimits({ip, email: `walk${i}@example.com`}, take)).toBe(true);
+        }
+        const keysAtLimit = counts.size;
+        for (let i = 0; i < 50; i++) {
+            expect(await withinPasswordResetLimits({ip, email: `more${i}@example.com`}, take)).toBe(false);
+        }
+        expect(counts.size).toBe(keysAtLimit);
+        expect(counts.has(passwordResetKey('more0@example.com'))).toBe(false);
+        expect(await withinPasswordResetLimits({ip: '198.51.100.2', email: 'more0@example.com'}, take)).toBe(true);
+    });
+
+    it('holds the requests no header names a client for to the one client limit together', async () => {
+        const {take} = memoryCounter();
+        for (let i = 0; i < PASSWORD_RESET_CLIENT_LIMIT; i++) {
+            expect(await withinPasswordResetLimits({ip: null, email: `walk${i}@example.com`}, take)).toBe(true);
+        }
+        expect(await withinPasswordResetLimits({ip: null, email: 'fresh@example.com'}, take)).toBe(false);
+        expect(await withinPasswordResetLimits({ip: '198.51.100.2', email: 'fresh@example.com'}, take)).toBe(true);
     });
 });
 
