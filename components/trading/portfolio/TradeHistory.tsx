@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type {ReactNode} from "react";
 import {cn} from "@/lib/utils";
-import {formatEasternTimestamp, formatSignedPrice, formatPrice, getChangeColorClass} from "@/lib/format";
+import {formatEasternTimestamp, formatSignedPrice, formatPrice, formatShares, getChangeColorClass} from "@/lib/format";
 import {REPLAY_COPY} from "@/lib/learn/copy/replay";
 import {boughtForLine, receiptLine} from "@/lib/learn/copy/receipts";
 import type {FillReceipt} from "@/lib/trading/receipts";
@@ -70,7 +70,7 @@ const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNote
                                 <Link href={`/stocks/${t.symbol}`} className="text-sm font-bold text-fg hover:text-brand transition-colors font-mono">
                                     {t.symbol}
                                 </Link>
-                                <span className="text-xs text-fg-muted ml-2">{t.quantity} @ {formatPrice(t.price)}</span>
+                                <span className="text-xs text-fg-muted ml-2">{formatShares(t.quantity)} @ {formatPrice(t.price)}</span>
                                 {t.accountName && (
                                     <span className="label-type ml-2 text-[length:var(--label-size)] text-fg-muted">{t.accountName}</span>
                                 )}

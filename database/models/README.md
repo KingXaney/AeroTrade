@@ -6,9 +6,10 @@ reads and writes live. Change a field here, then in the store module named besid
 
 | Model | Feature | Read and written by |
 |---|---|---|
-| `paper-account` | trading | `lib/trading/accounts`, `ledger`, `valuation`, `lifecycle`, `orders` |
+| `paper-account` | trading | `lib/trading/accounts`, `ledger`, `valuation`, `lifecycle`, `orders` (which also writes `pendingFill`, the trade row a fill is about to insert; `lib/trading/pending-fill` settles it), `lib/trading/splits-store` (`splits`, `splitRev`) |
 | `paper-trade` | trading | `lib/trading/ledger`, `orders`, `lifecycle` |
-| `account-snapshot` | trading | `lib/trading/snapshots` (the nightly write), `valuation`, `analytics-store` |
+| `account-snapshot` | trading | `lib/trading/snapshots` (the nightly write: `closedAt` marks a row the job wrote, `atClose` the holdings it valued at a stored close), `valuation`, `analytics-store` |
+| `stock-split` | trading | `lib/trading/splits-store` — one row per symbol and ex-date as Yahoo states it, with the close before it in the new basis; each account applies it to itself once |
 | `account-income` | income | `lib/income/store` (the nightly credit), `lib/income/page-store` |
 | `benchmark-snapshot` | prices | `lib/prices/benchmark-store` (cold-start fallback for the SPY benchmark) |
 | `price-bar` | prices | `lib/prices/store` — every bar, dividend and T-bill read goes through it |

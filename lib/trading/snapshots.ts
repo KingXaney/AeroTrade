@@ -50,10 +50,14 @@ export const snapshotBenchmark = async (date: string, {onlyIfMissing = false}: {
 
 // Every account — or, for the late pass, only those the day's first pass left without a close
 // (`missingFor`: no row for that date that the job itself wrote).
-export const loadSnapshotAccounts = async ({missingFor}: {missingFor?: string} = {}): Promise<SnapshotAccount[]> => {
+// `accountIds` narrows a run to the named accounts (the browser QA's, so one suite's run never
+// values another's fixtures).
+export const loadSnapshotAccounts = async ({missingFor, accountIds}: {missingFor?: string; accountIds?: readonly string[] | null} = {}): Promise<SnapshotAccount[]> => {
     await connectToDatabase();
     const closed: unknown[] = missingFor ? await AccountSnapshot.distinct('accountId', {date: missingFor, closedAt: {$exists: true}}) : [];
-    const docs = await PaperAccount.find(closed.length > 0 ? {_id: {$nin: closed}} : {}).lean();
+    const docs = await PaperAccount.find({
+        ...(accountIds?.length ? {_id: {$in: accountIds.filter((id) => !closed.includes(id))}} : closed.length > 0 ? {_id: {$nin: closed}} : {}),
+    }).lean();
     return docs.map((a) => ({
         id: String(a._id),
         userId: a.userId,

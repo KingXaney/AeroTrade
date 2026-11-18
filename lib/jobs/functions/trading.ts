@@ -32,9 +32,12 @@ export const recordDailySnapshots = inngest.createFunction(
     { id: JOBS.snapshots.id, triggers: triggersOf(JOBS.snapshots) },
     async ({ step, event }) => {
         const today = eventDay(event.ts);
-        const late = (event.data as {full?: unknown} | undefined)?.full !== true && isLatePass(event.ts);
+        const data = (event.data ?? {}) as {full?: unknown; accountIds?: unknown};
+        const late = data.full !== true && isLatePass(event.ts);
         const benchmark = await step.run('snapshot-benchmark', async () => snapshotBenchmark(today, {onlyIfMissing: late}));
-        const scope = late ? {missingFor: today} : {};
+        // A scoped run (the browser QA) values only the named accounts, never another suite's.
+        const accountIds = Array.isArray(data.accountIds) ? data.accountIds.map(String) : null;
+        const scope = {...(late ? {missingFor: today} : {}), accountIds};
 
         let accounts = await step.run('load-accounts', async () => loadSnapshotAccounts(scope));
         if (accounts.length === 0) {

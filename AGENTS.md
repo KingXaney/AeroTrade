@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
+- `npm run trigger -- <brain|navigator|news|snapshots|splits|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: repairs income rows written twice (`scripts/income-dedupe.mjs`), builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes; `-- --dry-run` writes nothing and prints what it would change)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -235,6 +235,18 @@ and friends keep none beyond Shared and the invariants).
   for whatever acts on a price — the snapshot job, the Navigator's plan, a culture enrolment's first
   orders; a fill reads `lib/prices/quote-store.getFreshQuote` — and there a missing quote stays
   missing.
+- A holding whose symbol has stopped quoting is **gone** (`lib/prices/gone.isGone`, pure: the quote
+  sheet has received no price for it in `GONE_AFTER_SESSIONS`, three, sessions, or never;
+  `lib/prices/quote-store.getGoneSymbols` reads it, and nothing is gone without a Finnhub key). An
+  unpriced holding that is not gone is an outage and waits; a gone one would wait for ever, so it
+  is valued at its newest stored close of any age within `LAST_CLOSE_LOOKBACK_DAYS`, dated — on
+  a page (`buildHoldingsPriceMap`'s last fallback) and in the daily snapshot, which marks the row
+  (`AccountSnapshot.atClose`). `/portfolio` gives a gone holding one action in place of Trade and
+  Sell, "Close at the last close" (`components/trading/portfolio/CloseOutButton`,
+  `lib/actions/trading.actions.closeOutHolding`, `lib/trading/close-out.closeOutGoneHolding`): the
+  whole holding sold at that close, the fill's reason saying so (`GONE_COPY`). It is the ONE fill
+  made without a live quote, the server decides whether the symbol is gone, and `executeOrder`
+  is unchanged.
 - Switching the active account is one write that renders nothing and one page request.
   `components/trading/accounts/useSwitchAccount` posts to `app/api/accounts/active/route.ts` (same
   origin by `lib/same-origin.sameOriginRequest`, the session, `getOwnedAccount`, then the HTTP-only
@@ -260,10 +272,54 @@ and friends keep none beyond Shared and the invariants).
 - `lib/trading/ledger.getTradeLedger` is the one cached PaperTrade read a page makes. Every
   per-account trade read — the ledger, bounded history, the CSV, the comparison table, `/history`'s
   feed, the chat's sell totals — starts at the account's `inceptionAt` through the ledger's
-  `epochTrades`/`epochTradesOf`.
+  `epochTrades`/`epochTradesOf`. The ledger, the bounded history, `/history`'s feed and the CSV
+  hand back the fills as the account's books hold them now, from the account's own document: with
+  a fill whose row is still to be inserted (`pendingFill`, below) and with a fill from before a
+  split restated in today's shares (`splits`, below).
 - `lib/trading/fill.applyFill` is the one fill arithmetic, shared by
   `lib/trading/orders.executeOrder`, the strategy simulator and `lib/trading/receipts`, which
-  replays each fill through it (the trade log and `/trade`'s `LastFill`).
+  replays each fill through it (the trade log and `/trade`'s `LastFill`). Orders are whole shares;
+  a holding may carry a fraction of one (a split leaves it), so a sell that would leave less than
+  one share sells the fraction too and the result says how many shares moved (`quantity`, what the
+  trade row stores; `lib/format.formatShares` prints it). `{exact: true}` is a replay's: a stored
+  or restated fill moves exactly what its row says.
+- A fill is recoverable. `lib/trading/orders.commitFill` moves cash and positions in ONE account
+  write that also carries the trade row it is about to insert (`PaperAccount.pendingFill`, the row's
+  `_id` chosen first), guarded on `cash`, on `splitRev` and on no fill already waiting; then
+  `lib/trading/pending-fill.settlePendingFill` inserts the row (a duplicate key is done) and unsets
+  the field. A failure after the account write is a FILLED order and answers as one, never "Order
+  failed"; the next order (`loadAccountForFill`), the nightly income job and the split job settle
+  what was left, and until then the reads above add the pending row (`lib/trading/pending`, pure).
+  An automated caller passes an `idempotencyKey` (the Navigator's is
+  `lib/navigator/run.navigatorOrderKey`, per week, side and symbol).
+- Stock splits: the books are kept in TODAY'S shares (`lib/trading/splits`, pure;
+  `docs/specs/2026-11-17-books-integrity.md`). A split is one `StockSplit` row per symbol and
+  ex-date, read from Yahoo's chart with `events=split` in a call of its own
+  (`lib/prices/yahoo.fetchYahooSplits`; the bars call never carries `events`), with `prevClose`,
+  the close before it in the new basis from the same payload. `lib/trading/splits-store`
+  applies it to each account holding the symbol in one guarded write: the position rebuilt from
+  the account's own restated fills (`positionFromFills`; an account whose position does not
+  rebuild from its trades is skipped and named), the split appended to `PaperAccount.splits` with
+  that account's cut (`cutFor`: the split's 09:30 ET instant, or, for a fill between the previous
+  close and the ex-date's close, where its price says the basis turned), `splitRev` bumped. The
+  account's own list is what its ledger is read with (`restateFill`: quantity × ratio, price ÷
+  ratio, total and realised P&L untouched; `lib/income/store` restates the trades it replays, and
+  the Income panel a dividend paid before the split, `restateDividend`), so the stored position
+  and the ledger never disagree. Stored trade rows are never rewritten. The trade log says it once
+  under the table (`SPLIT_COPY.note`, only for splits that restated a fill shown). The
+  `stock-splits` job (`lib/jobs/functions/splits`, weekdays 09:40 ET, trigger `splits`) checks
+  every held symbol, rebuilds the bars of a symbol with a split to apply, then applies; the
+  snapshot job checks again any holding whose quote is more than `SPLIT_SUSPECT_MOVE` from its
+  last stored close. `STOCK_SPLIT_DETECTION=off` (the browser QA) asks Yahoo nothing.
+- The daily snapshot (`lib/trading/snapshots`, `lib/jobs/functions/trading`): a snapshot is
+  permanent, so an account with an unquoted holding that is not gone waits. `writeSnapshots`
+  returns what it wrote, valued at a stored close and skipped, and the stamp is
+  `lib/trading/snapshot-run.describeSnapshotRun` (pure): how many of the accounts were written, the
+  symbols that had no quote, whether SPY was recorded — never a healthy line for a run that wrote
+  nothing. The second cron (16:40 ET) is the late pass (`isLatePass`): only the accounts with no
+  row for the day that the job itself wrote (`AccountSnapshot.closedAt`; a day-zero seed has
+  none), so it asks Finnhub only about those. `full: true` on the event values every account
+  again; `accountIds` scopes a run (the browser QA).
 - `lib/trading/lots` pairs a sell with the learner's buy notes, FIFO; `lib/trading/analytics` also
   dates the drawdown.
 - `lib/trading/lifecycle`: the day-zero snapshot, `restartAccount` (reset and Navigator re-enroll)
@@ -349,6 +405,15 @@ and friends keep none beyond Shared and the invariants).
 
 - `lib/navigator/run` is the one run the weekly job and the bootstrap share — claim, plan, orders,
   rationale (`lib/navigator/prompts` the rationale prompt).
+- The weekly run trades only while the market is open, as the strategies and the pickers do
+  (`lib/jobs/functions/navigator`, read off the event's own time; `force: true` trades at any
+  hour): otherwise it scores, saves the week's targets and claims nothing. A claim taken on a
+  morning when a quote the plan needed was refused is given back before any order is sent
+  (`AccountPlan.unpriced`, `refusedQuotes`, `releaseNavigatorWeek`); a symbol that is gone never
+  holds a run back. The Tuesday 10:00 ET cron is the retry and does nothing when no enrolment is
+  still waiting for its week (`lib/navigator/weekly.isRetryRun`, `countWaitingNavigators`). The
+  stamp is `describeWeeklyRun` (pure): an enrolment held back or one whose run threw is named,
+  never folded into "ran for 1/1". The on-demand run (enrolment, "Run AI now") is unchanged.
 - `lib/navigator/allocator.HOLDING_REASON` is the kept-position fallback reason.
 - The weekly job's scoring step also keeps the week's whole scored universe, one
   `NavigatorSignalWeek` per ET week (`lib/navigator/store.computeNavigatorScores` with `record`; the
@@ -1730,7 +1795,8 @@ and friends keep none beyond Shared and the invariants).
 - `lib/jobs/functions/` is one file of thin wrappers per feature (`lib/jobs/functions/index` the
   list the route serves); the step bodies live with their feature — `lib/trading/snapshots`,
   `lib/income/store`, `lib/brain/ingest`, `lib/navigator/run`, `lib/email/digest` and
-  `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`, `lib/lab/papers/job`.
+  `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`, `lib/lab/papers/job`,
+  `lib/trading/splits-store`.
 - `lib/jobs/registry` is the one list of jobs (id, event, crons, status row); `lib/jobs/health` the
   status strip's read of their stamps; `lib/jobs/steps` holds `stepId` and `chunk`.
 - The limits tracker, `lib/limits/`: `registry` (import-free — every outside service the app

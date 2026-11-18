@@ -6,6 +6,7 @@
 import {Types} from "mongoose";
 import PaperAccount, {type PaperAccountDoc} from "@/database/models/paper-account.model";
 import PaperTrade from "@/database/models/paper-trade.model";
+import {formatShares} from "@/lib/format";
 import {getCompanyProfile} from "@/lib/prices/finnhub";
 import {getFreshQuote} from "@/lib/prices/quote-store";
 import {getOwnedAccount, toPlainPositions} from "@/lib/trading/accounts";
@@ -146,7 +147,7 @@ export const commitFill = async (
     }
 
     const verb = side === 'buy' ? 'Bought' : 'Sold';
-    return {success: true, message: `${verb} ${fill.quantity} ${sym} @ $${price.toFixed(2)}`, price};
+    return {success: true, message: `${verb} ${formatShares(fill.quantity)} ${sym} @ $${price.toFixed(2)}`, price};
 };
 
 // Market order at the current live price. Whole shares, long-only.

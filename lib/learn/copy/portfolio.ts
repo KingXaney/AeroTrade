@@ -9,6 +9,7 @@
 // so the comparison cannot drift from what the allocator does.
 
 import {getEasternDateString} from "@/lib/dates";
+import {formatShares} from "@/lib/format";
 import {MAX_POSITION_WEIGHT, MIN_CASH_WEIGHT} from "@/lib/navigator/config";
 import type {BridgeLineKey} from "@/lib/trading/learn/bridge";
 import {unpricedText} from "@/lib/learn/copy/unpriced";
@@ -179,7 +180,7 @@ export const GONE_COPY = {
     caveat: 'The last close is not always what a holder received: a cash merger pays the deal price, and a delisting can pay less.',
     lastClose: 'Last close',
     proceeds: 'Proceeds',
-    confirm: (quantity: number): string => `Close ${quantity} share${quantity === 1 ? '' : 's'}`,
+    confirm: (quantity: number): string => `Close ${formatShares(quantity)} share${quantity === 1 ? '' : 's'}`,
     working: 'Closing…',
     done: 'Holding closed',
     failed: 'The holding could not be closed',
