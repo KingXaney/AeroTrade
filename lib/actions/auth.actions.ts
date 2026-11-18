@@ -18,7 +18,7 @@ import {
     withinSignInLimits,
     withinSignUpLimit,
 } from "@/lib/auth/limits";
-import {passwordResetEmail} from "@/lib/auth/validation";
+import {FULL_NAME_INVALID_MESSAGE, passwordResetEmail, signUpName} from "@/lib/auth/validation";
 import {SIGN_UP_PROFILE_INVALID_MESSAGE, signUpProfile} from "@/lib/auth/sign-up-profile";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 import type {SignInFormData, SignUpFormData} from '@/lib/auth/types';
@@ -33,11 +33,16 @@ const extractAuthError = (e: unknown, fallback: string): string => {
 }
 
 export const signUpWithEmail = async (input: SignUpFormData) => {
-    const { email, password, fullName } = input;
+    const { email, password } = input;
     // The form only offers listed answers, so one outside its list means a direct call: refused
     // before any counter is spent, and only the checked answers reach the welcome prompt.
     const profile = signUpProfile(input);
     if (!profile) return { success: false, error: SIGN_UP_PROFILE_INVALID_MESSAGE }
+    // The name heads the welcome email, mailed to an address nobody has verified, and is shown
+    // wherever a name is: held to the form's own rule (lib/auth/validation.ts signUpName) before
+    // any counter is spent, and only its trimmed reading reaches better-auth and the event.
+    const name = signUpName(input.fullName);
+    if (!name) return { success: false, error: FULL_NAME_INVALID_MESSAGE }
 
     try {
         // Every attempt counts, refused before better-auth is asked: a refused one creates
@@ -49,7 +54,7 @@ export const signUpWithEmail = async (input: SignUpFormData) => {
             return { success: false, error: SIGN_UP_LIMITED_MESSAGE }
         }
 
-        const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
+        const response = await auth.api.signUpEmail({ body: { email, password, name } })
 
         if(response) {
             // Awaited, not queued: the user is redirected to the dashboard the moment this
@@ -63,7 +68,7 @@ export const signUpWithEmail = async (input: SignUpFormData) => {
 
             await inngest.send({
                 name: JOBS.signUpEmail.event,
-                data: { email, name: fullName, ...profile }
+                data: { email, name, ...profile }
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }
 

@@ -34,3 +34,32 @@ export const PASSWORD_RULE = {
     minLength: {value: MIN_PASSWORD_LENGTH, message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`},
     maxLength: {value: MAX_PASSWORD_LENGTH, message: `Password must be at most ${MAX_PASSWORD_LENGTH} characters`},
 };
+
+// The name sign-up takes. It heads the welcome email — mailed from the app's own sender to an
+// address nobody has verified — and is shown wherever a name is, so it is held to what a name is
+// written with: 2 to 60 characters once trimmed, of letters in any script with the marks they
+// carry (\p{M}: no Devanagari or Thai name is written without them), spaces, an apostrophe as
+// typed or as a phone sets it, hyphens, and a full stop that ends a word or an initial. So no
+// digit, @, / or : — and no full stop followed at once by two letters, or by a letter and its
+// mark: that is the middle of a web address, which letters and full stops alone can spell and a
+// mail client would link.
+export const MIN_FULL_NAME_LENGTH = 2;
+export const MAX_FULL_NAME_LENGTH = 60;
+export const FULL_NAME_INVALID_MESSAGE = `Name must be ${MIN_FULL_NAME_LENGTH} to ${MAX_FULL_NAME_LENGTH} characters: letters, spaces, apostrophes, hyphens, and full stops that end a word or an initial.`;
+const FULL_NAME_PATTERN = /^(?:[\p{L}\p{M}\p{Zs}'’-]|\.(?!\p{L}[\p{L}\p{M}]))+$/u;
+
+// The name a sign-up gives, trimmed — what the account and the welcome email are handed. A server
+// action's argument is whatever the client posted, whatever its type says: anything but a string
+// that trims to such a name is no name. The length is read before the pattern.
+export const signUpName = (input: unknown): string | null => {
+    if (typeof input !== 'string') return null;
+    const name = input.trim();
+    if (name.length < MIN_FULL_NAME_LENGTH || name.length > MAX_FULL_NAME_LENGTH) return null;
+    return FULL_NAME_PATTERN.test(name) ? name : null;
+};
+
+// The form's rule is the action's own reading, so the two cannot disagree about a name.
+export const FULL_NAME_RULE = {
+    required: 'Full name is required',
+    validate: (value: unknown): true | string => signUpName(value) !== null || FULL_NAME_INVALID_MESSAGE,
+};

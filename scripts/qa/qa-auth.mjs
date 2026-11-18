@@ -11,8 +11,11 @@
 // no later suite starts inside this one's window. Sign-up is limited per client address: this
 // suite's own sign-up is counted, and a client over the limit (its counter seeded past any
 // SIGN_UP_CLIENT_LIMIT the harness sets) gets one fixed sentence and no account; every signup:*
-// row is removed at the end too. Neither the sign-up nor the sign-in action hands the browser the
-// session token its cookie carries, and the tab icon loads logged out.
+// row is removed at the end too. The name sign-up takes is held to one rule by the form and by the
+// action: one that spells a web address is refused by the form without a request, and — posted
+// past the form — by the action with the same sentence, no account and no counter spent. Neither
+// the sign-up nor the sign-in action hands the browser the session token its cookie carries, and
+// the tab icon loads logged out.
 // Also, signed in first: the market-status badge on /trade and /watchlist (no "live prices"), an
 // empty /watchlist's own Add a stock button (a pick from its suggestions adds the stock in place),
 // the scan view kept in /trade's URL (and /markets redirecting there), and /history's Trades section.
@@ -29,6 +32,10 @@ const P2 = 'N3wPassw0rd!N3wPassw0rd!';
 // lib/auth/limits.ts: SIGN_IN_LIMITED_MESSAGE, SIGN_IN_EMAIL_LIMIT, SIGN_IN_CLIENT_LIMIT.
 const LIMITED = 'Too many sign-in attempts. Try again in a few minutes.';
 const SIGN_UP_LIMITED = 'Too many sign-up attempts from this network. Try again later.';
+// lib/auth/validation.ts: FULL_NAME_INVALID_MESSAGE, and a name its rule refuses (letters and full
+// stops alone spell an address a mail client would link in the welcome email's heading).
+const NAME_INVALID = 'Name must be 2 to 60 characters: letters, spaces, apostrophes, hyphens, and full stops that end a word or an initial.';
+const LINK_NAME = 'www.example.com';
 const EMAIL_LIMIT = 10;
 const CLIENT_LIMIT = 30;
 // lib/auth/limits.ts: PASSWORD_RESET_CLIENT_LIMIT; lib/auth/validation.ts: MAX_EMAIL_LENGTH.
@@ -299,6 +306,45 @@ try {
     }
     await shot('04-sign-in-limited');
 
+    // --- sign-up, the name ----------------------------------------------------------------
+    // The form holds the name to the rule, and the action reads it again before any counter is
+    // spent: its argument is whatever the browser posted, so the second attempt types a name the
+    // form takes and swaps the address in on the wire.
+    const signUpSpent = async () => (await limits.find({key: /^signup:ip:/}).toArray()).reduce((sum, row) => sum + row.count, 0);
+    const spentBefore = await signUpSpent();
+    const named = await browser.newContext({viewport: {width: 1440, height: 900}});
+    page = await named.newPage();
+    const namedEmail = `qaauth-name${Date.now()}@example.com`;
+    let nameActions = 0;
+    const onSignUp = (url) => url.pathname === '/sign-up';
+    const swapName = async (route) => {
+        if (route.request().method() !== 'POST' || !route.request().headers()['next-action']) return route.fallback();
+        nameActions++;
+        const body = route.request().postData() ?? '';
+        return route.continue({postData: body.split('"fullName":"QA Named"').join(`"fullName":"${LINK_NAME}"`)});
+    };
+    await page.route(onSignUp, swapName);
+    await page.goto(`${BASE}/sign-up`, {waitUntil: 'load'});
+    await page.fill('#fullName', LINK_NAME);
+    await page.fill('#email', namedEmail);
+    await page.fill('#password', P1);
+    await page.click('button[type="submit"]');
+    const nameError = page.locator('form').getByText(NAME_INVALID);
+    await nameError.waitFor({timeout: 30000}).catch(() => {});
+    check('the sign-up form refuses a name that spells a web address, in the rule\'s one sentence', await nameError.isVisible());
+    check('…without a request to the action', nameActions === 0, `actions=${nameActions}`);
+    await page.fill('#fullName', 'QA Named');
+    await page.click('button[type="submit"]');
+    const nameToast = page.locator('[data-sonner-toast]').getByText(NAME_INVALID);
+    await nameToast.waitFor({timeout: 30000}).catch(() => {});
+    check('posted past the form, the action refuses it with the same sentence', nameActions === 1 && await nameToast.isVisible(), `actions=${nameActions}`);
+    check('…stays on /sign-up', /\/sign-up/.test(page.url()), page.url());
+    check('…creates no account', (await db.collection('user').countDocuments({email: namedEmail})) === 0);
+    const spentAfter = await signUpSpent();
+    check('…and spends no sign-up counter', spentAfter === spentBefore, `${spentBefore} → ${spentAfter}`);
+    await page.unroute(onSignUp, swapName);
+    await shot('05-sign-up-name');
+
     // --- sign-up, per client --------------------------------------------------------------
     const signUpRows = await limits.find({key: /^signup:ip:/}).toArray();
     check('this suite\'s sign-up was counted against its client', signUpRows.length === 1 && signUpRows[0].count >= 1,
@@ -318,7 +364,7 @@ try {
         check('a client over the sign-up limit is refused with the fixed sentence', await toast.isVisible());
         check('…stays on /sign-up', /\/sign-up/.test(page.url()), page.url());
         check('…and no account was created', (await db.collection('user').countDocuments({email: lateEmail})) === 0);
-        await shot('05-sign-up-limited');
+        await shot('06-sign-up-limited');
     }
 } catch (err) {
     check(`threw: ${err.message}`, false);

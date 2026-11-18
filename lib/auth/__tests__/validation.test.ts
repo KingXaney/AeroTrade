@@ -1,12 +1,18 @@
 import {describe, expect, it, vi} from 'vitest';
 import {
     EMAIL_RULE,
+    FULL_NAME_INVALID_MESSAGE,
+    FULL_NAME_RULE,
     MAX_EMAIL_LENGTH,
+    MAX_FULL_NAME_LENGTH,
     MAX_PASSWORD_LENGTH,
+    MIN_FULL_NAME_LENGTH,
     MIN_PASSWORD_LENGTH,
     PASSWORD_RULE,
     passwordResetEmail,
+    signUpName,
 } from '@/lib/auth/validation';
+import {findBanned} from '@/lib/learn/banned';
 
 describe('the auth form rules', () => {
     it('hold the password to the lengths better-auth enforces', () => {
@@ -76,5 +82,89 @@ describe('passwordResetEmail', () => {
         } finally {
             test.mockRestore();
         }
+    });
+});
+
+// The name sign-up is given heads the welcome email — mailed, from the app's own sender, to an
+// address nobody has verified — and is shown wherever a name is. A server action's argument is
+// whatever the client posted: the name is read before any counter is spent.
+describe('signUpName', () => {
+    it('reads a name the form would accept, trimmed', () => {
+        expect(signUpName('Ada Lovelace')).toBe('Ada Lovelace');
+        expect(signUpName('  Ada Lovelace\t\n')).toBe('Ada Lovelace');
+        expect(signUpName('Ng')).toBe('Ng');
+    });
+
+    it('reads a name in any script, with the marks its letters are written with', () => {
+        const names = [
+            'José Álvarez', 'José Álvarez', 'Zoë Brontë', 'Søren Kierkegaard', 'Nguyễn Thị Minh',
+            'Ελένη Παπαδοπούλου', 'Алексей Иванов', '李小龙', '山田　太郎', '김민준',
+            'प्रिया शर्मा', 'สุดา ศิริพร', 'محمد علي', 'דוד לוי',
+        ];
+        for (const name of names) expect(signUpName(name), name).toBe(name);
+    });
+
+    it('takes an apostrophe as typed or as a phone sets it, a hyphen, and a full stop that ends a word or an initial', () => {
+        const names = [
+            "Conan O'Brien", 'Conan O’Brien', "Jeanne d'Arc", 'Jean-Luc Picard', 'Mary-Kate Olsen',
+            'Martin Luther King Jr.', 'John Q. Public', 'J. R. R. Tolkien', 'J.K. Rowling', 'J.R.R. Tolkien', 'St. John',
+        ];
+        for (const name of names) expect(signUpName(name), name).toBe(name);
+    });
+
+    it('reads no name from anything but a string', () => {
+        const malformed: unknown[] = [null, undefined, 42, true, [], ['Ada Lovelace'], {}, {toString: () => 'Ada Lovelace'}];
+        for (const input of malformed) expect(signUpName(input), String(JSON.stringify(input))).toBeNull();
+    });
+
+    it('takes 2 to 60 characters once trimmed, no fewer and no more', () => {
+        expect(MIN_FULL_NAME_LENGTH).toBe(2);
+        expect(MAX_FULL_NAME_LENGTH).toBe(60);
+        for (const name of ['', ' ', '   \t\n', 'A', ' A ']) expect(signUpName(name), JSON.stringify(name)).toBeNull();
+        const longest = 'a'.repeat(MAX_FULL_NAME_LENGTH);
+        expect(signUpName(longest)).toBe(longest);
+        expect(signUpName(`  ${longest}  `)).toBe(longest);
+        expect(signUpName(`${longest}a`)).toBeNull();
+        expect(signUpName('a'.repeat(1_000_000))).toBeNull();
+    });
+
+    it('reads none from a name carrying an address, a digit, markup or a line break', () => {
+        const refused = [
+            'Ada http://example.com', 'Ada https://example.com/prize', 'ada@example.com', 'Ada: claim now', 'Ada/Bob',
+            'Ada 555 0100', 'Agent 47', 'Ada <b>Lovelace</b>', 'Ada & Bob', 'Ada, Bob', 'Ada!', 'Ada?', 'Ada_Lovelace',
+            'Ada (Lovelace)', '"Ada"', 'Ada\nLovelace', 'Ada\tLovelace', 'Ada​Lovelace', 'Ada‮Lovelace', 'Ada 🚀',
+        ];
+        for (const name of refused) expect(signUpName(name), JSON.stringify(name)).toBeNull();
+    });
+
+    // Letters and full stops alone spell a web address, and a mail client links one it finds in a
+    // heading. A full stop followed at once by two letters — or by a letter and its mark, as a
+    // domain's ending in another script begins — is the middle of an address, never the end of a
+    // word or an initial.
+    it('reads none from a name whose full stop begins a domain', () => {
+        const refused = [
+            'example.com', 'www.example.com', 'Visit www.example.com now', 'Claim at prize.example today', 'a.co',
+            'Ada.Lovelace', 'пример.рф', 'example.भारत', 'example.ćom',
+        ];
+        for (const name of refused) expect(signUpName(name), JSON.stringify(name)).toBeNull();
+    });
+});
+
+describe('FULL_NAME_RULE', () => {
+    it('is the rule sign-up reads the name with, and answers with its one sentence', () => {
+        expect(FULL_NAME_RULE.required).toBeTruthy();
+        for (const name of ['Ada Lovelace', '  Ada Lovelace ', "Conan O'Brien", 'J.K. Rowling', '李小龙']) {
+            expect(FULL_NAME_RULE.validate(name), name).toBe(true);
+        }
+        for (const name of ['A', '   ', 'a'.repeat(MAX_FULL_NAME_LENGTH + 1), 'www.example.com', 'Agent 47', 42, null, undefined]) {
+            expect(FULL_NAME_RULE.validate(name), String(JSON.stringify(name))).toBe(FULL_NAME_INVALID_MESSAGE);
+            expect(signUpName(name)).toBeNull();
+        }
+    });
+
+    it('says the lengths it holds a name to, in words the no-advice list passes', () => {
+        expect(FULL_NAME_INVALID_MESSAGE).toContain(`${MIN_FULL_NAME_LENGTH} to ${MAX_FULL_NAME_LENGTH}`);
+        expect(findBanned(FULL_NAME_INVALID_MESSAGE)).toEqual([]);
+        expect(findBanned(FULL_NAME_RULE.required)).toEqual([]);
     });
 });
