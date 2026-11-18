@@ -133,28 +133,38 @@ try {
     // --- no live quote: the newest stored close stands in, dated; an old one does not -------
     // The harness has no Finnhub key, so every quote is missing. QACLS has a close from yesterday,
     // inside the fallback window: it is priced there, with a P&L. QAOLD's only close is twenty days
-    // old: it stays at cost. The header says both once; the price cell dates the close.
+    // old: it is priced there too, dated. QANOB has no stored close: it stays at cost. The header
+    // says all of it once; a price cell dates its close.
     const closeDay = etDay(86_400_000);
+    const oldDay = etDay(20 * 86_400_000);
     await db.collection('pricebars').insertMany([
         {symbol: 'QACLS', date: closeDay, close: 45, open: 45, high: 45, low: 45, source: 'yahoo', dividend: 0},
-        {symbol: 'QAOLD', date: etDay(20 * 86_400_000), close: 99, open: 99, high: 99, low: 99, source: 'yahoo', dividend: 0},
+        {symbol: 'QAOLD', date: oldDay, close: 99, open: 99, high: 99, low: 99, source: 'yahoo', dividend: 0},
     ]);
     await accounts.updateOne({_id: valueInsert.insertedId}, {$set: {cash: 99_000, positions: [
         {symbol: 'QACLS', company: 'QA Close Co', quantity: 4, avgCost: 40},
         {symbol: 'QAOLD', company: 'QA Old Co', quantity: 2, avgCost: 50},
+        {symbol: 'QANOB', company: 'QA No Bar Co', quantity: 1, avgCost: 10},
     ]}});
     await page.goto(`${BASE}/portfolio?account=${String(valueInsert.insertedId)}`, {waitUntil: 'load'});
     await page.getByText('Holdings', {exact: true}).waitFor({timeout: 30000});
-    const basisLine = `2 holdings · 1 of 2 valued at cost · 1 of 2 at the ${shortDay(closeDay)} close`;
+    const basisLine = '3 holdings · 1 of 3 valued at cost · 2 of 3 at their last close';
     check('the header says which holdings stand at cost and which at a stored close, once', await page.getByText(basisLine, {exact: true}).count() === 1, basisLine);
-    const closeCell = page.locator('[data-price-close]').first();
+    const closeCell = page.locator(`[data-price-close="${closeDay}"]`);
     check('a holding with no quote is priced at its stored close, the cell dated',
-        await page.locator('[data-price-close]').count() === 1 && (await closeCell.getAttribute('data-price-close')) === closeDay
+        await closeCell.count() === 1
         && (await closeCell.innerText()).trim() === '$45.00' && (await closeCell.getAttribute('title')) === `No live quote — the ${shortDay(closeDay)} close`,
-        `${await closeCell.getAttribute('data-price-close')} ${await closeCell.innerText().catch(() => '')}`);
+        `${await closeCell.count()} ${await closeCell.innerText().catch(() => '')}`);
     check('…and carries its P&L from that close', await page.getByText('+$20.00 (+12.50%)').count() >= 1);
-    check('a holding whose only close is outside the window stays at cost, with no P&L',
-        await page.getByText('$99.00').count() === 0 && await page.locator('[title="No live quote — value shown at cost"]').count() === 1);
+    // No quote and no close inside the week: the symbol has stopped trading under that name, and
+    // its newest stored close, dated, is nearer what the holding is worth than its cost.
+    const oldCell = page.locator(`[data-price-close="${oldDay}"]`);
+    check('a holding whose only close is older than a week is valued at that close, dated',
+        await oldCell.count() === 1 && (await oldCell.innerText()).trim() === '$99.00'
+        && (await oldCell.getAttribute('title')) === `No live quote — the ${shortDay(oldDay)} close`,
+        `${await oldCell.count()} ${await oldCell.innerText().catch(() => '')}`);
+    check('a holding with no quote and no stored close at all stays at cost, with no P&L',
+        await page.locator('[data-price-close]').count() === 2 && await page.locator('[title="No live quote — value shown at cost"]').count() === 1);
 
     await page.setViewportSize({width: 390, height: 844});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
@@ -379,6 +389,14 @@ try {
     await symbolInput.waitFor({timeout: 30000});
     await page.locator('#order-shares').fill('1');
     await noteField.fill(note);
+    // A field typed into before React has hydrated is reset to its empty state: type again
+    // until the note holds (a busy machine hydrates late).
+    for (let i = 0; i < 10; i++) {
+        await page.waitForTimeout(300);
+        if ((await noteField.inputValue()) === note && (await page.locator('#order-shares').inputValue()) === '1') break;
+        await page.locator('#order-shares').fill('1');
+        await noteField.fill(note);
+    }
     const tradesBeforeNote = await db.collection('papertrades').countDocuments({accountId: mainId});
     await page.getByRole('button', {name: 'Buy AAPL'}).click();
     await page.getByText(/Couldn.t fetch a live price/).waitFor({timeout: 30000}).catch(() => {});

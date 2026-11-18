@@ -87,7 +87,8 @@ try {
     // A second account on a symbol with no quote today that is NOT gone: an outage.
     const outage = await accounts.insertOne({
         userId, name: 'Outage', cash: 100_000 - 100, startingBalance: 100_000, inceptionAt: INCEPTION,
-        positions: [position('QBKO', 4, 25)], createdAt: INCEPTION, updatedAt: new Date(),
+        // Created after the main account, which stays the one /portfolio opens on.
+        positions: [position('QBKO', 4, 25)], createdAt: new Date(), updatedAt: new Date(),
     });
     const outageId = String(outage.insertedId);
     await trades.insertOne(buy(outageId, 'QBKO', 4, 25));
