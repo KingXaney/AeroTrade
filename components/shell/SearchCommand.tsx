@@ -11,11 +11,24 @@ import {searchStocks} from "@/lib/actions/stocks.actions";
 import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
-import {searchGlossaryFor} from "@/lib/learn/where";
+import type {searchGlossaryFor} from "@/lib/learn/where";
 import {NAV_PAGES, searchPages, type NavDestination} from "@/lib/shell/navigation";
 import {paletteRows, type StockAnswer} from "@/lib/shell/palette";
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicLink} from '@/lib/topics/types';
+
+// ⌘K's Learn rows are matched against the glossary: 120 KB of definitions that no page needs
+// until the palette is open (lib/shell/__tests__/first-load.test.ts keeps it out of the shell's
+// own bundle). So it is fetched then — at the trigger's first hover, focus or touch, and when
+// the palette opens — once for the page's life; until it lands the palette draws its other rows.
+type GlossarySearch = typeof searchGlossaryFor;
+let glossarySearch: Promise<GlossarySearch> | null = null;
+const loadGlossarySearch = (): Promise<GlossarySearch> =>
+    (glossarySearch ??= import("@/lib/learn/where").then((mod) => mod.searchGlossaryFor, (error: unknown) => {
+        glossarySearch = null;   // a dropped connection: the next open asks again
+        throw error;
+    }));
+const preloadGlossary = () => { void loadGlossarySearch().catch(() => undefined); };
 
 type SearchCommandProps = {
     renderAs?: 'button' | 'text';
@@ -53,7 +66,14 @@ export default function SearchCommand({
     const existingTopic = rows.topic !== 'none' ? initialTopics.find((t) => t.name.toLowerCase() === topicQuery.toLowerCase()) : undefined;
     // Glossary rows are matched client-side against a pure registry: no request, no key. Only the
     // entries the reader's /glossary renders (glossaryGroupsFor), so no row opens a missing anchor.
-    const learnHits = searchGlossaryFor(topicQuery, 4, {owner});
+    const [searchGlossary, setSearchGlossary] = useState<GlossarySearch | null>(null);
+    useEffect(() => {
+        if (!open || searchGlossary) return;
+        let current = true;
+        loadGlossarySearch().then((search) => { if (current) setSearchGlossary(() => search); }, () => undefined);
+        return () => { current = false; };
+    }, [open, searchGlossary]);
+    const learnHits = searchGlossary ? searchGlossary(topicQuery, 4, {owner}) : [];
     // Pages are matched the same way, against the navigation registry: with the rail showing
     // icons only, the palette is also how a page is reached by name.
     const pageHits = searchPages(topicQuery, 4, pages);
@@ -122,13 +142,15 @@ export default function SearchCommand({
                 // Was a bare <span onClick> — Tab skipped it and screen readers announced
                 // it as inert text. The ⌘K hint is the only place the shortcut is advertised.
                 <button type="button" onClick={() => setOpen(true)} aria-label={label}
+                        onPointerEnter={preloadGlossary} onFocus={preloadGlossary} onTouchStart={preloadGlossary}
                         className="search-text inline-flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-line-strong/30 bg-surface-0/60 text-sm transition-colors md:w-full md:max-w-md md:shrink md:justify-start md:px-3">
                     <Search className="size-4 opacity-70 shrink-0" aria-hidden="true"/>
                     <span className="hidden md:inline flex-1 truncate text-left text-fg-muted">{label}</span>
                     <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted font-mono">⌘K</kbd>
                 </button>
             ) : (
-                <Button onClick={() => setOpen(true)} className="search-btn">
+                <Button onClick={() => setOpen(true)} className="search-btn"
+                        onPointerEnter={preloadGlossary} onFocus={preloadGlossary} onTouchStart={preloadGlossary}>
                     {label}
                 </Button>
             )}
