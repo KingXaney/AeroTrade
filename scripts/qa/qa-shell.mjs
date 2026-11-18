@@ -5,9 +5,11 @@
 // the typed query is out, and opens the first stock once it has answered — never the Follow row
 // while anything else was found), the mobile drawer stands in for the rail
 // and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
-// friends: a sent request is listed with its age, and the recipient sees a dot on the avatar and
-// a count in the account menu. Anyone but the owner meets none of the owner's pages: each sends
-// them Home, the routes answer 401, and nothing on their own pages leads there.
+// friends: a sent request is toasted without the name its address is registered under and listed
+// with its age, one past the cap of requests waiting or past the hour's count is refused, and the
+// recipient sees a dot on the avatar and a count in the account menu. Anyone but the owner meets
+// none of the owner's pages: each sends them Home, the routes answer 401, and nothing on their own
+// pages leads there.
 // Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -209,8 +211,18 @@ try {
     const second = await browser.newPage({viewport: {width: 1440, height: 900}});
     const secondEmail = await signUp(second, 'two');
     await second.goto(`${BASE}/friends`, {waitUntil: 'networkidle'});
-    await second.fill('input[type="email"]', firstEmail);
-    await second.locator('form button[type="submit"], button:has-text("Send")').first().click();
+    const sendRequest = async (email) => {
+        await second.fill('input[type="email"]', email);
+        await second.locator('form button[type="submit"], button:has-text("Send")').first().click();
+    };
+    const friendToast = (text) => second.locator('[data-sonner-toast]').filter({hasText: text}).first();
+    await sendRequest(firstEmail);
+    // The toast says a request was sent and names nobody: the name the address is registered
+    // under ("QA one") is not the sender's to learn from it (lib/learn/copy/friends.ts).
+    await friendToast('Friend request sent').waitFor({timeout: 15000}).catch(() => {});
+    const sentToast = await friendToast('Friend request sent').innerText().catch(() => '');
+    check('a sent request is toasted without the name its address is registered under',
+        /Friend request sent/.test(sentToast) && !/QA one/.test(sentToast), sentToast);
     await second.waitForTimeout(1500);
     check('sent request shows in the Sent panel',
         await second.getByText('Sent (1)').count() > 0);
@@ -223,6 +235,28 @@ try {
     await second.reload({waitUntil: 'networkidle'});
     const waiting = await second.getByText(/Waiting · sent/).first().innerText().catch(() => '');
     check('a three-day-old sent request says so', backdated.modifiedCount === 1 && /sent 3 days ago/.test(waiting), waiting);
+
+    // A friend request is counted per reader by the hour, and refused while 20 of the reader's
+    // own wait for an answer (lib/friends/limits.ts) — both before the address is looked up.
+    // Nineteen more pending rows, to nobody, fill the cap beside the one above; then the counter
+    // is set to its limit of 10 rather than spent by ten requests.
+    const senderId = String(sender?._id);
+    await db.collection('friendships').insertMany(Array.from({length: 19}, (_, i) => ({
+        requesterId: senderId, addresseeId: `qa-shell-nobody-${i}`, status: 'pending', createdAt: new Date(), updatedAt: new Date(),
+    })));
+    await sendRequest(`qanobody${Date.now()}@example.com`);
+    const capped = await friendToast('You have 20 friend requests waiting for an answer').waitFor({timeout: 15000}).then(() => true, () => false);
+    check('a request while 20 of the reader\'s own wait is refused with the cap\'s sentence', capped);
+    await db.collection('friendships').deleteMany({requesterId: senderId, addresseeId: /^qa-shell-nobody-/});
+    const requestKey = `friends:request:${senderId}`;
+    await db.collection('ratelimits').updateOne({key: requestKey},
+        {$set: {count: 10, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 3_600_000)}}, {upsert: true});
+    await sendRequest(`qanobody${Date.now()}@example.com`);
+    const limited = await friendToast('That was a lot of friend requests in an hour').waitFor({timeout: 15000}).then(() => true, () => false);
+    check('a request past the reader\'s count for the hour is refused with the limit\'s sentence', limited);
+    check('…and neither refusal sent anything',
+        await db.collection('friendships').countDocuments({requesterId: senderId}) === 1);
+    await db.collection('ratelimits').deleteMany({key: requestKey});
 
     // The recipient should now see a badge without visiting /friends.
     await page.setViewportSize({width: 1440, height: 900});
