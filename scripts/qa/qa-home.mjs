@@ -25,6 +25,8 @@ try {
     const userId = String(user?._id ?? '');
 
     // --- a new account's Home -------------------------------------------------------
+    // The address changes before the page has streamed: wait for Home itself.
+    await page.locator('[data-home]').waitFor({timeout: 30000}).catch(() => undefined);
     check('sign-up lands on Home', new URL(page.url()).pathname === '/' && await page.locator('[data-home]').count() === 1, page.url());
     check('…greeted by first name', (await page.locator('h1').innerText()) === 'Welcome back, Ada', await page.locator('h1').innerText());
     check('…with the market status beside it', await page.locator('[data-home] span[title*="NYSE"]').count() === 1);

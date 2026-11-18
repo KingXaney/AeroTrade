@@ -86,29 +86,42 @@ const unseenCountFor = async (topic: TopicView, nowSeconds: number): Promise<num
         {limit: UNSEEN_COUNT_CAP + 1},
     );
 
-// Counts and the latest article per keyword set in one aggregation; unseen counts depend on each
-// user's lastSeenAt, so they are one small, capped count per topic (MAX_TOPICS_PER_USER at most).
+// One keyword set's newest article and how many it has stored. Two reads on the
+// {keywordSetHash, datetime} index: the first entry of the set, and a count of its entries — no
+// document but the newest is fetched. (This was one aggregate that sorted and fetched every
+// stored article of every followed set to keep one: up to thirty days at sixty a day a set, on
+// every page load, since the shell reads the overview.)
+const latestAndCount = async (keywordSetHash: number): Promise<{latest: ArticleLike | null; count: number}> => {
+    const [latest, count] = await Promise.all([
+        TopicArticle.findOne({keywordSetHash}).sort({datetime: -1}).lean<ArticleLike | null>(),
+        TopicArticle.countDocuments({keywordSetHash}),
+    ]);
+    return {latest, count};
+};
+
+// Each followed topic with its newest article, its stored count and its unseen count. The first
+// two belong to the keyword set (several topics may share one); the unseen count depends on each
+// reader's lastSeenAt, so it is one small, capped count per topic (MAX_TOPICS_PER_USER at most).
+// Everything is read together, in one round of index reads.
 export const getTopicsOverview = async (userId: string): Promise<TopicsOverview> => {
     const topics = await getTopicsForUser(userId);
     if (topics.length === 0) return {topics: [], unseenTotal: 0};
 
     const hashes = Array.from(new Set(topics.map((t) => t.keywordSetHash)));
-    const rows = await TopicArticle.aggregate<{_id: number; count: number; latest: ArticleLike}>([
-        {$match: {keywordSetHash: {$in: hashes}}},
-        {$sort: {datetime: -1}},
-        {$group: {_id: '$keywordSetHash', count: {$sum: 1}, latest: {$first: '$$ROOT'}}},
-    ]);
-    const byHash = new Map(rows.map((r) => [r._id, r]));
     const now = Math.floor(Date.now() / 1000);
-    const unseen = await Promise.all(topics.map((t) => unseenCountFor(t, now)));
+    const [sets, unseen] = await Promise.all([
+        Promise.all(hashes.map(latestAndCount)),
+        Promise.all(topics.map((t) => unseenCountFor(t, now))),
+    ]);
+    const byHash = new Map(hashes.map((hash, i) => [hash, sets[i]]));
 
     const items: TopicOverviewItem[] = topics.map((t, i) => {
-        const row = byHash.get(t.keywordSetHash);
+        const set = byHash.get(t.keywordSetHash);
         return {
             ...t,
             unseenCount: unseen[i],
-            articleCount: row?.count ?? 0,
-            latest: row ? toArticleView(row.latest) : null,
+            articleCount: set?.count ?? 0,
+            latest: set?.latest ? toArticleView(set.latest) : null,
         };
     });
     return {topics: items, unseenTotal: items.reduce((sum, t) => sum + t.unseenCount, 0)};
