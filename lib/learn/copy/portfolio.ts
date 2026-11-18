@@ -168,6 +168,35 @@ const quotedText = (oldestAt: number, {lastClose, now}: QuoteTimes, marketOpen: 
     return `${beside ? 'others' : 'prices'} as of ${quoteTime(oldestAt, now)}`;
 };
 
+// A holding whose symbol has stopped quoting (lib/prices/gone.ts): no fill can be made at a live
+// price, so the one way out is to close the whole holding at its last stored close. The button,
+// its dialog, the refusals and the reason written on the fill.
+export const GONE_COPY = {
+    action: 'Close at the last close',
+    title: (symbol: string): string => `Close ${symbol} at its last close`,
+    body: (symbol: string, date: string, sessions: number): string =>
+        `${symbol} has had no live quote for ${sessions} sessions, so it cannot be sold at a live price. This closes the whole holding at its ${shortDate(date)} close, the last price stored for it.`,
+    caveat: 'The last close is not always what a holder received: a cash merger pays the deal price, and a delisting can pay less.',
+    lastClose: 'Last close',
+    proceeds: 'Proceeds',
+    confirm: (quantity: number): string => `Close ${quantity} share${quantity === 1 ? '' : 's'}`,
+    working: 'Closing…',
+    done: 'Holding closed',
+    failed: 'The holding could not be closed',
+    // The fill's reason, shown on its row in the trade log.
+    reason: (date: string, sessions: number): string => `Closed at the ${shortDate(date)} close: no live quote for ${sessions} sessions.`,
+    notHeld: (symbol: string): string => `This account holds no ${symbol}.`,
+    stillQuoted: (symbol: string): string => `${symbol} has a live quote, so its orders go through the Trade Desk.`,
+    noClose: (symbol: string): string => `No stored close was found for ${symbol}.`,
+} as const;
+
+// A stock split restates the ledger in today's shares (lib/trading/splits.ts). Said once, under
+// the trade log, naming each split that restated a fill shown there.
+export const SPLIT_COPY = {
+    note: (splits: readonly {symbol: string; label: string; exDate: string}[]): string =>
+        `Fills before a split are shown in today's shares: ${splits.map((split) => `${split.symbol} ${split.label} on ${shortDate(split.exDate)}`).join(', ')}.`,
+} as const;
+
 // The switch between paper accounts (components/trading/accounts): the line under the heading
 // while the account picked is on its way, what a screen reader hears once it is shown, and the
 // toast when the switch could not be made.

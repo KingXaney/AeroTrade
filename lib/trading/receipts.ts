@@ -28,7 +28,9 @@ export const replayReceipts = (ledger: readonly LedgerTrade[]): Record<string, F
     const out: Record<string, FillReceipt> = {};
     for (const trade of byTime(ledger)) {
         const before = holding(account, trade.symbol);
-        const fill = applyFill(account, {symbol: trade.symbol, side: trade.side, quantity: trade.quantity}, trade.price);
+        // Exact: a stored fill moved what its row says, a fraction of a share included (the tail
+        // of a holding a split left one in, or a fill restated in today's shares).
+        const fill = applyFill(account, {symbol: trade.symbol, side: trade.side, quantity: trade.quantity}, trade.price, undefined, {exact: true});
         // A sell the ledger cannot back (history from before accounts had ids): no receipt,
         // and the replayed position stays as it was.
         if (!fill.ok) continue;

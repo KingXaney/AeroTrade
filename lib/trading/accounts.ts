@@ -23,6 +23,9 @@ export const toAccountSummary = (account: PaperAccountDoc): PaperAccountSummary 
     inceptionAt: accountEpoch(account).getTime(),
     createdAt: new Date(account.createdAt).getTime(),
     ...(account.incomeTotals ? {income: {interest: account.incomeTotals.interest ?? 0, dividends: account.incomeTotals.dividends ?? 0}} : {}),
+    ...(account.splits && account.splits.length > 0
+        ? {splits: account.splits.map((split) => ({symbol: split.symbol, exDate: split.exDate, numerator: split.numerator, denominator: split.denominator}))}
+        : {}),
 });
 
 // Plain copies of the stored positions, for valuation and analytics.

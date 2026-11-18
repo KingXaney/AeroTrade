@@ -22,3 +22,8 @@ export const TRADE_HISTORY_LIMIT = 50;
 // history. The nightly income job tops up the bars of every held symbol, so a held symbol's
 // newest close is normally the last session's.
 export const CLOSE_FALLBACK_DAYS = 7;
+
+// How far back the last stored close of a symbol that has stopped quoting is looked for: what a
+// gone holding (lib/prices/gone.ts) is valued at on a page and in the daily snapshot, and what
+// it may be closed out at (lib/trading/close-out.ts).
+export const LAST_CLOSE_LOOKBACK_DAYS = 366;

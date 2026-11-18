@@ -175,3 +175,74 @@ export const fetchYahooChart = async (
 
 export const fetchYahooDaily = async (symbol: string, options: {range: YahooRange}): Promise<Bar[]> =>
     (await fetchYahooChart(symbol, options)).bars;
+
+// ---------------------------------------------------------------------------
+// Splits — a call of its own
+// ---------------------------------------------------------------------------
+
+// The chart's own list of stock splits, asked for separately: the bars call above must never
+// carry `events` (see yahooChartUrl), so a refused split call costs one detection and never the
+// price history. Two years covers every account the app has ever held.
+export const yahooSplitsUrl = (symbol: string): string =>
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker(symbol))}?range=2y&interval=1d&events=split`;
+
+// `numerator` new shares for every `denominator` old ones, from the ET date `exDate`. `prevClose`
+// is the close of the session before it AS THIS PAYLOAD HAS IT, which is already in the new basis
+// (Yahoo restates every earlier close on the day of a split): what lib/trading/splits.cutFor
+// tells an old-basis fill from a new-basis one with. Absent when the payload starts on the ex-date.
+export type YahooSplit = {exDate: string; numerator: number; denominator: number; prevClose?: number};
+
+// Null when the payload is not a chart at all (nothing was learned); [] when it lists no split.
+export const parseYahooSplits = (json: unknown): YahooSplit[] | null => {
+    if (!isRecord(json) || !isRecord(json.chart) || !Array.isArray(json.chart.result)) return null;
+    const result: unknown = json.chart.result[0];
+    if (!isRecord(result)) return null;
+    const listed = isRecord(result.events) && isRecord(result.events.splits) ? Object.values(result.events.splits) : [];
+
+    const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
+    const quote: unknown = isRecord(result.indicators) && Array.isArray(result.indicators.quote) ? result.indicators.quote[0] : undefined;
+    const closes = isRecord(quote) && Array.isArray(quote.close) ? quote.close : [];
+    const closeBefore = (exDate: string): number | undefined => {
+        let found: number | undefined;
+        timestamps.forEach((timestamp, index) => {
+            if (typeof timestamp !== "number" || !Number.isFinite(timestamp) || barDateOf(timestamp) >= exDate) return;
+            const close = positiveAt(closes, index);
+            if (close !== undefined) found = close;
+        });
+        return found;
+    };
+
+    const splits: YahooSplit[] = [];
+    for (const entry of listed) {
+        if (!isRecord(entry)) continue;
+        const {date, numerator, denominator} = entry;
+        if (typeof date !== "number" || !Number.isFinite(date)) continue;
+        if (typeof numerator !== "number" || typeof denominator !== "number") continue;
+        if (!(numerator > 0) || !(denominator > 0) || !Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator === denominator) continue;
+        const exDate = barDateOf(date);
+        const prevClose = closeBefore(exDate);
+        splits.push({exDate, numerator, denominator, ...(prevClose !== undefined ? {prevClose} : {})});
+    }
+    return splits.sort((a, b) => a.exDate.localeCompare(b.exDate));
+};
+
+// Null on any failure: a refusal is filed with the limits tracker, and the caller counts the
+// symbol as not checked rather than as having no split.
+export const fetchYahooSplits = async (symbol: string): Promise<YahooSplit[] | null> => {
+    try {
+        const response = await fetch(yahooSplitsUrl(symbol), {
+            cache: "no-store",
+            headers: {"User-Agent": "Mozilla/5.0"},
+            signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+            console.error(`Yahoo splits fetch failed for ${symbol}: HTTP ${response.status}`);
+            await reportLimit('yahoo', await responseSignal(response, `splits ${symbol}`));
+            return null;
+        }
+        return parseYahooSplits(await response.json());
+    } catch (error) {
+        console.error(`Yahoo splits fetch threw for ${symbol}`, error);
+        return null;
+    }
+};

@@ -27,6 +27,7 @@ import {
     QUOTE_WINDOW_MS,
 } from "@/lib/prices/config";
 import {fetchQuote, finnhubConfigured, type QuoteAnswer} from "@/lib/prices/finnhub";
+import {isGone} from "@/lib/prices/gone";
 import {lastSessionClose, marketStatus} from "@/lib/prices/market-hours";
 import {
     askedPrice,
@@ -324,6 +325,20 @@ export const getSheetQuotes = async (symbols: readonly string[], {wait = 'recent
 export const getSheetQuote = async (symbol: string, options: {wait?: QuoteWait} = {}): Promise<SheetQuote | null> => {
     const [wanted] = normalizeSymbols([symbol]);
     return wanted ? (await getSheetQuotes([wanted], options)).get(wanted) ?? null : null;
+};
+
+// The symbols among these that are gone (lib/prices/gone.ts): the sheet has received no price
+// for them in the last few sessions, or never. A plain read of the rows — Finnhub is not asked.
+// None without a key: where nothing can be quoted, nothing has stopped quoting.
+export const getGoneSymbols = async (symbols: readonly string[], now: number = Date.now()): Promise<string[]> => {
+    const wanted = normalizeSymbols(symbols);
+    if (wanted.length === 0 || !finnhubConfigured()) return [];
+    await connectToDatabase();
+    const rows = await readRows(wanted);
+    return wanted.filter((symbol) => {
+        const row = rows.get(symbol);
+        return isGone(typeof row?.price === 'number' && typeof row.fetchedAt === 'number' ? row.fetchedAt : null, now);
+    });
 };
 
 // The quotes a fill, the snapshot job or a plan ACTS on: asked of Finnhub at this moment, never

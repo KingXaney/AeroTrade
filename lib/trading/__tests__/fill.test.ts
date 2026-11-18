@@ -39,6 +39,7 @@ describe('applyFill', () => {
         expect(result).toEqual({
             ok: true,
             total: 1_200,
+            quantity: 10,
             account: {cash: 8_800, positions: [{symbol: 'AAPL', quantity: 20, avgCost: 110}]},
         });
     });
@@ -62,6 +63,7 @@ describe('applyFill', () => {
         expect(result).toEqual({
             ok: true,
             total: 520,
+            quantity: 4,
             realizedPnl: 120,
             account: {cash: 10_520, positions: [{symbol: 'AAPL', quantity: 6, avgCost: 100}]},
         });
@@ -69,7 +71,7 @@ describe('applyFill', () => {
 
     it('removes a position sold down to zero, with a negative P&L intact', () => {
         const result = applyFill(account, {symbol: 'AAPL', side: 'sell', quantity: 10}, 90);
-        expect(result).toEqual({ok: true, total: 900, realizedPnl: -100, account: {cash: 10_900, positions: []}});
+        expect(result).toEqual({ok: true, total: 900, quantity: 10, realizedPnl: -100, account: {cash: 10_900, positions: []}});
     });
 
     it('never mutates the account it was given', () => {
@@ -103,5 +105,75 @@ describe('applyFill — the company label a live fill carries', () => {
 
     it('matches symbols exactly — the caller resolves a holding\'s spelling', () => {
         expect(applyFill(live, {symbol: 'aapl', side: 'sell', quantity: 1}, 100)).toEqual({ok: false, reason: 'not held'});
+    });
+    // A split can leave a fraction of a share in a holding (lib/trading/splits.ts). Orders stay
+    // whole shares, so the fraction leaves with the last whole one.
+    describe('a holding with a fraction of a share', () => {
+        const half: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 7.5, avgCost: 20}]};
+
+        it('says how many shares it moved', () => {
+            const buy = applyFill({cash: 1000, positions: []}, {symbol: 'XYZ', side: 'buy', quantity: 3}, 10);
+            expect(buy.ok && buy.quantity).toBe(3);
+        });
+
+        it('sells the fraction with the last whole share', () => {
+            const all = applyFill(half, {symbol: 'XYZ', side: 'sell', quantity: 7}, 30);
+            expect(all.ok && all.quantity).toBe(7.5);
+            expect(all.ok && all.total).toBe(225);
+            expect(all.ok && all.realizedPnl).toBe(75);
+            expect(all.ok && all.account.positions).toEqual([]);
+        });
+
+        it('leaves the fraction while a whole share is still held', () => {
+            const some = applyFill(half, {symbol: 'XYZ', side: 'sell', quantity: 6}, 30);
+            expect(some.ok && some.quantity).toBe(6);
+            expect(some.ok && some.account.positions[0].quantity).toBe(1.5);
+        });
+
+        it('refuses more whole shares than are held', () => {
+            expect(applyFill(half, {symbol: 'XYZ', side: 'sell', quantity: 8}, 30)).toEqual({ok: false, reason: 'not held'});
+        });
+
+        it('sells a holding of less than one share as one share', () => {
+            const crumb: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 0.5, avgCost: 20}]};
+            const sold = applyFill(crumb, {symbol: 'XYZ', side: 'sell', quantity: 1}, 30);
+            expect(sold.ok && sold.quantity).toBe(0.5);
+            expect(sold.ok && sold.account.positions).toEqual([]);
+            expect(applyFill(crumb, {symbol: 'XYZ', side: 'sell', quantity: 2}, 30)).toEqual({ok: false, reason: 'not held'});
+        });
+
+        it('still sells a whole holding exactly', () => {
+            const whole: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 10, avgCost: 20}]};
+            const sold = applyFill(whole, {symbol: 'XYZ', side: 'sell', quantity: 10}, 30);
+            expect(sold.ok && sold.quantity).toBe(10);
+            const part = applyFill(whole, {symbol: 'XYZ', side: 'sell', quantity: 9}, 30);
+            expect(part.ok && part.account.positions[0].quantity).toBe(1);
+        });
+    });
+
+    // A replay of stored fills (receipts, a split's restated ledger) moves exactly what the row
+    // says: a fill restated in today's shares may be 7.5 shares bought.
+    describe('exact, for a replay', () => {
+        it('moves a fractional quantity as written', () => {
+            const bought = applyFill({cash: 1000, positions: []}, {symbol: 'XYZ', side: 'buy', quantity: 7.5}, 20, undefined, {exact: true});
+            expect(bought.ok && bought.quantity).toBe(7.5);
+            expect(bought.ok && bought.total).toBe(150);
+            expect(bought.ok && bought.account.positions[0]).toEqual({symbol: 'XYZ', quantity: 7.5, avgCost: 20});
+        });
+
+        it('sells a fraction as written and drops a holding sold to nothing', () => {
+            const held: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 7.5, avgCost: 20}]};
+            const part = applyFill(held, {symbol: 'XYZ', side: 'sell', quantity: 2.5}, 30, undefined, {exact: true});
+            expect(part.ok && part.account.positions[0].quantity).toBe(5);
+            const all = applyFill(held, {symbol: 'XYZ', side: 'sell', quantity: 7.5}, 30, undefined, {exact: true});
+            expect(all.ok && all.account.positions).toEqual([]);
+            expect(applyFill(held, {symbol: 'XYZ', side: 'sell', quantity: 7.6}, 30, undefined, {exact: true})).toEqual({ok: false, reason: 'not held'});
+        });
+
+        it('forgives the float noise a ratio leaves', () => {
+            const held: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 10 / 3 * 3, avgCost: 20}]};
+            const all = applyFill(held, {symbol: 'XYZ', side: 'sell', quantity: 10.000000000001}, 30, undefined, {exact: true});
+            expect(all.ok && all.account.positions).toEqual([]);
+        });
     });
 });

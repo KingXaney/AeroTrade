@@ -3,6 +3,7 @@
 import {revalidatePath} from "next/cache";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {executeOrder} from "@/lib/trading/orders";
+import {closeOutGoneHolding} from "@/lib/trading/close-out";
 import {sanitizeTradeNote} from "@/lib/trading/order-math";
 import type {ActionResult} from '@/lib/actions/types';
 
@@ -31,4 +32,16 @@ export const placeOrder = async (
     const result = await executeOrder(userId, {accountId, symbol, side, quantity, source: 'user', ...(reason ? {reason} : {})});
     if (result.success) revalidateTradingPaths();
     return {success: result.success, message: result.message};
+};
+
+// Close a holding whose symbol has stopped quoting, at its last stored close
+// (lib/trading/close-out.ts decides whether it has; the arguments arrive unchecked).
+export const closeOutHolding = async ({accountId, symbol}: {accountId: unknown; symbol: unknown}): Promise<ActionResult> => {
+    const userId = await getCurrentUserId();
+    if (!userId) return {success: false, message: 'Not authenticated'};
+    if (typeof accountId !== 'string' || typeof symbol !== 'string' || symbol.length > 24) return {success: false, message: 'Account not found'};
+
+    const result = await closeOutGoneHolding(userId, {accountId, symbol});
+    if (result.success) revalidateTradingPaths();
+    return result;
 };

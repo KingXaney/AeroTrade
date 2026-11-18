@@ -7,6 +7,12 @@
 // holding. A buy averages its cost into the position (VWAP); a sell books (price − average cost)
 // × shares as realised P&L; a position sold to zero is dropped. Never mutates its input.
 //
+// A holding itself may carry a fraction of a share: a split leaves one (lib/trading/splits.ts).
+// Orders stay whole shares, so a sell that would leave less than one share sells the fraction
+// with it, and a holding of less than one share sells as one. The result says how many shares
+// moved. `exact` is for a replay of stored fills (the receipts, a ledger restated after a
+// split): the quantity is moved as written, fraction and all.
+//
 // Symbols match exactly. executeOrder upper-cases the order's symbol and looks the holding up
 // case-insensitively, then fills under the holding's own spelling, so a stored position keeps it.
 
@@ -32,29 +38,35 @@ type FillOrder = {
 export type FillRejection = 'invalid quantity' | 'no price' | 'insufficient cash' | 'cash floor' | 'not held';
 
 type FillResult =
-    | {ok: true; account: SimAccount; realizedPnl?: number; total: number}
+    | {ok: true; account: SimAccount; realizedPnl?: number; total: number; quantity: number}
     | {ok: false; reason: FillRejection};
+
+// Below this a quantity is float noise (a ratio's rounding), not shares.
+const SHARE_EPSILON = 1e-9;
 
 export const applyFill = (
     account: SimAccount,
     order: FillOrder,
     price: number,
     minCashAfter?: number,
+    {exact = false}: {exact?: boolean} = {},
 ): FillResult => {
-    const qty = Math.floor(Number(order.quantity));
+    const requested = Number(order.quantity);
+    const qty = exact ? requested : Math.floor(requested);
     if (!Number.isFinite(qty) || qty <= 0) {
         return {ok: false, reason: 'invalid quantity'};
     }
     if (typeof price !== 'number' || !(price > 0)) {
         return {ok: false, reason: 'no price'};
     }
-    const total = qty * price;
     const positions = account.positions.map((position) => ({...position}));
     let cash = account.cash;
     let realizedPnl: number | undefined;
+    let moved = qty;
     const existing = positions.find((position) => position.symbol === order.symbol);
 
     if (order.side === 'buy') {
+        const total = qty * price;
         if (total > cash) {
             return {ok: false, reason: 'insufficient cash'};
         }
@@ -76,18 +88,29 @@ export const applyFill = (
         }
         cash -= total;
     } else {
-        if (!existing || existing.quantity < qty) {
+        if (!existing) {
             return {ok: false, reason: 'not held'};
         }
-        realizedPnl = (price - existing.avgCost) * qty;
-        existing.quantity -= qty;
-        cash += total;
+        if (exact) {
+            if (qty > existing.quantity + SHARE_EPSILON) return {ok: false, reason: 'not held'};
+            moved = Math.min(qty, existing.quantity);
+        } else {
+            const whole = Math.floor(existing.quantity + SHARE_EPSILON);
+            const fraction = existing.quantity - whole > SHARE_EPSILON;
+            // The ticket's smallest order is one share, so a holding of less than one sells as one.
+            if (qty > Math.max(whole, fraction ? 1 : 0)) return {ok: false, reason: 'not held'};
+            if (existing.quantity - qty < 1) moved = existing.quantity;
+        }
+        realizedPnl = (price - existing.avgCost) * moved;
+        existing.quantity -= moved;
+        cash += moved * price;
     }
 
     return {
         ok: true,
-        account: {cash, positions: positions.filter((position) => position.quantity > 0)},
+        account: {cash, positions: positions.filter((position) => position.quantity > SHARE_EPSILON)},
         ...(realizedPnl !== undefined ? {realizedPnl} : {}),
-        total,
+        total: moved * price,
+        quantity: moved,
     };
 };

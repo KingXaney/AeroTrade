@@ -2,7 +2,7 @@
 // exercised against a stubbed global fetch — no network.
 
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-import {DIVIDEND_NOISE_FLOOR, dividendCoverage, fetchYahooChart, fetchYahooDaily, inferDividends, parseYahooChart, parseYahooListing, yahooChartUrl, yahooTicker} from "@/lib/prices/yahoo";
+import {DIVIDEND_NOISE_FLOOR, dividendCoverage, fetchYahooChart, fetchYahooDaily, fetchYahooSplits, inferDividends, parseYahooChart, parseYahooListing, parseYahooSplits, yahooChartUrl, yahooSplitsUrl, yahooTicker} from "@/lib/prices/yahoo";
 
 // Session opens (09:30 ET) as epoch seconds: EDT is UTC-4, EST is UTC-5.
 const EDT_2026_07_27 = Date.UTC(2026, 6, 27, 13, 30) / 1000;
@@ -364,5 +364,89 @@ describe("fetchYahooDaily", () => {
         vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
         expect(await fetchYahooDaily("SPY", {range: "5y"})).toEqual([]);
+    });
+});
+
+// Splits come from a call of their own: the bars call must never carry `events` (it drew a 429).
+describe("yahooSplitsUrl", () => {
+    it("asks the chart for split events over two years", () => {
+        const url = yahooSplitsUrl("brk.b");
+        expect(url).toContain("/v8/finance/chart/BRK-B?");
+        expect(url).toContain("events=split");
+        expect(url).toContain("range=2y");
+    });
+});
+
+describe("parseYahooSplits", () => {
+    const withSplits = (splits: unknown) => {
+        const chart = chartOf({timestamp: [EDT_2026_07_27, EDT_2026_07_28, EDT_2026_07_29], close: [120.5, 121, 119]});
+        (chart.chart.result[0] as Record<string, unknown>).events = {splits};
+        return chart;
+    };
+
+    it("reads each split with its ex-date, its ratio and the close before it", () => {
+        const json = withSplits({[String(EDT_2026_07_28)]: {date: EDT_2026_07_28, numerator: 10, denominator: 1, splitRatio: "10:1"}});
+        expect(parseYahooSplits(json)).toEqual([{exDate: "2026-07-28", numerator: 10, denominator: 1, prevClose: 120.5}]);
+    });
+
+    it("has no close for a split on the payload's first session", () => {
+        const json = withSplits({a: {date: EDT_2026_07_27, numerator: 3, denominator: 2}});
+        expect(parseYahooSplits(json)).toEqual([{exDate: "2026-07-27", numerator: 3, denominator: 2}]);
+    });
+
+    it("is an empty list when the chart lists none", () => {
+        expect(parseYahooSplits(chartOf({timestamp: [EDT_2026_07_27], close: [100]}))).toEqual([]);
+        expect(parseYahooSplits(withSplits({}))).toEqual([]);
+    });
+
+    it("drops what is not a split: a one-for-one, a bad number, a missing date", () => {
+        const json = withSplits({
+            a: {date: EDT_2026_07_28, numerator: 1, denominator: 1},
+            b: {date: EDT_2026_07_28, numerator: 0, denominator: 1},
+            c: {date: EDT_2026_07_28, numerator: "10", denominator: 1},
+            d: {numerator: 10, denominator: 1},
+            e: "nonsense",
+        });
+        expect(parseYahooSplits(json)).toEqual([]);
+    });
+
+    it("orders several by ex-date", () => {
+        const json = withSplits({
+            late: {date: EDT_2026_07_29, numerator: 2, denominator: 1},
+            early: {date: EDT_2026_07_28, numerator: 1, denominator: 5},
+        });
+        expect(parseYahooSplits(json)?.map((s) => s.exDate)).toEqual(["2026-07-28", "2026-07-29"]);
+    });
+
+    it("is null, not empty, when the payload is not a chart: nothing was learned", () => {
+        expect(parseYahooSplits(null)).toBeNull();
+        expect(parseYahooSplits({chart: {result: null, error: {code: "Not Found"}}})).toBeNull();
+        expect(parseYahooSplits({chart: {result: []}})).toBeNull();
+    });
+});
+
+describe("fetchYahooSplits", () => {
+    beforeEach(() => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("is null when Yahoo refuses or the request throws", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Too Many Requests", {status: 429})));
+        expect(await fetchYahooSplits("NVDA")).toBeNull();
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+        expect(await fetchYahooSplits("NVDA")).toBeNull();
+    });
+
+    it("returns the parsed splits of a good answer", async () => {
+        const chart = chartOf({timestamp: [EDT_2026_07_27, EDT_2026_07_28], close: [100, 10]});
+        (chart.chart.result[0] as Record<string, unknown>).events = {splits: {x: {date: EDT_2026_07_28, numerator: 10, denominator: 1}}};
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(chart), {status: 200}));
+        vi.stubGlobal("fetch", fetchMock);
+        expect(await fetchYahooSplits("NVDA")).toEqual([{exDate: "2026-07-28", numerator: 10, denominator: 1, prevClose: 100}]);
+        expect(String(fetchMock.mock.calls[0][0])).toContain("events=split");
     });
 });

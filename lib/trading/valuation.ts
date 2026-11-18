@@ -9,7 +9,7 @@ import {lastSessionClose, sessionCloseOf} from "@/lib/prices/market-hours";
 import {getFreshQuotes, getSheetQuotes} from "@/lib/prices/quote-store";
 import {getLatestBars} from "@/lib/prices/store";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
-import {CLOSE_FALLBACK_DAYS} from "@/lib/trading/config";
+import {CLOSE_FALLBACK_DAYS, LAST_CLOSE_LOOKBACK_DAYS} from "@/lib/trading/config";
 import {enrichPosition, symbolsBehind, withStoredCloses, type PriceInfo} from "@/lib/trading/analytics";
 import {getAccountsForUser, getCachedAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 import type {AccountWithPortfolio, EnrichedPosition, PaperPosition, PortfolioSummary} from '@/lib/trading/types';
@@ -77,7 +77,18 @@ export const buildHoldingsPriceMap = async (symbols: string[]): Promise<Map<stri
             console.error('Stored closes for unquoted holdings could not be read:', error);
             return new Map<string, {date: string; close: number}>();
         });
-    return withStoredCloses(live, closes, sessionCloseOf);
+    const valued = withStoredCloses(live, closes, sessionCloseOf);
+    // Still nothing: the symbol has had neither a quote nor a close for a week — it has stopped
+    // trading under that name. Its newest stored close, however old and dated as such, is nearer
+    // what the holding is worth than its cost; the snapshot job values it the same way.
+    const gone = Array.from(valued.entries()).filter(([, info]) => typeof info.price !== 'number').map(([symbol]) => symbol);
+    if (gone.length === 0) return valued;
+    const lastCloses = await getLatestBars(gone, {since: addCalendarDays(today, -LAST_CLOSE_LOOKBACK_DAYS), onOrBefore: today})
+        .catch((error) => {
+            console.error('Last stored closes for holdings that stopped quoting could not be read:', error);
+            return new Map<string, {date: string; close: number}>();
+        });
+    return withStoredCloses(valued, lastCloses);
 };
 
 // Pure computation: turn a stored account + price map into a serializable portfolio summary.

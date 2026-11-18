@@ -168,7 +168,10 @@ export const computeNavigatorScores = async (symbols: string[], {record}: {recor
     return scored;
 };
 
-export type AccountPlan = {planned: PlannedOrder[]; positions: HeldPosition[]; totalValue: number};
+// `unpriced`: the holdings and targets Finnhub gave no price for when the plan was sized. The
+// allocator leaves each out with no order; the weekly run reads the list to tell a refused
+// quote (the week is tried again) from a symbol that has stopped quoting (lib/prices/gone.ts).
+export type AccountPlan = {planned: PlannedOrder[]; positions: HeldPosition[]; totalValue: number; unpriced: string[]};
 
 // Plan one account's orders under the holding rails. Returns null when the
 // account can't be resolved (deleted / not owned).
@@ -231,7 +234,8 @@ export const planAccountOrders = async (
     }
 
     const planned = diffToOrders({totalValue: portfolio.totalValue, cash: portfolio.cash, positions, targets, maxTrades});
-    return {planned, positions, totalValue: portfolio.totalValue};
+    const unpriced = [...new Set(positions.filter((p) => p.price === null).map((p) => p.symbol.toUpperCase()))].sort();
+    return {planned, positions, totalValue: portfolio.totalValue, unpriced};
 };
 
 // Assemble the SuggestionItem for one executed (or skipped) order.

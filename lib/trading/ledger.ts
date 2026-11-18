@@ -1,6 +1,7 @@
 // An account's trades: the current-epoch filter every per-account trade read applies, the one
 // cached ledger read a page makes, the bounded history, the /history feed and the CSV export's
-// read. Server-only (NOT 'use server').
+// read. Each read hands back the account's fills as its books hold them now: with a fill whose
+// row is still to be inserted, and in today's shares after a split. Server-only (NOT 'use server').
 
 import {cache} from "react";
 import {Types} from "mongoose";
@@ -10,6 +11,8 @@ import PaperTrade from "@/database/models/paper-trade.model";
 import {DEFAULT_ACCOUNT_NAME, getOwnedAccount} from "@/lib/trading/accounts";
 import type {CsvTrade} from "@/lib/trading/csv";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
+import {pendingTradeRow, withPendingRows, type PendingFillLike} from "@/lib/trading/pending";
+import {restateFill, toAppliedSplits, type AppliedSplit} from "@/lib/trading/splits";
 import type {PaperTradeRecord, TradeSource} from '@/lib/trading/types';
 
 type LeanTrade = {
@@ -17,7 +20,13 @@ type LeanTrade = {
     realizedPnl?: number; source?: string; reason?: string; accountId?: string; createdAt: Date;
 };
 
-const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => ({
+// Two things every per-account trade read does to the rows it found, both from the account's
+// own document. A fill the account has taken whose row is not inserted yet is added
+// (lib/trading/pending.ts). And a fill from before a stock split the account has applied is
+// restated in today's shares (lib/trading/splits.ts) — the basis its position is stored in.
+type StoredSplits = Parameters<typeof toAppliedSplits>[0];
+
+const toTradeRecord = (t: LeanTrade, splits: readonly AppliedSplit[], accountName?: string): PaperTradeRecord => restateFill({
     id: String(t._id),
     symbol: t.symbol,
     company: t.company || t.symbol,
@@ -30,7 +39,7 @@ const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => 
     ...(t.reason ? {reason: t.reason} : {}),
     ...(accountName ? {accountName} : {}),
     createdAt: new Date(t.createdAt).getTime(),
-});
+}, splits);
 
 // Where an account's current epoch starts, for every per-account trade read. A reset
 // re-anchors inceptionAt and then deletes the old epoch's trades; one that crashed between the
@@ -38,11 +47,16 @@ const toTradeRecord = (t: LeanTrade, accountName?: string): PaperTradeRecord => 
 // inceptionAt, as creditAccountIncome's do. Accounts from before inceptionAt existed have none
 // and keep their migrated history. Undefined when the account is not this user's — nothing of
 // theirs to read. cache() shares it between a render's ledger and history reads.
-const tradeEpoch = cache(async (userId: string, accountId: string): Promise<{since: Date | null} | undefined> => {
+type TradeEpoch = {since: Date | null; pending: LeanTrade | null; splits: AppliedSplit[]};
+
+const tradeEpoch = cache(async (userId: string, accountId: string): Promise<TradeEpoch | undefined> => {
     if (!Types.ObjectId.isValid(accountId)) return undefined;
     await connectToDatabase();
-    const account = await PaperAccount.findOne({_id: accountId, userId}).select('inceptionAt').lean<{inceptionAt?: Date} | null>();
-    return account ? {since: account.inceptionAt ?? null} : undefined;
+    const account = await PaperAccount.findOne({_id: accountId, userId}).select('inceptionAt pendingFill splits')
+        .lean<{inceptionAt?: Date; pendingFill?: PendingFillLike; splits?: StoredSplits} | null>();
+    return account
+        ? {since: account.inceptionAt ?? null, pending: pendingTradeRow(accountId, account.pendingFill), splits: toAppliedSplits(account.splits)}
+        : undefined;
 });
 
 // The one PaperTrade filter for an account's current epoch. Exported for readers that already
@@ -70,7 +84,7 @@ export const getTradeLedger = cache(async (userId: string, accountId: string): P
     const epoch = await tradeEpoch(userId, accountId);
     if (!epoch) return [];
     const trades = await PaperTrade.find(epochTrades(userId, accountId, epoch.since)).sort({createdAt: 1, _id: 1}).lean<LeanTrade[]>();
-    return trades.map((t) => toTradeRecord(t));
+    return withPendingRows(trades, [epoch.pending], 'asc').map((t) => toTradeRecord(t, epoch.splits));
 });
 
 // The newest `limit` fills of the current epoch, newest first, in a bounded read of their own
@@ -85,7 +99,7 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
             .sort({createdAt: -1, _id: -1})
             .limit(limit)
             .lean<LeanTrade[]>();
-        return trades.map((t) => toTradeRecord(t));
+        return withPendingRows(trades, [epoch.pending], 'desc').slice(0, limit).map((t) => toTradeRecord(t, epoch.splits));
     } catch (error) {
         console.error('Error fetching trade history:', error);
         return [];
@@ -100,14 +114,20 @@ export const getTradeHistory = async (userId: string, accountId: string, limit =
 export const getRecentTradesForUser = async (userId: string, limit = 50): Promise<{trades: PaperTradeRecord[]; total: number} | null> => {
     try {
         await connectToDatabase();
-        const accounts = await PaperAccount.find({userId}).select('name inceptionAt').lean<{_id: unknown; name?: string; inceptionAt?: Date}[]>();
+        const accounts = await PaperAccount.find({userId}).select('name inceptionAt pendingFill splits')
+            .lean<{_id: unknown; name?: string; inceptionAt?: Date; pendingFill?: PendingFillLike; splits?: StoredSplits}[]>();
         const epoch = epochTradesOf(userId, accounts);
-        const [trades, total] = await Promise.all([
+        const [found, counted] = await Promise.all([
             PaperTrade.find(epoch).sort({createdAt: -1, _id: -1}).limit(limit).lean<LeanTrade[]>(),
             PaperTrade.countDocuments(epoch),
         ]);
         const names = new Map(accounts.map((a) => [String(a._id), a.name || DEFAULT_ACCOUNT_NAME]));
-        return {trades: trades.map((t) => toTradeRecord(t, t.accountId ? names.get(t.accountId) : undefined)), total};
+        const splits = new Map(accounts.map((a) => [String(a._id), toAppliedSplits(a.splits)]));
+        const trades = withPendingRows(found, accounts.map((a) => pendingTradeRow(String(a._id), a.pendingFill)), 'desc');
+        return {
+            trades: trades.slice(0, limit).map((t) => toTradeRecord(t, (t.accountId && splits.get(t.accountId)) || [], t.accountId ? names.get(t.accountId) : undefined)),
+            total: counted + (trades.length - found.length),
+        };
     } catch (error) {
         console.error('Error fetching recent trades:', error);
         return null;
@@ -121,6 +141,8 @@ export const getRecentTradesForUser = async (userId: string, limit = 50): Promis
 export const getAccountExport = async (userId: string, accountId: string): Promise<{name: string; trades: CsvTrade[]} | null> => {
     const account = await getOwnedAccount(userId, accountId);
     if (!account) return null;
-    const trades = await PaperTrade.find(epochTrades(userId, String(account._id), account.inceptionAt)).sort({createdAt: 1, _id: 1}).lean<CsvTrade[]>();
-    return {name: account.name, trades};
+    const id = String(account._id);
+    const trades = await PaperTrade.find(epochTrades(userId, id, account.inceptionAt)).sort({createdAt: 1, _id: 1}).lean<(CsvTrade & {_id: unknown; createdAt: Date})[]>();
+    const splits = toAppliedSplits(account.splits);
+    return {name: account.name, trades: withPendingRows(trades, [pendingTradeRow(id, account.pendingFill)], 'asc').map((t) => restateFill(t, splits))};
 };
