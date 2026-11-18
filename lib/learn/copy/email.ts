@@ -121,3 +121,26 @@ export const RESET_EMAIL_COPY = {
     text: (url: string, minutes: number): string =>
         `Reset your ${SITE_NAME} password: ${url}\n\nThe link expires in ${minutes} minutes. If you did not ask for this, ignore this email: your password stays as it is.`,
 } as const;
+
+// The owner's alert (lib/jobs/functions/alerts.ts): a job that failed, or the jobs overdue on
+// their stamp. Sent to the owner list only; the error line is the job's own, quoted as text.
+export const JOB_ALERT_COPY = {
+    failed: {
+        subject: (label: string): string => `${SITE_NAME}: the ${label} job failed`,
+        hero: (label: string): string => `The ${label} job failed`,
+        preheader: (label: string): string => `${label} stopped with an error after its retries.`,
+        body: (schedule: string, when: string): string => `It runs ${schedule}. The run that stopped at ${when} had used its retries; the error it ended on is below.`,
+        errorLead: 'Error:',
+        lastGood: (ago: string | null): string => (ago ? `Its last completed run was ${ago}.` : 'It has not completed a run yet.'),
+    },
+    overdue: {
+        subject: (count: number): string => `${SITE_NAME}: ${count === 1 ? '1 job is' : `${count} jobs are`} overdue`,
+        hero: (count: number): string => (count === 1 ? 'One job is overdue' : `${count} jobs are overdue`),
+        preheader: 'A job has not completed a run in longer than its schedule allows.',
+        body: 'Each of these last completed a run longer ago than its schedule allows. A job that is not firing, or that fails before its last step, looks like this.',
+        row: (label: string, schedule: string, ago: string): string => `${label} (${schedule}): last completed ${ago}.`,
+    },
+    cta: 'Open the system view',
+    why: `You get this email because your address is on ${SITE_NAME}'s owner list. It is sent at most once per job per day.`,
+    text: (headline: string, lines: readonly string[], url: string): string => `${headline}\n\n${lines.join('\n')}\n\n${url}`,
+} as const;

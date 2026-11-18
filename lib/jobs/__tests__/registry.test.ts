@@ -37,6 +37,7 @@ describe('job registry', () => {
             ['culture-follow-bootstrap', 'app/bootstrap.culture.follow'],
             ['broker-sync', 'app/sync.broker.mirror', 'TZ=America/New_York 15 11 * * 1-5'],
             ['agent-world-weekly', 'app/run.agent.world', 'TZ=America/New_York 30 8 * * 1', 'TZ=America/New_York 30 8 * * 2'],
+            ['job-alerts', 'app/check.job.health', 'TZ=America/New_York 0 9 * * *'],
         ]);
     });
 

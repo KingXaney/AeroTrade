@@ -48,7 +48,7 @@ OWNER_EMAILS=$(cd "$QA_DIR" && node --input-type=module -e "import {OWNER_EMAILS
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading steady-prices books topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
+ALL=(auth styles shell home landing chat topics-refresh trading steady-prices books job-alerts topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
 
 KEEP_UP=0
 NAMES=()

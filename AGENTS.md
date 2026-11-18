@@ -20,7 +20,7 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 - `npm run build:check` — compile-only Next build; needs no database or keys
 - `npm run build` / `npm start` — the production build and its server
 - `npm run dev` + `npx inngest-cli@latest dev -u http://localhost:3000/api/inngest` — app + jobs
-- `npm run trigger -- <brain|navigator|news|snapshots|splits|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
+- `npm run trigger -- <brain|navigator|news|snapshots|splits|alerts|income|topics|briefs|briefing|strategies|strategies-preview|strategies-resimulate|culture|culture-weekly|culture-preview|culture-resimulate|culture-backfill|lab|agent-world|agent-world-now|agent-world-preview>` — fire a job locally (`news <email>`: a test brief to that one opted-in reader; `culture-backfill [brandId ...]`: every brand's Wikipedia views back to the backtest horizon, or the named brands)
 - `npm run test:db` — connect to `MONGODB_URI` (from `.env`) and print the database and host it reached
 - `npm run migrate:accounts` — the idempotent multi-account migration: repairs income rows written twice (`scripts/income-dedupe.mjs`), builds the indexes in `scripts/migration-indexes.mjs` and drops the ones they replaced (run it on every database, again whenever that list changes; `-- --dry-run` writes nothing and prints what it would change)
 - `npm run opinion:local` — the brain's Second Opinion from your Claude subscription through the Claude Code CLI, written straight to the database (`.env.example` lists the other ways)
@@ -1821,6 +1821,23 @@ and friends keep none beyond Shared and the invariants).
   `lib/income/store`, `lib/brain/ingest`, `lib/navigator/run`, `lib/email/digest` and
   `lib/email/welcome`, `lib/topics/refresh`, `lib/strategies/job`, `lib/lab/papers/job`,
   `lib/trading/splits-store`.
+- The owner is told when a job breaks (`lib/jobs/functions/alerts.watchJobs`, the `job-alerts`
+  job; rules in `lib/jobs/alerts`, pure). Its wrapper adds Inngest's own `inngest/function.failed`
+  to the registry's triggers: a function that has used its retries has its error written on its
+  `JobRun` row (`lastError`, `lastErrorAt`, one bounded line; `jobOfFunctionId` reads the job out
+  of Inngest's name for it) and the owner list (`LAB_OWNER_EMAILS`) is mailed. The 09:00 ET cron
+  is the daily check: every job overdue on its stamp (`overdueJobs`; never-run and on-demand jobs
+  are not), in one mail. At most one mail per job per ET day (`JobRun.alertedOn`, claimed by a
+  conditional update in `lib/jobs/alerts-store`, given back when the mail could not be sent — the
+  alert never throws for a failed send, which would raise the event it listens for). A preview
+  build does neither. A completed run clears the error (`recordJobRun`), and until then the status
+  strip shows it (`components/jobs/JobStamp`: `jobHealth` is `'failed'` while the failure is newer
+  than the last completed run; its line is `JOB_STAMP_COPY`). The mail is `renderJobAlertEmail` on
+  the shared frame, its sentences `JOB_ALERT_COPY`, the error escaped as text, its one link the
+  system view. The job cannot report itself.
+- The brain update folds what it applied: a batch whose model call fails ends the extraction
+  loop, never the function, so the batches already applied (their articles are stamped as read
+  and would never be queued again) still reach `fold-brain`; the stamp says where it stopped.
 - `lib/jobs/registry` is the one list of jobs (id, event, crons, status row); `lib/jobs/health` the
   status strip's read of their stamps; `lib/jobs/steps` holds `stepId` and `chunk`.
 - The limits tracker, `lib/limits/`: `registry` (import-free — every outside service the app

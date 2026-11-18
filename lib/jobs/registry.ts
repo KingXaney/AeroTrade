@@ -200,6 +200,16 @@ export const JOBS = {
         trigger: 'agent-world',
         health: {label: 'Trading agent world', schedule: 'Mondays 08:30 ET', staleAfterHours: 8 * 24},
     },
+    // The owner's alert (lib/jobs/functions/alerts.ts). Its wrapper adds Inngest's own failure
+    // event to these triggers: a job that fails is mailed at once. The cron is the daily check
+    // for jobs overdue on their stamp, after the night's jobs and before the open.
+    jobAlerts: {
+        id: 'job-alerts',
+        event: 'app/check.job.health',
+        crons: ['TZ=America/New_York 0 9 * * *'],
+        trigger: 'alerts',
+        health: {label: 'Job alerts', schedule: 'daily 09:00 ET', staleAfterHours: 30},
+    },
 } as const satisfies Record<string, JobDefinition>;
 
 // In declaration order — the status strip's row order.

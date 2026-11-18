@@ -4,7 +4,7 @@
 
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
-import {DIGEST_COPY, EMAIL_FOOTER_COPY, oneLine, RESET_EMAIL_COPY, SUBJECT_MAX, WELCOME_EMAIL_COPY} from '@/lib/learn/copy/email';
+import {DIGEST_COPY, EMAIL_FOOTER_COPY, JOB_ALERT_COPY, oneLine, RESET_EMAIL_COPY, SUBJECT_MAX, WELCOME_EMAIL_COPY} from '@/lib/learn/copy/email';
 import type {SuggestionAction} from '@/lib/navigator/types';
 
 const strings = (value: unknown): string[] => {
@@ -34,6 +34,16 @@ const rendered = (): string[] => [
     RESET_EMAIL_COPY.preheader(30),
     RESET_EMAIL_COPY.body('Ada', 30),
     RESET_EMAIL_COPY.text('https://a.example.com/r', 30),
+    ...strings(JOB_ALERT_COPY),
+    JOB_ALERT_COPY.failed.subject('Account snapshots'),
+    JOB_ALERT_COPY.failed.hero('Account snapshots'),
+    JOB_ALERT_COPY.failed.preheader('Account snapshots'),
+    JOB_ALERT_COPY.failed.body('weekdays 16:10 ET', 'Nov 17, 4:12 PM ET'),
+    JOB_ALERT_COPY.failed.lastGood('2 days ago'),
+    JOB_ALERT_COPY.failed.lastGood(null),
+    ...[1, 3].flatMap((n) => [JOB_ALERT_COPY.overdue.subject(n), JOB_ALERT_COPY.overdue.hero(n)]),
+    JOB_ALERT_COPY.overdue.row('Interest & dividends', 'daily 00:05 ET', '2 days ago'),
+    JOB_ALERT_COPY.text('The Account snapshots job failed', ['Error: x'], 'https://a.example.com/brain'),
 ];
 
 describe('the email copy', () => {

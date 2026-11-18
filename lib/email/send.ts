@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import {reportLimit} from "@/lib/limits/report";
-import {renderPasswordResetEmail, renderWelcomeEmail} from "@/lib/email/templates";
-import {RESET_EMAIL_COPY, WELCOME_EMAIL_COPY} from "@/lib/learn/copy/email";
+import {renderJobAlertEmail, renderPasswordResetEmail, renderWelcomeEmail} from "@/lib/email/templates";
+import {JOB_ALERT_COPY, RESET_EMAIL_COPY, WELCOME_EMAIL_COPY} from "@/lib/learn/copy/email";
 import {isPreviewBuild, SITE_NAME, siteUrl} from "@/lib/site";
 
 type WelcomeEmailData = {
@@ -95,4 +95,26 @@ export const sendNewsSummaryEmail = async (
 ): Promise<void> => {
     if (!mailerReady('the daily news summary')) return;
     await sendReporting({from: from(), to: email, subject, text, html});
+};
+
+// The owner's alert about a job (lib/jobs/functions/alerts.ts), to the owner list. False when
+// nothing was sent: no mailer here, or nobody to send to.
+export const sendJobAlertEmail = async ({to, subject, preheader, headline, lines, error}: {
+    to: readonly string[];
+    subject: string;
+    preheader: string;
+    headline: string;
+    lines: readonly string[];
+    error?: string;
+}): Promise<boolean> => {
+    if (to.length === 0 || !mailerReady('the job alert')) return false;
+    const url = `${appUrl()}/brain?view=system`;
+    await sendReporting({
+        from: from(),
+        to: to.join(', '),
+        subject,
+        text: JOB_ALERT_COPY.text(headline, error !== undefined ? [...lines, `${JOB_ALERT_COPY.failed.errorLead} ${error}`] : lines, url),
+        html: renderJobAlertEmail({appUrl: appUrl(), title: subject, preheader, headline, lines, error}),
+    });
+    return true;
 };
