@@ -51,3 +51,6 @@ the map is `docs/MAP.md`.
   (`normalized-momentum`, `lookback`, `volatility`, homed on the front door in `lib/learn/where`)
   are the panel's one `WhatTheseMean`, passed in by the page with `ask={false}`, since the chat
   widget is not mounted there. Home draws the same component from a server read (see home).
+- No line of `lib/learn/copy/landing` names a page that is the owner's alone (### owner in
+  `AGENTS.md`), and its glossary count is `lib/learn/where.glossaryKeysFor` for an account that
+  is not the owner's — the glossary such an account sees; its test holds both.

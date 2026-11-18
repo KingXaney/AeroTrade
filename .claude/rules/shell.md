@@ -37,6 +37,24 @@ the map is `docs/MAP.md`.
   `lib/news/feed-store.getNewsReaderPrefs`; the stamp never revalidates — the shell clears its dot
   from `lib/shell/news-seen` (the `aero:news-seen` window event, as `lib/chat/ask` opens the chat)
   and settles on the next full load. The shell's own sentences are `lib/learn/copy/shell`.
+- ⌘K (`components/shell/SearchCommand`, which takes the audience's `pages` and `owner` from the
+  `(root)` layout through the Header) draws Pages, Learn, Stocks, then the topic row, and Enter
+  runs the first row that can be run. `lib/shell/palette.paletteRows` decides the stock rows and
+  whether the topic row can run: no stock row and a waiting (disabled) topic row until the search
+  has answered for the text in the box, and still waiting when the search did not answer
+  (`unavailable`, said as `SHELL_COPY.searchUnanswered`, never as "No stocks found") or the
+  glossary has not landed. The topic row is keyed on waiting/ready, because cmdk selects a
+  mounting row and never one that stops being disabled, and is pinned to the list's foot
+  (`.search-topic` in `app/globals.css`), since as many as 25 stocks stand before it. An Enter
+  pressed while the stock search is out, with no page or glossary row drawn, is kept for that
+  text and opens the first stock when the search answers — a stock only, never the topic row.
+  Its Learn rows are `lib/learn/where.searchGlossaryFor`: only entries the reader's /glossary
+  renders.
+- What every signed-in page loads first stays small: `lib/shell/__tests__/first-load.test.ts`
+  walks the layouts' static imports into the client files and fails when the glossary, the chat
+  panel, the markdown stack or three.js is reached without being asked for. ⌘K fetches the
+  glossary (`import()`) at its trigger's first hover, focus or touch and when it opens;
+  `components/chat/ChatWidget` loads the panel the same way; `lib/learn/copy/robot` imports nothing.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
   also finds pages, `searchPages`), the account menu. From md the trigger sits in the bar's true
   middle (`.header-bar` in `app/globals.css`: two equal side columns, the middle narrowing so each

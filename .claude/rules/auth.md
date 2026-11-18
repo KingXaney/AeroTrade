@@ -61,3 +61,23 @@ the map is `docs/MAP.md`.
 - `lib/auth/sign-up-profile.signUpProfile` checks that country, goal, risk tolerance and industry
   are options the form offers, read before any counter is spent; only those four answers reach the
   welcome event, whose prompt `lib/email/prompts.buildWelcomePrompt` fills through a replacer function.
+- Password reset: `lib/auth/validation.passwordResetEmail` is read before any counter is spent (a
+  string of at most `MAX_EMAIL_LENGTH`, 254, the length checked before the forms' pattern;
+  anything else gets the one RESET_REQUESTED answer). `lib/auth/limits.withinPasswordResetLimits`
+  then spends the client address first (`PASSWORD_RESET_CLIENT_LIMIT`, 10 in 15 minutes, every
+  request no header names a client for on one shared key, as at sign-up), then the lower-cased
+  email (3).
+- Sign-in reads no address past `SIGN_IN_EMAIL_MAX` and no password past `SIGN_IN_PASSWORD_MAX`
+  (`lib/auth/limits.signInCredentials`; the two are held equal to `lib/auth/validation`'s by its
+  test): the address becomes a counter's key and the password is hashed.
+- The sign-up name: `lib/auth/validation.signUpName` reads it beside the four answers, before
+  any counter is spent, and only the trimmed name reaches better-auth and the welcome event. A
+  name is 2 to 60 characters with at least one letter: letters in any script with their marks,
+  spaces, apostrophes, hyphens, commas, round brackets, a middle dot, at most four digits, a
+  joiner only inside a word, and full stops — but no full stop followed at once by two Latin
+  letters, nor, in another script, one after a word of three letters or more: that is the middle
+  of a web address a mail client would link in the welcome's heading. `FULL_NAME_RULE`, the
+  form's rule, is that same function and `FULL_NAME_INVALID_MESSAGE`.
+- A feature's own limits live with the feature, import-free like `lib/auth/limits`:
+  `lib/prices/action-limits` (the stock search, an order), `lib/friends/limits` (a friend
+  request), `lib/account/limits`.

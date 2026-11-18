@@ -47,3 +47,13 @@ the map is `docs/MAP.md`.
   — the day and shared clauses always, the hour clause only while the hour is the wall and low,
   one "resets in" for the warned window else the day's, and none before a window has opened
   (invariant 8). "Messages", not model calls: one message may spend up to five model steps.
+- `lib/chat/request.readChatRequest` is the one read of POST /api/chat's body (no runtime import,
+  unit-tested): roles user and assistant only; a user message is text parts only, else
+  bad_request; an assistant message keeps its text, its `step-start` boundaries and the settled
+  reads (`output-available`, `output-error`) of the tools the caller has, copied field by field
+  with only `google.thoughtSignature` of the provider metadata; everything else is dropped. Two
+  sizes over the newest `CHAT_HISTORY_MESSAGES` (40), both conversation_too_long: text at
+  `CHAT_TEXT_CHARS_MAX` (24,000) and everything kept, serialized, at `CHAT_HISTORY_CHARS_MAX`
+  (200,000). `app/api/chat/route.ts` checks `lib/same-origin.sameOriginRequest`, then the
+  session, then the body, before any `takeRateLimit`, and passes `allowSystemInMessages: false`;
+  `lib/chat/__tests__/request.test.ts` reads the route's source for that order.

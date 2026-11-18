@@ -41,3 +41,7 @@ the map is `docs/MAP.md`.
   `lib/actions/learn.actions`; else the concept today's topic articles used, matched by equality.
   The server reads are `lib/learn/facts-store` and `lib/learn/lesson-store`; `lib/learn/missions`
   is pure.
+- `lib/learn/where` is where a term is homed and whose glossary it is in: `glossaryGroupsFor` and
+  `glossaryKeysFor` are one reader's groups and keys (the owner's pages' groups left out for
+  anyone else), and `searchGlossaryFor` is ⌘K's search over them; `searchGlossary` takes an
+  optional filter applied before its cap, so a hidden term never takes one of the rows.

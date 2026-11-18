@@ -2108,6 +2108,9 @@ try {
             const again = await waitDoc((x) => x.state.seats[seatA]?.leaveAfter === true, 10000);
             await A.page.click('[data-open="menu"]');
             await A.page.waitForSelector('[data-menu="log"]', {timeout: 10000});
+            // The document says so first; the page's own view follows a moment later, and the open
+            // menu redraws with it. Read once it has, or after ten seconds as it stands.
+            await A.page.waitForSelector('[data-menu="stay"]', {timeout: 10000}).catch(() => {});
             const menu = await A.page.$$eval('[data-menu]', (els) => els.map((el) => el.getAttribute('data-menu')));
             await A.page.keyboard.press('Escape');
             check('…the menu\'s "Leave after this hand" sets it again; its place is then "Stay at the table", beside "Leave now"',

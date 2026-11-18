@@ -45,8 +45,8 @@ the map is `docs/MAP.md`.
   in any second), writes a price only over an older one, and reads an empty or zero answer, a
   refusal or a timeout as no price: the stored price stays, the symbol waits `QUOTE_BACKOFF_MS`,
   the refusal is filed once a refresh, and a failed write never costs the page the rows it read.
-  Only a ticker-shaped string is a symbol (`normalizeSymbols`), and the ticket's action answers
-  the signed-in reader alone. `lib/prices/quote-store.getFreshQuotes` (and `getFreshQuote`) is
+  Only a ticker-shaped string is a symbol (`normalizeSymbols`), and the ticket's two actions (its
+  Last Price and its symbol search) answer the signed-in reader alone. `lib/prices/quote-store.getFreshQuotes` (and `getFreshQuote`) is
   what a fill, the snapshot job or a plan ACTS on: Finnhub asked at that moment, uncached (Next's
   fetch cache serves a stale entry of any age, and any `revalidatePath` makes it a miss), counted
   before it is asked and never refused — a batch the last sixty seconds have no room for waits a
@@ -60,3 +60,13 @@ the map is `docs/MAP.md`.
   throws; a caller that cannot go on without the index (the claim) refuses for itself. Without a key the sheet
   answers nothing and reads nothing. `QUOTE_SESSION=open` is the browser QA's: every instant in
   session. The design and its measurements: `docs/specs/2026-11-10-steady-prices.md`.
+- `lib/prices/action-limits` (import-free) holds the per-reader counts on the two actions that ask
+  Finnhub on a person's say-so, counted by `lib/rate-limit.takeRateLimit`: the stock search twice
+  — 60 a minute (`search:<userId>`), which a reader typing the longest query a key at a time does
+  not reach, and 300 an hour (`search:hour:<userId>`), which a loop meets in five minutes — and an
+  order 20 a minute (`order:<userId>`). `searchQuery` is the search's input check: a string of at
+  most 40 characters, trimmed, read before anything is spent. `lib/actions/stocks.actions.searchStocks`
+  answers the stocks found (none is `[]`) or `null` when the search did not answer — no session,
+  the count spent, or Finnhub gave nothing back (`lib/prices/finnhub.findStocks`) — and the boxes
+  never say "no stocks found" of a search that did not look (`lib/shell/palette`). Nothing typed
+  is the popular list, which asks Finnhub nothing and is not counted.

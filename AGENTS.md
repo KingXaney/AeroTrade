@@ -32,12 +32,13 @@ before the rename keep the name "Main Strategy" (new ones are "Main account", `D
 
 [docs/MAP.md](docs/MAP.md) is the map: every feature's folder in every layer, and "To change…,
 edit…". The contracts a map cannot show are one file per feature in `.claude/rules/`, under the
-map's own feature names (dashboard and friends keep none beyond Shared and the invariants).
+map's own feature names (dashboard keeps none beyond Shared and the invariants).
 Each file opens with a `paths:` list of the files it belongs beside, and Claude Code loads it by
-itself the first time one of them is read or edited — from the checkout the session started in,
-for a worktree under it too. Nothing else loads them: **any other reader — a person, another
-agent, a subagent sent to a file it has not opened — reads a feature's file before changing
-that feature.**
+itself the first time one of them is opened with Read, Write or Edit (or a `cat` or `head` of
+that one file) — from the checkout the session started in, for a worktree under it too. A
+search, a `sed` or a scripted edit loads nothing, and nothing else loads them at all: **any
+other reader — a person, another agent, a session working through the shell — reads a feature's
+file before changing that feature.**
 
 - [landing](.claude/rules/landing.md)
 - [home](.claude/rules/home.md)
@@ -67,6 +68,7 @@ that feature.**
 - [stocks](.claude/rules/stocks.md)
 - [settings](.claude/rules/settings.md)
 - [broker](.claude/rules/broker.md)
+- [friends](.claude/rules/friends.md)
 
 `lib/__tests__/docs-map.test.ts` fails when a path named here, in a rule file or in the map stops
 existing; when a rule file is missing from this list, has a glob that matches nothing, or outgrows
@@ -137,13 +139,15 @@ page outgrows 30,000, since every session reads all of it.
   - the rest: the stock page's "What the rules see" (no strategy watches a symbol for anyone
     else), the first-week missions in `OWNER_MISSIONS`, a followed strategy's rebalance lesson
     (`OnboardingFacts.owner`), the Topics page's brain suggestions, `/portfolio`'s "Traded by", the
-    glossary's groups homed on those pages (`glossaryGroupsFor`) and the strategies' disclaimer
+    glossary's groups homed on those pages (`glossaryGroupsFor`), ⌘K's Learn rows for their
+    terms (`lib/learn/where.searchGlossaryFor`) and the strategies' disclaimer
     under them, and the daily brief's Navigator and culture blocks;
   - the jobs: the AI Navigator and the culture pickers trade the owner's enrolments only
     (`buildNavigatorUniverse`, `listActiveFollowers`); one anyone else made before rests.
   News — the briefing, the feed, the topic briefs — is everyone's, as are the accounts, the
-  topics, the games, poker night and the glossary's other groups. The landing page still
-  describes the strategies and the Navigator.
+  topics, the games, poker night and the glossary's other groups. The landing page and the
+  auth pages' right column describe only what every account can open (`lib/learn/copy/landing`,
+  held by its test).
 
 ## Invariants — keep these true
 

@@ -189,3 +189,17 @@ the map is `docs/MAP.md`.
     closes (`lib/prices/store.getLatestBars`), one snapshot and `getHoldWindowBars`' edge closes
     plus dividend rows and the window's ^IRX points, memoised per window and T-bill stamp for the
     ET day. `LuckOrSkill` draws it as an SVG histogram with you / SPY / median markers.
+- The desk below 1280 px: the ticket is first in the document and the chart is placed on its left
+  by `xl:` grid classes, so below xl the two stack ticket-first and the keyboard reaches the ticket
+  before the embed's frame. The chart's height is `lib/stocks/tradingview.tradeChartHeight`
+  (`TRADE_CHART_HEIGHT`: 560 from xl, 360 below), read from `TRADE_DESK_WIDE_QUERY` through
+  useSyncExternalStore; it is null on the server and through hydration, and the embed waits for
+  a number (so it is built once). `TRADE_CHART_PLACE_CLASS` holds the chart's place in CSS from
+  the first paint, on the embed's container, and `TICKER_TAPE_PLACE_CLASS` the tape's over the
+  desk, at the taller of the two heights TradingView draws it at: the page under them does not
+  move when their frames arrive a second later (qa-trading measures it).
+- `lib/actions/trading.actions.placeOrder` spends the reader's order counter
+  (`lib/prices/action-limits.withinOrderLimit`, 20 a minute) before `executeOrder` is reached and
+  refuses past it with `ORDER_COPY.tooFast` (`lib/learn/copy/trade`); a counter that cannot be
+  written answers as a failed order, never a rejection. The jobs call `executeOrder` themselves
+  and are not counted.
