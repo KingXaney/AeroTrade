@@ -293,6 +293,18 @@ try {
     check('a stock already on the list is marked in a search, cannot be run, and the next one is selected',
         await marked.getAttribute('aria-disabled').catch(() => null) === 'true' && /on your watchlist/i.test(await marked.innerText().catch(() => ''))
         && await addDialog.locator('[data-watchlist-hit="QTWB"]').getAttribute('aria-selected').catch(() => null) === 'true');
+    // The search is counted per reader by the minute (lib/prices/action-limits.ts). With the
+    // counter set to its limit of 30, the next query — "QT", which both listings match — is
+    // refused before Finnhub is asked, and answers as a search that found nothing.
+    const searchKey = `search:${userId}`;
+    await db.collection('ratelimits').updateOne({key: searchKey},
+        {$set: {count: 30, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+    await page.keyboard.press('Backspace');
+    const refusedSearch = addDialog.locator('[data-watchlist-add-status]').filter({hasText: 'No stocks found for “QT”.'});
+    await refusedSearch.waitFor({timeout: 15000}).catch(() => {});
+    check('a search past the reader\'s count for the minute answers no stock',
+        await refusedSearch.count() === 1 && await hits.count() === 0, `${await hits.count()} rows`);
+    await db.collection('ratelimits').deleteMany({key: searchKey});
     await page.keyboard.press('Escape');
     await addDialog.waitFor({state: 'detached', timeout: 5000}).catch(() => {});
     // The checks below read the watchlist this suite seeded: AAPL alone.
@@ -520,6 +532,20 @@ try {
         placeOrderBody ?? 'no placeOrder POST');
     check('…and the server stayed the authority (nothing traded)', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBeforeNote);
     await page.unroute(onTicketPages, capturePlaceOrder);
+    await settleToasts();
+
+    // --- orders are counted per reader by the minute (lib/prices/action-limits.ts) --------
+    // The counter is set to its limit of 20 rather than spent by twenty orders. The next order
+    // is refused with the limit's own sentence — not the "live price" refusal an order that
+    // reached executeOrder gets in this harness — so no quote was asked for it.
+    const orderKey = `order:${userId}`;
+    await db.collection('ratelimits').updateOne({key: orderKey},
+        {$set: {count: 20, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+    await page.getByRole('button', {name: 'Buy AAPL'}).click();
+    const orderLimited = await page.getByText('That was a lot of orders in a minute').first().waitFor({timeout: 30000}).then(() => true, () => false);
+    check('an order past the reader\'s count for the minute is refused with the limit\'s sentence', orderLimited);
+    check('…and nothing traded', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBeforeNote);
+    await db.collection('ratelimits').deleteMany({key: orderKey});
     await settleToasts();
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------

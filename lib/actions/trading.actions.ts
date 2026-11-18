@@ -2,6 +2,9 @@
 
 import {revalidatePath} from "next/cache";
 import {getCurrentUserId} from "@/lib/auth/session";
+import {ORDER_COPY} from "@/lib/learn/copy/trade";
+import {withinOrderLimit} from "@/lib/prices/action-limits";
+import {takeRateLimit} from "@/lib/rate-limit";
 import {executeOrder} from "@/lib/trading/orders";
 import {closeOutGoneHolding} from "@/lib/trading/close-out";
 import {sanitizeTradeNote} from "@/lib/trading/order-math";
@@ -22,11 +25,16 @@ const revalidateTradingPaths = () => {
 // AI navigator job can share the exact same path without a request context.
 // `note` is the learner's own "why": typed unknown because a server action's arguments
 // arrive from the client unchecked; sanitizeTradeNote keeps only a bounded one-line string.
+// Counted per reader by the minute before executeOrder is reached (lib/prices/action-limits.ts):
+// every order it takes that far asks Finnhub for a fresh quote, which the quote sheet counts
+// against the plan's one shared minute and never refuses, and for the company's profile — even an
+// order the cash check then turns down. The jobs call executeOrder themselves and are not counted.
 export const placeOrder = async (
     {symbol, side, quantity, accountId, note}: {symbol: string; side: 'buy' | 'sell'; quantity: number; accountId: string; note?: unknown},
 ): Promise<ActionResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
+    if (!(await withinOrderLimit(userId, takeRateLimit))) return {success: false, message: ORDER_COPY.tooFast};
 
     const reason = sanitizeTradeNote(note);
     const result = await executeOrder(userId, {accountId, symbol, side, quantity, source: 'user', ...(reason ? {reason} : {})});
