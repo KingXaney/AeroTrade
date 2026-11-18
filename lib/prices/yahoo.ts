@@ -187,9 +187,10 @@ export const yahooSplitsUrl = (symbol: string): string =>
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker(symbol))}?range=2y&interval=1d&events=split`;
 
 // `numerator` new shares for every `denominator` old ones, from the ET date `exDate`. `prevClose`
-// is the close of the session before it AS THIS PAYLOAD HAS IT, which is already in the new basis
-// (Yahoo restates every earlier close on the day of a split): what lib/trading/splits.cutFor
-// tells an old-basis fill from a new-basis one with. Absent when the payload starts on the ex-date.
+// is the close of the session before it in the basis that held right AFTER the split (Yahoo
+// restates every earlier close on the day of a split, and again on every later one): what
+// lib/trading/splits.cutFor tells an old-basis fill from a new-basis one with. Absent when the
+// payload starts on the ex-date.
 export type YahooSplit = {exDate: string; numerator: number; denominator: number; prevClose?: number};
 
 // Null when the payload is not a chart at all (nothing was learned); [] when it lists no split.
@@ -223,7 +224,18 @@ export const parseYahooSplits = (json: unknown): YahooSplit[] | null => {
         const prevClose = closeBefore(exDate);
         splits.push({exDate, numerator, denominator, ...(prevClose !== undefined ? {prevClose} : {})});
     }
-    return splits.sort((a, b) => a.exDate.localeCompare(b.exDate));
+    splits.sort((a, b) => a.exDate.localeCompare(b.exDate));
+    // The payload's closes are in TODAY'S basis: every later split in it has restated the close
+    // before an earlier one too. Put each back in the basis that held right after its own
+    // split, which is the one a fill made that day was priced in.
+    for (let i = 0; i < splits.length; i += 1) {
+        const prevClose = splits[i].prevClose;
+        if (prevClose === undefined) continue;
+        let later = 1;
+        for (let j = i + 1; j < splits.length; j += 1) later *= splits[j].numerator / splits[j].denominator;
+        splits[i].prevClose = prevClose * later;
+    }
+    return splits;
 };
 
 // Null on any failure: a refusal is filed with the limits tracker, and the caller counts the

@@ -48,7 +48,8 @@ export const runWeeklyNavigator = inngest.createFunction(
         const weekKey = getEasternWeekKey(today);
         // The Tuesday retry has work only while an enrolment still waits for its week; with
         // none, Monday's scores and stamp stand.
-        if (isRetryRun(event.name, event.ts)) {
+        const retry = isRetryRun(event.name, event.ts);
+        if (retry) {
             const waiting = await step.run('waiting-enrolments', async () => countWaitingNavigators(weekKey));
             if (waiting === 0) return {success: true, message: `Retry: no enrolment is waiting for week ${weekKey}`};
         }
@@ -80,9 +81,13 @@ export const runWeeklyNavigator = inngest.createFunction(
 
         for (const nav of universe.navigators) {
             const safeId = stepId(nav.userId);
+            // What the catch needs to know: a claim this run took, and whether any order went.
+            let claimedHere = false;
+            let ordersStarted = false;
             try {
                 const claimed = await step.run(`claim-run-${safeId}`, async () => claimNavigatorWeek(nav.userId, weekKey));
                 if (!claimed) continue;
+                claimedHere = true;
 
                 const orders = await step.run(`plan-orders-${safeId}`, async () => planNavigatorOrders(nav.userId, nav.accountId, inputs));
                 if (!orders) continue;
@@ -90,12 +95,14 @@ export const runWeeklyNavigator = inngest.createFunction(
                 // A quote the plan needed was refused: trading on the rest would leave a holding
                 // or a target out for the whole week. Nothing has been sent yet, so the claim
                 // goes back and the next run plans the week whole.
-                const refused = await step.run(`refused-quotes-${safeId}`, async () => refusedQuotes(orders.unpriced));
+                const refused = await step.run(`refused-quotes-${safeId}`, async () => refusedQuotes(orders.unpriced, {retry}));
                 if (refused.length > 0) {
                     await step.run(`release-run-${safeId}`, async () => releaseNavigatorWeek(nav.userId, weekKey));
+                    claimedHere = false;
                     heldBack.push({userId: nav.userId, symbols: refused});
                     continue;
                 }
+                ordersStarted = true;
 
                 const executed = await executeNavigatorPlan(step, {
                     userId: nav.userId,
@@ -121,6 +128,15 @@ export const runWeeklyNavigator = inngest.createFunction(
             } catch (error) {
                 console.error('Navigator failed for user:', nav.userId, error);
                 failed.push(nav.userId);
+                // The run threw before any order was sent: the week is not spent. Its own step
+                // and its own catch, since whatever failed the plan may fail this too.
+                if (claimedHere && !ordersStarted) {
+                    try {
+                        await step.run(`release-failed-${safeId}`, async () => releaseNavigatorWeek(nav.userId, weekKey));
+                    } catch (releaseError) {
+                        console.error('The week\'s claim could not be given back for user:', nav.userId, releaseError);
+                    }
+                }
             }
         }
 

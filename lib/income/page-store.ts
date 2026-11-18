@@ -61,9 +61,10 @@ export const getIncomeActivity = async (userId: string, accountId: string): Prom
         const points = await getDividendPoints(fills.map((t) => t.symbol), {from: getEasternDateString(inceptionAt), to: account.incomeThrough});
         // A dividend paid before a split the account has applied reads in today's shares, as
         // the ledger beside it does (lib/trading/splits.ts): the amount paid is untouched.
+        // Each row is restated before it is grouped, while it still carries when it was
+        // written: a row the job wrote after the split was applied is in today's shares already.
         const splits = toAppliedSplits(account.splits);
-        const activity = groupIncomeActivity(distinctIncomeRows(rows).rows);
-        return withReceipts({...activity, dividends: activity.dividends.map((row) => restateDividend(row, splits))}, fills, points);
+        return withReceipts(groupIncomeActivity(distinctIncomeRows(rows).rows.map((row) => restateDividend(row, splits))), fills, points);
     } catch (error) {
         console.error('Error reading income activity:', error);
         return null;

@@ -194,6 +194,10 @@ export const GONE_COPY = {
 // A stock split restates the ledger in today's shares (lib/trading/splits.ts). Said once, under
 // the trade log, naming each split that restated a fill shown there.
 export const SPLIT_COPY = {
+    // An order for a holding that a split had just reached, or might have: the order is not
+    // sent, because its share count was sized before the holding changed.
+    fillApplied: (symbol: string): string => `A stock split was just applied to ${symbol}, and this account's holding is now in today's shares. The order was not sent, because its share count came from before the split.`,
+    fillUnchecked: (symbol: string): string => `${symbol}'s price is far from its last close, which is what a stock split looks like, and its splits could not be checked just now. The order was not sent; a minute from now it can be.`,
     note: (splits: readonly {symbol: string; label: string; exDate: string}[]): string =>
         `Fills before a split are shown in today's shares: ${splits.map((split) => `${split.symbol} ${split.label} on ${shortDate(split.exDate)}`).join(', ')}.`,
 } as const;

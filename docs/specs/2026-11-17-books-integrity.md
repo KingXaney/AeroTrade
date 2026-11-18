@@ -1,6 +1,6 @@
 # Books integrity — five ways a paper account could go silently wrong
 
-Status: in progress (2026-11-17)
+Status: implemented 2026-11-18
 
 ## Why
 
@@ -47,19 +47,39 @@ is, not what the account is worth, so nothing an account earned or paid moves.
   rebased price history and the per-share dividends are already in.
 - **Fractions.** A 3-for-2 or a reverse split can leave half a share. The holding keeps it;
   orders stay whole shares; a sell that would leave less than one share sells the fraction with
-  it (`applyFill`, which now returns the quantity it moved).
-- **When.** A job of its own, `stock-splits`, weekdays 09:40 ET: every held symbol is checked,
-  a symbol with a new split has its bars rebuilt, then every account that traded it before the
-  split is brought up to date. The 16:10 snapshot job checks again any holding whose quote sits
-  more than 15% from its last stored close, before it values anything.
+  it (`applyFill`, which now returns the quantity it moved), and a holding of less than one share
+  sells as one — on the ticket, in the sell dialog and for an automated exit.
+- **When.** Three lines, because the minutes after a split's 09:30 instant are when a holding
+  reads as ten shares at a tenth of the price (the strategies trade at 09:35; a reader may sell
+  at 09:31):
+  1. **At the fill.** An order for a symbol the account holds checks first: a stored split in
+     effect is applied, and a quote more than 15% from the last stored close has Yahoo asked
+     about that one symbol. If a split was applied, the order is not sent — its share count was
+     sized on the old shares — and says so. If the check could not be made, it is not sent either.
+  2. **The job.** `stock-splits`, weekdays 09:40 ET: every held symbol is checked, a symbol with
+     a split to apply has its bars rebuilt (once per split), then every account is brought up to
+     date: those holding the symbol and, for a split of the last ten days, those that traded it
+     since the session before (an account that sold out in old shares still has the rest coming).
+  3. **Before the snapshot.** The 16:10 job applies every outstanding split before it values
+     anything, reads its accounts again, and skips an account a split reached mid-run.
 - **What a reader sees.** The trade log states it once, under the table: "Fills before a split
   are shown in today's shares: NVDA 10-for-1 on Jun 10." A dividend paid before the split is
   restated the same way in the Income panel.
 
-Known limits: a split is detected for a symbol that is held when it happens, so a sold-out
-position's old fills stay in old shares; snapshots already written before a late detection are
-not rewritten (the job's stamp says how late a split was applied); a sell placed between the
-ex-date's open and the job's 09:40 run books its realised P&L against the old average cost.
+Known limits:
+
+- A split is looked for while its symbol is held. A position sold out before the ex-date keeps
+  its old fills in old shares (its dollars are right; only the share counts on the log are old).
+- Snapshots written before a late detection are not rewritten; the job's stamp says how many
+  sessions late a split was applied.
+- The fill guard needs a stored close from the last week to notice a quote that looks like a
+  split, and Yahoo to answer. With neither, an order in the minutes before the 09:40 job fills
+  on the old shares, as it did before this change; the job then repairs the share count from the
+  ledger, and the sell's realised P&L stays as booked.
+- A dividend paid in the gap between a rebuilt price history and the split's application is
+  credited on old shares at the new per-share amount. It needs a pay date in that gap.
+- A 5-for-4 split (ratio 1.25) is told from an ordinary move by price, with 12% between the two
+  readings; a first-day gap larger than that would misread one fill.
 
 ## 2. A holding that stops quoting
 
@@ -67,7 +87,7 @@ ex-date's open and the job's 09:40 run books its realised P&L against the old av
 (`lib/trading/gone.isGone` over the quote sheet's own `fetchedAt`; pure).
 
 - **Valuing it.** A page values it at its newest stored close of any age, dated, as it already
-  did inside seven days. The snapshot job does the same for an account whose only unpriced
+  did inside seven days; a quote the sheet has not renewed in three sessions is no longer shown. The snapshot job does the same for an account whose only unpriced
   holdings are gone, and marks the row (`AccountSnapshot.atClose`), so the account's chart no
   longer stops. An unpriced holding that is not gone is an outage: the account is skipped for
   the day, as before.
@@ -109,10 +129,29 @@ price) and generous for a bankruptcy; the fill says which close it used.
   targets and claims nothing. A Tuesday 10:00 ET cron tries again, and does nothing when no
   enrolment is still waiting for its week.
 - A claim taken on a morning when a quote the plan needs was refused is given back before any
-  order is sent, and the stamp says why. A symbol that is gone (section 2) never holds a run
-  back: it is left out, as before.
+  order is sent, and the stamp says why. A holding without a quote holds the run back unless its
+  symbol is gone (section 2). A target the account does not hold has no such history, so it
+  holds the run back on the week's first run only; the retry trades without it.
+- A run that throws before any order was sent gives its claim back too.
 - The on-demand run (enrolment, "Run AI now") is unchanged.
+
+## Review
+
+Three independent reviewers read the change (money maths, failure and concurrency, regressions),
+each followed by a skeptic: 18 findings, 14 confirmed, 4 narrowed, none refuted. The ones that
+changed the design are above: the fill guard and the wider `outstanding` (a sell in the window
+between a split's instant and its application moved the wrong number of shares and a full
+sell-out was never repaired), the retried and named contested write, the snapshot job's
+unconditional reload, the sellable sub-share holding, the dividend restated by when its row was
+written, the hold-back rule for an unheld target, the claim given back when a run throws, and
+the stale quote of a gone symbol on the page. Not taken: an inclusive band for ratio 1.25 (a
+trade between two rare misreadings, listed above), a per-run token on the Navigator's claim.
 
 ## Verification
 
-To be filled in: `npm run check`, `npm run build:check`, the browser suites run and their counts.
+- `npm run check`: lint, `tsc --noEmit`, 4,228 unit tests.
+- Browser suites, on the final code: `qa-books` 43 checks, `qa-trading` 87, `qa-steady-prices`
+  52, `qa-income` 30.
+- Not exercised end to end: detection against Yahoo itself (the suites run with
+  `STOCK_SPLIT_DETECTION=off`; the parser is tested against the payload shape, read from a live
+  answer on 2026-11-17), and the weekly Navigator's gate (its decisions are unit-tested).

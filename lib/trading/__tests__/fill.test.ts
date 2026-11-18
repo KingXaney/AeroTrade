@@ -142,6 +142,16 @@ describe('applyFill — the company label a live fill carries', () => {
             expect(applyFill(crumb, {symbol: 'XYZ', side: 'sell', quantity: 2}, 30)).toEqual({ok: false, reason: 'not held'});
         });
 
+        it('reads float noise under a whole number as that number', () => {
+            // 23 old shares less 3, one for ten: 2.3 - 0.3 is 1.9999999999999998, and it is two shares.
+            const noisy: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 2.3 - 0.3, avgCost: 20}]};
+            const one = applyFill(noisy, {symbol: 'XYZ', side: 'sell', quantity: 1}, 30);
+            expect(one.ok && one.quantity).toBe(1);
+            expect(one.ok && one.account.positions).toHaveLength(1);
+            const both = applyFill(noisy, {symbol: 'XYZ', side: 'sell', quantity: 2}, 30);
+            expect(both.ok && both.account.positions).toEqual([]);
+        });
+
         it('still sells a whole holding exactly', () => {
             const whole: SimAccount = {cash: 0, positions: [{symbol: 'XYZ', quantity: 10, avgCost: 20}]};
             const sold = applyFill(whole, {symbol: 'XYZ', side: 'sell', quantity: 10}, 30);

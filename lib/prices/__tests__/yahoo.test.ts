@@ -418,6 +418,19 @@ describe("parseYahooSplits", () => {
         expect(parseYahooSplits(json)?.map((s) => s.exDate)).toEqual(["2026-07-28", "2026-07-29"]);
     });
 
+    it("puts an earlier split's close back in the basis that held after it", () => {
+        // $2,000 -> 2-for-1 -> $1,000 -> 10-for-1 -> $100. Today's payload shows $100 before both.
+        const chart = chartOf({timestamp: [EDT_2026_07_27, EDT_2026_07_28, EDT_2026_07_29], close: [100, 100, 100]});
+        (chart.chart.result[0] as Record<string, unknown>).events = {splits: {
+            first: {date: EDT_2026_07_28, numerator: 2, denominator: 1},
+            second: {date: EDT_2026_07_29, numerator: 10, denominator: 1},
+        }};
+        expect(parseYahooSplits(chart)).toEqual([
+            {exDate: "2026-07-28", numerator: 2, denominator: 1, prevClose: 1000},
+            {exDate: "2026-07-29", numerator: 10, denominator: 1, prevClose: 100},
+        ]);
+    });
+
     it("is null, not empty, when the payload is not a chart: nothing was learned", () => {
         expect(parseYahooSplits(null)).toBeNull();
         expect(parseYahooSplits({chart: {result: null, error: {code: "Not Found"}}})).toBeNull();

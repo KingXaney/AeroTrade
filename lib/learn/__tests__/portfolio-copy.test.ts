@@ -318,6 +318,14 @@ describe('a holding that has stopped quoting', () => {
     });
 });
 
+describe('an order that met a split', () => {
+    it('says why it was not sent', () => {
+        expect(SPLIT_COPY.fillApplied('NVDA')).toContain('The order was not sent');
+        expect(SPLIT_COPY.fillUnchecked('NVDA')).toContain('The order was not sent');
+        [SPLIT_COPY.fillApplied('NVDA'), SPLIT_COPY.fillUnchecked('NVDA')].forEach(clean);
+    });
+});
+
 describe('the split note under the trade log', () => {
     it('names each split once, in today\'s shares', () => {
         const note = SPLIT_COPY.note([{symbol: 'NVDA', label: '10-for-1', exDate: '2024-06-10'}, {symbol: 'XYZ', label: '1-for-8', exDate: '2026-03-02'}]);

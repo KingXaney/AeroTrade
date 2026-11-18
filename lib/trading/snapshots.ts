@@ -25,6 +25,8 @@ type SnapshotAccount = {
     cash: number;
     startingBalance: number;
     inceptionAt: number;
+    // Memoized with the positions: a split applied after this was read makes them old shares.
+    splitRev: number;
     incomeThrough: string | null;
     positions: {symbol: string; company: string; quantity: number; avgCost: number}[];
 };
@@ -66,6 +68,7 @@ export const loadSnapshotAccounts = async ({missingFor, accountIds}: {missingFor
         // Memoized so write-snapshots can detect a reset that landed mid-run
         // (reset always re-anchors inceptionAt).
         inceptionAt: accountEpoch(a).getTime(),
+        splitRev: a.splitRev ?? 0,
         // Read with `cash` from the same document, so the snapshot records exactly
         // which income its cash contains (lib/income/store.ts tops it up).
         incomeThrough: a.incomeThrough ?? null,
@@ -136,12 +139,13 @@ export const writeSnapshots = async (
     // (pre-reset) state must not overwrite.
     const fresh = await PaperAccount.find(
         {_id: {$in: accounts.map((a) => a.id)}},
-        {inceptionAt: 1, createdAt: 1},
+        {inceptionAt: 1, createdAt: 1, splitRev: 1},
     ).lean();
     const freshInception = new Map(fresh.map((f) => [
         String(f._id),
         accountEpoch(f).getTime(),
     ]));
+    const freshSplitRev = new Map(fresh.map((f) => [String(f._id), f.splitRev ?? 0]));
 
     let written = 0;
     const atClose: SnapshotSkip[] = [];
@@ -150,6 +154,13 @@ export const writeSnapshots = async (
         const inception = freshInception.get(a.id);
         if (inception === undefined || inception > a.inceptionAt) {
             console.warn(`Snapshot skipped for account ${a.id}: deleted or reset mid-run`);
+            skipped.push({accountId: a.id, symbols: []});
+            continue;
+        }
+        // A split landed between the read and here: the memoized positions are in old shares.
+        // No row for today, so the late pass values the account as it now stands.
+        if (freshSplitRev.get(a.id) !== a.splitRev) {
+            console.warn(`Snapshot skipped for account ${a.id}: a split was applied mid-run`);
             skipped.push({accountId: a.id, symbols: []});
             continue;
         }

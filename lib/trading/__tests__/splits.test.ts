@@ -8,9 +8,11 @@ import {
     describeSplitRun,
     factorAt,
     isSplit,
+    looksLikeSplit,
     positionFromFills,
     restateDividend,
     restateFill,
+    snapShares,
     splitInstant,
     splitKey,
     splitLabel,
@@ -157,11 +159,49 @@ describe('positionFromFills', () => {
     });
 });
 
+describe('snapShares', () => {
+    it('rounds a hair off a whole number to it, and leaves a real fraction alone', () => {
+        expect(snapShares(2.3 - 0.3)).toBe(2);
+        expect(snapShares(100.00000000001)).toBe(100);
+        expect(snapShares(7.5)).toBe(7.5);
+        expect(snapShares(10 / 3)).toBe(10 / 3);
+    });
+
+    it('is what a rebuilt holding is stored as', () => {
+        const fill = (side: 'buy' | 'sell', quantity: number, createdAt: number) => ({side, quantity, price: 10, createdAt});
+        expect(positionFromFills([fill('buy', 2.3, 1), fill('sell', 0.3, 2)])?.quantity).toBe(2);
+    });
+});
+
+describe('looksLikeSplit', () => {
+    it('is a quote far from the last stored close', () => {
+        expect(looksLikeSplit(120, 1200)).toBe(true);
+        expect(looksLikeSplit(30, 20)).toBe(true);
+        expect(looksLikeSplit(114, 100)).toBe(false);
+        expect(looksLikeSplit(86, 100)).toBe(false);
+    });
+
+    it('is nothing without a close to compare with', () => {
+        expect(looksLikeSplit(120, null)).toBe(false);
+        expect(looksLikeSplit(120, undefined)).toBe(false);
+        expect(looksLikeSplit(120, 0)).toBe(false);
+    });
+});
+
 describe('restateDividend', () => {
     const row = {symbol: 'NVDA', exDate: '2024-03-05', quantity: 10, perShare: 0.04, amount: 0.4};
 
     it('reads a dividend from before the split in today\'s shares', () => {
         expect(restateDividend(row, [tenForOne])).toEqual({...row, quantity: 100, perShare: 0.004});
+    });
+
+    it('leaves a row written after the account applied the split: it is in today\'s shares already', () => {
+        const applied: AppliedSplit = {...tenForOne, appliedAt: at(EX, 9, 40)};
+        // Ex three days before the split, paid two days after it: written by the next night's job.
+        const late = {symbol: 'NVDA', exDate: '2024-06-07', quantity: 100, perShare: 0.1, amount: 10, createdAt: new Date(at('2024-06-13', 0, 5))};
+        expect(restateDividend(late, [applied])).toBe(late);
+        const early = {...late, quantity: 10, perShare: 1, createdAt: new Date(at('2024-06-08', 0, 5))};
+        expect(restateDividend(early, [applied])).toMatchObject({quantity: 100, perShare: 0.1});
     });
 
     it('leaves a later dividend, another symbol and a row without its figures alone', () => {
@@ -179,6 +219,8 @@ describe('toAppliedSplits', () => {
         expect(toAppliedSplits(undefined)).toEqual([]);
         expect(toAppliedSplits([{symbol: 'NVDA', exDate: EX, numerator: 10, denominator: 1, before: new Date(splitInstant(EX))}]))
             .toEqual([tenForOne]);
+        expect(toAppliedSplits([{symbol: 'NVDA', exDate: EX, numerator: 10, denominator: 1, before: new Date(splitInstant(EX)), appliedAt: new Date(at(EX, 9, 40))}]))
+            .toEqual([{...tenForOne, appliedAt: at(EX, 9, 40)}]);
     });
 
     it('restates a lean row whose time is a Date', () => {
@@ -213,6 +255,11 @@ describe('describeSplitRun', () => {
     it('names what it skipped and why', () => {
         const run = {checked: 5, unanswered: [], detection: true, applied: [], skipped: [{accountId: 'aaaaaaaaaaaaaaaaaa222222', symbol: 'NVDA', reason: 'position does not rebuild from its trades'}]};
         expect(describeSplitRun(run)).toBe('Checked 5 holding(s) · no split to apply · 1 skipped: 222222 NVDA (position does not rebuild from its trades)');
+    });
+
+    it('names an account whose write kept losing', () => {
+        const run = {checked: 5, unanswered: [], detection: true, applied: [], skipped: [], unsettled: [{accountId: 'aaaaaaaaaaaaaaaaaa333333', symbol: 'NVDA'}]};
+        expect(describeSplitRun(run)).toBe('Checked 5 holding(s) · no split to apply · 1 not applied, the account changed mid-write (333333 NVDA): tried again next run');
     });
 
     it('says so when detection is off', () => {

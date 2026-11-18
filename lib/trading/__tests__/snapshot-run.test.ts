@@ -53,9 +53,9 @@ describe('describeSnapshotRun', () => {
         expect(stamp).toContain('not recorded');
     });
 
-    it('tells an account reset mid-run from one with no quote', () => {
+    it('tells an account that changed mid-run from one with no quote', () => {
         expect(describeSnapshotRun(run({written: 4, skipped: [{accountId: 'a', symbols: []}]})))
-            .toBe('4 of 5 account(s) snapshotted; 1 skipped, reset or deleted mid-run; SPY recorded');
+            .toBe('4 of 5 account(s) snapshotted; 1 skipped, changed mid-run; SPY recorded');
     });
 
     it('says which holdings were valued at a stored close and which split was applied first', () => {

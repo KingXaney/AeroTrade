@@ -7,7 +7,7 @@ import {type PriceInfo} from "@/lib/trading/analytics";
 import {describeSnapshotRun, isLatePass} from "@/lib/trading/snapshot-run";
 import {findSplitSuspects, goneCloses, loadSnapshotAccounts, quoteEntries, snapshotBenchmark, snapshotSymbols, writeSnapshots} from "@/lib/trading/snapshots";
 import type {SplitApplication} from "@/lib/trading/splits";
-import {checkSplitsFor} from "@/lib/trading/splits-store";
+import {applySplitsBeforeSnapshot} from "@/lib/trading/splits-store";
 
 // Finnhub's free tier allows ~60 calls/min; quotes are fetched in chunks with a
 // pause between them once the symbol universe is big enough to matter.
@@ -60,13 +60,13 @@ export const recordDailySnapshots = inngest.createFunction(
             priceEntries.push(...entries);
         }
 
-        let splits: SplitApplication[] = [];
+        // Splits before values. Yahoo is asked about the holdings whose quote looks like one, and
+        // every split outstanding is applied — those, and any the morning's job left behind. The
+        // accounts are then read again whatever the step reports: a retried step, or another
+        // run, may have applied a split that this attempt's answer does not mention.
         const suspects = await step.run('split-suspects', async () => findSplitSuspects(priceEntries, today));
-        if (suspects.length > 0) {
-            splits = (await step.run('check-splits', async () => checkSplitsFor(suspects))).applied;
-            // A split changed positions: value what the accounts hold now.
-            if (splits.length > 0) accounts = await step.run('reload-accounts', async () => loadSnapshotAccounts(scope));
-        }
+        const splits: SplitApplication[] = (await step.run('apply-splits', async () => applySplitsBeforeSnapshot(suspects))).applied;
+        accounts = await step.run('reload-accounts', async () => loadSnapshotAccounts(scope));
 
         const gone = await step.run('gone-closes', async () => goneCloses(accounts, priceEntries, today));
         const written = await step.run('write-snapshots', async () => writeSnapshots(accounts, priceEntries, today, gone));

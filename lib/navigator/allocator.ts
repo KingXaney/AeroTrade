@@ -225,7 +225,10 @@ export const diffToOrders = (input: {
             const quantity = candidate.maxSellQuantity !== null
                 ? Math.min(desired, candidate.maxSellQuantity)
                 : desired;
-            if (quantity < 1) {
+            // A whole exit of a holding of less than one share (a split can leave one) is one
+            // share to the order, which sells the fraction; any other sub-share sell is dropped.
+            const exitsCrumb = typeof candidate.fullExitQuantity === 'number' && candidate.fullExitQuantity > 0 && candidate.fullExitQuantity < 1;
+            if (quantity < 1 && !exitsCrumb) {
                 continue; // sub-share sell: dropped, consumes no trade slot
             }
             cash += quantity * candidate.price;

@@ -11,7 +11,7 @@
 // Run: npm run qa -- trading   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, MONGO, check, outDir, ownerEmail, settledClick, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, check, outDir, ownerEmail, settledClick, signUp, summary, hydrated} from './lib.mjs';
 
 const OUT = outDir('trading');
 
@@ -235,7 +235,7 @@ try {
     // --- the order ticket ---------------------------------------------------------------
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
     const symbolInput = page.locator('#order-symbol');
-    await symbolInput.waitFor({timeout: 30000});
+    await hydrated(symbolInput);
     check('deep link prefills the ticket', (await symbolInput.inputValue()) === 'AAPL');
     // exact: the page header's "live prices" would otherwise match a substring search
     check('the ticket says Last Price, not Live Price', await page.getByText('Last Price', {exact: true}).count() === 1 && await page.getByText('Live Price', {exact: true}).count() === 0);
@@ -311,7 +311,7 @@ try {
     // A Trade link clicked while already on the desk is a soft navigation: the page
     // instance survives, so the ticket has to adopt the new symbol from its props.
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
-    await symbolInput.waitFor({timeout: 30000});
+    await hydrated(symbolInput);
     // The strip sits at the fold after hours, when the ticket's queue note is two lines taller.
     await settledClick(page.locator('a[aria-label="Trade MSFT"]').first());
     await page.waitForURL(/\/trade\?symbol=MSFT/, {timeout: 15000});
@@ -324,7 +324,7 @@ try {
     const pricebars = db.collection('pricebars');
     const buyLine = async () => {
         await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
-        await symbolInput.waitFor({timeout: 30000});
+        await hydrated(symbolInput);
         await page.locator('#order-shares').fill('10');
         const line = page.locator('[data-testid="order-effect"]');
         await line.waitFor({timeout: 30000}).catch(() => {});
@@ -386,7 +386,7 @@ try {
     };
     await page.route(onTicketPages, capturePlaceOrder);
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
-    await symbolInput.waitFor({timeout: 30000});
+    await hydrated(symbolInput);
     await page.locator('#order-shares').fill('1');
     await noteField.fill(note);
     // A field typed into before React has hydrated is reset to its empty state: type again
@@ -426,6 +426,7 @@ try {
     await recent.waitFor({timeout: 30000});
     check('the recent-trades widget lists this epoch\'s fills and not the old epoch\'s',
         /AAPL/.test(await recent.innerText()) && !/ZZOLD/.test(await recent.innerText()), (await recent.innerText()).replace(/\s+/g, ' ').slice(0, 160));
+    await hydrated(widget.locator('#order-symbol'));
     await widget.locator('#order-symbol').fill('TSLA');
     await widget.locator('#order-symbol').press('Enter');
     await page.waitForTimeout(1500);

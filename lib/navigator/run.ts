@@ -88,12 +88,15 @@ export const countWaitingNavigators = async (weekKey: string): Promise<number> =
     return AiNavigator.countDocuments({status: 'active', lastRunDate: {$ne: weekKey}});
 };
 
-// Of a plan's unpriced symbols, the ones a refused quote explains: not a symbol that has
-// stopped quoting, which no retry will price (lib/prices/gone.ts).
-export const refusedQuotes = async (unpriced: readonly string[]): Promise<string[]> => {
-    if (unpriced.length === 0) return [];
-    const gone = new Set(await getGoneSymbols(unpriced));
-    return unpriced.filter((symbol) => !gone.has(symbol));
+// Of a plan's unpriced symbols, the ones worth holding the week back for. A HOLDING without a
+// quote is a refusal unless its symbol has stopped quoting, which no retry will price
+// (lib/prices/gone.ts: every holding is quoted each session, so a long silence means that). An
+// unheld TARGET has no such history — nobody has asked about it — so it is taken as refused,
+// but only on the week's first run: the retry trades without it, and a symbol Finnhub never
+// prices cannot keep an account from trading at all.
+export const refusedQuotes = async (unpriced: {held: readonly string[]; targets: readonly string[]}, {retry}: {retry: boolean}): Promise<string[]> => {
+    const gone = unpriced.held.length === 0 ? new Set<string>() : new Set(await getGoneSymbols(unpriced.held));
+    return [...unpriced.held.filter((symbol) => !gone.has(symbol)), ...(retry ? [] : unpriced.targets)].sort();
 };
 
 // One account's orders under the holding rails; null (and the error recorded on the enrollment)

@@ -240,7 +240,9 @@ and friends keep none beyond Shared and the invariants).
   `lib/prices/quote-store.getGoneSymbols` reads it, and nothing is gone without a Finnhub key). An
   unpriced holding that is not gone is an outage and waits; a gone one would wait for ever, so it
   is valued at its newest stored close of any age within `LAST_CLOSE_LOOKBACK_DAYS`, dated — on
-  a page (`buildHoldingsPriceMap`'s last fallback) and in the daily snapshot, which marks the row
+  a page (`buildHoldingsPriceMap` drops a sheet quote older than the gone cutoff,
+  `analytics.withoutGoneQuotes`, so the stored-close passes date the holding; its last fallback
+  is a close of any age) and in the daily snapshot, which marks the row
   (`AccountSnapshot.atClose`). `/portfolio` gives a gone holding one action in place of Trade and
   Sell, "Close at the last close" (`components/trading/portfolio/CloseOutButton`,
   `lib/actions/trading.actions.closeOutHolding`, `lib/trading/close-out.closeOutGoneHolding`): the
@@ -281,8 +283,11 @@ and friends keep none beyond Shared and the invariants).
   replays each fill through it (the trade log and `/trade`'s `LastFill`). Orders are whole shares;
   a holding may carry a fraction of one (a split leaves it), so a sell that would leave less than
   one share sells the fraction too and the result says how many shares moved (`quantity`, what the
-  trade row stores; `lib/format.formatShares` prints it). `{exact: true}` is a replay's: a stored
-  or restated fill moves exactly what its row says.
+  trade row stores; `lib/format.formatShares` prints it), and a holding of less than one share
+  sells as one (`lib/trading/order-math.sellableShares` is the most whole shares a sell may
+  name, for the ticket, its presets and the sell dialog; `executeOrder` takes an automated exit's
+  sub-share quantity only against such a holding). `{exact: true}` is a replay's: a stored or
+  restated fill moves exactly what its row says.
 - A fill is recoverable. `lib/trading/orders.commitFill` moves cash and positions in ONE account
   write that also carries the trade row it is about to insert (`PaperAccount.pendingFill`, the row's
   `_id` chosen first), guarded on `cash`, on `splitRev` and on no fill already waiting; then
@@ -306,11 +311,28 @@ and friends keep none beyond Shared and the invariants).
   ratio, total and realised P&L untouched; `lib/income/store` restates the trades it replays, and
   the Income panel a dividend paid before the split, `restateDividend`), so the stored position
   and the ledger never disagree. Stored trade rows are never rewritten. The trade log says it once
-  under the table (`SPLIT_COPY.note`, only for splits that restated a fill shown). The
-  `stock-splits` job (`lib/jobs/functions/splits`, weekdays 09:40 ET, trigger `splits`) checks
-  every held symbol, rebuilds the bars of a symbol with a split to apply, then applies; the
-  snapshot job checks again any holding whose quote is more than `SPLIT_SUSPECT_MOVE` from its
-  last stored close. `STOCK_SPLIT_DETECTION=off` (the browser QA) asks Yahoo nothing.
+  under the table (`SPLIT_COPY.note`, only for splits that restated a fill shown). A dividend row
+  is restated only when it went ex before the split AND was written before the account applied it
+  (`AppliedSplit.appliedAt`): the income job writes later rows in today's shares already.
+- A split reaches an account by three lines, because the minutes after its 09:30 instant are
+  when a holding reads as ten shares at a tenth of the price. (1) An order never acts on a
+  holding still in old shares: `executeOrder` calls `splits-store.settleSplitsBeforeFill` for a
+  symbol the account holds — a stored split in effect is applied first, and a quote more than
+  `SPLIT_SUSPECT_MOVE` from the last stored close (`lib/trading/splits.looksLikeSplit`) has
+  Yahoo asked about that symbol — and the order is then NOT sent (`SPLIT_COPY.fillApplied`: its
+  share count was sized on the old shares; `fillUnchecked` when the check could not be made).
+  (2) The `stock-splits` job (`lib/jobs/functions/splits`, weekdays 09:40 ET, trigger `splits`)
+  checks every held symbol, rebuilds the bars of a symbol whose split is not yet rebased
+  (`StockSplit.rebasedAt`, once per split: bars first, holdings second), then applies. (3) The
+  snapshot job applies every outstanding split before it values anything
+  (`applySplitsBeforeSnapshot`: Yahoo for the suspects, then `applyStoredSplits`), reads its
+  accounts again whatever that step reports, and `writeSnapshots` skips an account whose
+  `splitRev` moved since it was read. `outstanding` takes the accounts holding the symbol and,
+  for a split of the last ten days, those with a fill of it since the session before (an account
+  that sold out in old shares still has the rest coming); a write that loses its guard is tried
+  three times and then named in the stamp; an account with nothing to restate still lists the
+  split, so it is not looked at again. `STOCK_SPLIT_DETECTION=off` (the browser QA) asks Yahoo
+  nothing.
 - The daily snapshot (`lib/trading/snapshots`, `lib/jobs/functions/trading`): a snapshot is
   permanent, so an account with an unquoted holding that is not gone waits. `writeSnapshots`
   returns what it wrote, valued at a stored close and skipped, and the stamp is
@@ -409,8 +431,10 @@ and friends keep none beyond Shared and the invariants).
   (`lib/jobs/functions/navigator`, read off the event's own time; `force: true` trades at any
   hour): otherwise it scores, saves the week's targets and claims nothing. A claim taken on a
   morning when a quote the plan needed was refused is given back before any order is sent
-  (`AccountPlan.unpriced`, `refusedQuotes`, `releaseNavigatorWeek`); a symbol that is gone never
-  holds a run back. The Tuesday 10:00 ET cron is the retry and does nothing when no enrolment is
+  (`AccountPlan.unpriced`, `refusedQuotes`, `releaseNavigatorWeek`): a HOLDING without a quote
+  holds the run back unless its symbol is gone; an unheld TARGET without one holds it back on the
+  week's first run only, so a symbol Finnhub never prices cannot keep an account from trading at
+  all. A run that throws before any order was sent gives its claim back too. The Tuesday 10:00 ET cron is the retry and does nothing when no enrolment is
   still waiting for its week (`lib/navigator/weekly.isRetryRun`, `countWaitingNavigators`). The
   stamp is `describeWeeklyRun` (pure): an enrolment held back or one whose run threw is named,
   never folded into "ran for 1/1". The on-demand run (enrolment, "Run AI now") is unchanged.

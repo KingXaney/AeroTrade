@@ -12,7 +12,7 @@
 // restated ledger never disagree.
 
 import {easternToInstant, previousTradingDay, sessionCloseOf} from "@/lib/prices/market-hours";
-import {applyFill, type SimAccount} from "@/lib/trading/fill";
+import {applyFill, SHARE_EPSILON, type SimAccount} from "@/lib/trading/fill";
 
 // `numerator` new shares for every `denominator` old ones: 10 and 1 for a 10-for-1.
 export type SplitRatio = {numerator: number; denominator: number};
@@ -21,8 +21,9 @@ export type SplitRatio = {numerator: number; denominator: number};
 // before it IN THE NEW BASIS (read from the same payload that carried the event).
 export type StockSplitEvent = SplitRatio & {symbol: string; exDate: string; at: number; prevClose?: number};
 
-// A split as one account applied it: fills before `before` are in old shares.
-export type AppliedSplit = SplitRatio & {symbol: string; exDate: string; before: number};
+// A split as one account applied it: fills before `before` are in old shares. `appliedAt` is
+// when the account took it (absent on a split built in memory, before it is stored).
+export type AppliedSplit = SplitRatio & {symbol: string; exDate: string; before: number; appliedAt?: number};
 
 // The first moment of trading in new shares: the ex-date's 09:30 ET open.
 export const splitInstant = (exDate: string): number => easternToInstant(exDate, 9, 30);
@@ -50,13 +51,14 @@ export const factorAt = (splits: readonly AppliedSplit[], symbol: string, at: nu
 
 // A stored split (PaperAccount.splits) as the pure functions read it.
 export const toAppliedSplits = (
-    stored: readonly {symbol: string; exDate: string; numerator: number; denominator: number; before: Date | string | number}[] | null | undefined,
+    stored: readonly {symbol: string; exDate: string; numerator: number; denominator: number; before: Date | string | number; appliedAt?: Date | string | number}[] | null | undefined,
 ): AppliedSplit[] => (stored ?? []).map((split) => ({
     symbol: split.symbol,
     exDate: split.exDate,
     numerator: split.numerator,
     denominator: split.denominator,
     before: new Date(split.before).getTime(),
+    ...(split.appliedAt !== undefined ? {appliedAt: new Date(split.appliedAt).getTime()} : {}),
 }));
 
 // A trade record (createdAt in epoch ms) or a lean trade row (a Date).
@@ -120,26 +122,51 @@ export const positionFromFills = (fills: readonly ReplayFill[]): {quantity: numb
         account = result.account;
     }
     const held = account.positions[0];
-    return held ? {quantity: held.quantity, avgCost: held.avgCost} : null;
+    return held ? {quantity: snapShares(held.quantity), avgCost: held.avgCost} : null;
 };
 
-type DividendLike = {symbol: string; exDate: string | null; quantity: number | null; perShare: number | null};
+// A share count a ratio left a hair off a whole number (23 old shares less 3, one for ten, is
+// 1.9999999999999998) is that whole number.
+export const snapShares = (quantity: number): number => {
+    const whole = Math.round(quantity);
+    return Math.abs(quantity - whole) <= SHARE_EPSILON ? whole : quantity;
+};
 
-// A dividend that went ex before a split, in today's shares: the amount paid is untouched.
+type DividendLike = {symbol: string; exDate?: string | null; quantity?: number | null; perShare?: number | null; createdAt?: Date | string | number};
+
+// A dividend row from before a split, in today's shares: the amount paid is untouched. A row is
+// in old shares when it went ex before the split AND was written before the account applied
+// it: the income job builds a row from the trades as they read that night, so one written after
+// the split was applied (a pay date a few days past the ex-date, a watermark that was waiting)
+// is in today's shares already and must not be restated again. A row with no write time, or a
+// split with no applied time, goes by the ex-dates alone.
 export const restateDividend = <T extends DividendLike>(row: T, splits: readonly AppliedSplit[]): T => {
-    if (row.exDate === null || row.quantity === null || row.perShare === null) return row;
+    if (typeof row.exDate !== 'string' || typeof row.quantity !== 'number' || typeof row.perShare !== 'number') return row;
     const upper = row.symbol.toUpperCase();
+    const written = row.createdAt === undefined ? null : new Date(row.createdAt).getTime();
     let numerator = 1;
     let denominator = 1;
     let any = false;
     for (const split of splits) {
         if (split.symbol.toUpperCase() !== upper || row.exDate >= split.exDate) continue;
+        if (written !== null && split.appliedAt !== undefined && written >= split.appliedAt) continue;
         numerator *= split.numerator;
         denominator *= split.denominator;
         any = true;
     }
     return any ? {...row, quantity: (row.quantity * numerator) / denominator, perShare: (row.perShare * denominator) / numerator} : row;
 };
+
+// ---------------------------------------------------------------------------
+// Before a fill: is the holding about to be traded on the wrong basis?
+// ---------------------------------------------------------------------------
+
+// A quote this far from the symbol's last stored close is what a split looks like to a holding
+// that has not been adjusted for it (the snapshot job's own threshold).
+export const SPLIT_SUSPECT_MOVE = 0.15;
+
+export const looksLikeSplit = (price: number, lastClose: number | null | undefined): boolean =>
+    typeof lastClose === 'number' && lastClose > 0 && price > 0 && Math.abs(price / lastClose - 1) > SPLIT_SUSPECT_MOVE;
 
 // ---------------------------------------------------------------------------
 // What a run of the split job did — its one-line stamp (the system view's strip)
@@ -156,13 +183,15 @@ export type SplitRun = {
     detection: boolean;              // false when detection is switched off (the browser QA)
     applied: readonly SplitApplication[];
     skipped: readonly SplitSkip[];
+    // Accounts whose guarded write kept losing to another writer: tried again next run.
+    unsettled?: readonly {accountId: string; symbol: string}[];
 };
 
 const named = (items: readonly string[], limit = 3): string =>
     `${items.slice(0, limit).join(', ')}${items.length > limit ? ` +${items.length - limit} more` : ''}`;
 
 // What was checked, then what changed; anything that did not go through is named, never dropped.
-export const describeSplitRun = ({checked, unanswered, detection, applied, skipped}: SplitRun): string => {
+export const describeSplitRun = ({checked, unanswered, detection, applied, skipped, unsettled = []}: SplitRun): string => {
     const parts: string[] = [];
     if (!detection) parts.push('Detection off');
     else {
@@ -181,6 +210,9 @@ export const describeSplitRun = ({checked, unanswered, detection, applied, skipp
     }
     if (skipped.length > 0) {
         parts.push(`${skipped.length} skipped: ${named(skipped.map((item) => `${item.accountId.slice(-6)} ${item.symbol} (${item.reason})`))}`);
+    }
+    if (unsettled.length > 0) {
+        parts.push(`${unsettled.length} not applied, the account changed mid-write (${named(unsettled.map((item) => `${item.accountId.slice(-6)} ${item.symbol}`))}): tried again next run`);
     }
     return parts.join(' · ');
 };

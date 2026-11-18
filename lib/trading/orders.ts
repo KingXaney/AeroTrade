@@ -14,6 +14,8 @@ import {applyFill, type FillRejection} from "@/lib/trading/fill";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {isOrderSide} from "@/lib/trading/order-math";
 import {settlePendingFill} from "@/lib/trading/pending-fill";
+import {settleSplitsBeforeFill} from "@/lib/trading/splits-store";
+import {SPLIT_COPY} from "@/lib/learn/copy/portfolio";
 import type {ActionResult} from '@/lib/actions/types';
 import type {PaperPosition, TradeSource} from '@/lib/trading/types';
 
@@ -163,13 +165,22 @@ export const executeOrder = async (
         const sym = (symbol || '').trim().toUpperCase();
         if (!sym) return {success: false, message: 'Enter a stock symbol'};
 
-        const qty = Math.floor(Number(quantity));
-        if (!Number.isFinite(qty) || qty <= 0) {
+        const requested = Number(quantity);
+        let qty = Math.floor(requested);
+        // A sell of less than one share is an order only against a holding of less than one
+        // (an automated exit sends the holding's own quantity): decided below, once it is known.
+        const subShare = side === 'sell' && Number.isFinite(requested) && requested > 0 && qty === 0;
+        if (!subShare && (!Number.isFinite(qty) || qty <= 0)) {
             return {success: false, message: 'Enter a whole number of shares greater than 0'};
         }
 
         const account = await loadAccountForFill(userId, accountId);
         if (!account) return {success: false, message: 'Account not found'};
+        const held = account.positions.find((p) => p.symbol.toUpperCase() === sym);
+        if (subShare) {
+            if (!held || !(held.quantity > 0) || held.quantity >= 1) return {success: false, message: 'Enter a whole number of shares greater than 0'};
+            qty = 1;   // applyFill sells a holding of less than one share as one
+        }
 
         if (idempotencyKey) {
             const prior = await PaperTrade.findOne({accountId: String(account._id), idempotencyKey}).lean<{price: number; quantity: number; symbol: string} | null>();
@@ -184,6 +195,17 @@ export const executeOrder = async (
         const price = quote.c;
         if (typeof price !== 'number' || !(price > 0)) {
             return {success: false, message: `Couldn't fetch a live price for ${sym}`};
+        }
+
+        // A holding must not be traded in old shares. Between a split's 09:30 instant and the
+        // job that applies it, ten shares read as ten shares at a tenth of the price: a sell
+        // then would move a tenth of the holding and call it all. So a split in effect is
+        // applied first (lib/trading/splits-store.settleSplitsBeforeFill), and the order is
+        // not sent: its share count was sized on the holding as it was.
+        if (held) {
+            const guard = await settleSplitsBeforeFill(account, sym, price);
+            if (guard === 'applied') return {success: false, message: SPLIT_COPY.fillApplied(sym)};
+            if (guard === 'unchecked') return {success: false, message: SPLIT_COPY.fillUnchecked(sym)};
         }
 
         return await commitFill(userId, account, {

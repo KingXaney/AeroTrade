@@ -168,10 +168,10 @@ export const computeNavigatorScores = async (symbols: string[], {record}: {recor
     return scored;
 };
 
-// `unpriced`: the holdings and targets Finnhub gave no price for when the plan was sized. The
-// allocator leaves each out with no order; the weekly run reads the list to tell a refused
-// quote (the week is tried again) from a symbol that has stopped quoting (lib/prices/gone.ts).
-export type AccountPlan = {planned: PlannedOrder[]; positions: HeldPosition[]; totalValue: number; unpriced: string[]};
+// `unpriced`: the holdings and the unheld targets Finnhub gave no price for when the plan was
+// sized. The allocator leaves each out with no order; the weekly run reads the lists to decide
+// whether the week is tried again (lib/navigator/run.refusedQuotes).
+export type AccountPlan = {planned: PlannedOrder[]; positions: HeldPosition[]; totalValue: number; unpriced: {held: string[]; targets: string[]}};
 
 // Plan one account's orders under the holding rails. Returns null when the
 // account can't be resolved (deleted / not owned).
@@ -234,7 +234,8 @@ export const planAccountOrders = async (
     }
 
     const planned = diffToOrders({totalValue: portfolio.totalValue, cash: portfolio.cash, positions, targets, maxTrades});
-    const unpriced = [...new Set(positions.filter((p) => p.price === null).map((p) => p.symbol.toUpperCase()))].sort();
+    const without = (rows: HeldPosition[]) => [...new Set(rows.filter((p) => p.price === null).map((p) => p.symbol.toUpperCase()))].sort();
+    const unpriced = {held: without(positions.filter((p) => p.quantity > 0)), targets: without(positions.filter((p) => !(p.quantity > 0)))};
     return {planned, positions, totalValue: portfolio.totalValue, unpriced};
 };
 

@@ -57,6 +57,20 @@ export const settledClick = async (locator) => {
     await locator.click();
 };
 
+// Waits until React has hydrated the element. A field typed into before that is reset to its
+// empty state when hydration lands, and a busy machine hydrates late: the suite then asserts on
+// values the page never held. React hangs its props on a hydrated node under a `__reactProps$`
+// key, which is what this looks for.
+export const hydrated = async (locator, timeout = 30000) => {
+    await locator.waitFor({timeout});
+    await locator.evaluate((node, ms) => new Promise((resolve) => {
+        const ready = () => Object.keys(node).some((key) => key.startsWith('__reactProps$'));
+        const started = Date.now();
+        const tick = () => (ready() || Date.now() - started > ms ? resolve(undefined) : setTimeout(tick, 50));
+        tick();
+    }), timeout);
+};
+
 // Signs a fresh user up through the form and waits for the dashboard. The tag names the user
 // ("QA <tag>") and its address (qa<tag><ms>@example.com), so a suite's users are easy to find;
 // `email` fixes the address instead — an owner's, from owners.mjs (LAB_OWNER_EMAIL, ownerEmail).

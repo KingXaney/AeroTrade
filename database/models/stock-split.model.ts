@@ -3,7 +3,8 @@ import {Document, model, models, Schema} from "mongoose";
 // One stock split, as Yahoo's chart states it (lib/prices/yahoo.fetchYahooSplits): `numerator`
 // new shares for every `denominator` old ones, in effect from `at` (the ex-date's 09:30 ET open).
 // `prevClose` is the close of the session before it in the NEW basis, from the same payload — what
-// tells an old-basis fill from a new-basis one in the hours around the open (lib/trading/splits.ts).
+// tells an old-basis fill from a new-basis one in the hours around the open (lib/trading/splits.ts);
+// it is in the basis that held right after this split, whatever later splits did to the history.
 // Detected once per symbol; each account then applies it to itself (lib/trading/splits-store.ts).
 export interface StockSplitDoc extends Document {
     symbol: string;
@@ -14,6 +15,8 @@ export interface StockSplitDoc extends Document {
     prevClose?: number;
     source: string;
     detectedAt: Date;
+    // When the symbol's price history was rebuilt on the new basis for this split: done once.
+    rebasedAt?: Date;
 }
 
 const StockSplitSchema = new Schema<StockSplitDoc>({
@@ -25,6 +28,7 @@ const StockSplitSchema = new Schema<StockSplitDoc>({
     prevClose: {type: Number},
     source: {type: String, required: true},
     detectedAt: {type: Date, required: true},
+    rebasedAt: {type: Date},
 });
 
 StockSplitSchema.index({symbol: 1, exDate: 1}, {unique: true});

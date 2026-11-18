@@ -42,7 +42,7 @@ type FillResult =
     | {ok: false; reason: FillRejection};
 
 // Below this a quantity is float noise (a ratio's rounding), not shares.
-const SHARE_EPSILON = 1e-9;
+export const SHARE_EPSILON = 1e-9;
 
 export const applyFill = (
     account: SimAccount,
@@ -99,7 +99,9 @@ export const applyFill = (
             const fraction = existing.quantity - whole > SHARE_EPSILON;
             // The ticket's smallest order is one share, so a holding of less than one sells as one.
             if (qty > Math.max(whole, fraction ? 1 : 0)) return {ok: false, reason: 'not held'};
-            if (existing.quantity - qty < 1) moved = existing.quantity;
+            // Less than one share would be left (with the noise allowed for: 1.9999999999999998
+            // held and one sold leaves a share, not a fraction of one).
+            if (existing.quantity - qty < 1 - SHARE_EPSILON) moved = existing.quantity;
         }
         realizedPnl = (price - existing.avgCost) * moved;
         existing.quantity -= moved;

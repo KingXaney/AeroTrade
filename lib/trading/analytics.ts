@@ -1,4 +1,5 @@
 import type {DrawdownWindow, EnrichedPosition, PaperPosition, PerfPoint, SnapshotPoint} from '@/lib/trading/types';
+import {isGone} from "@/lib/prices/gone";
 import {unpricedText} from "@/lib/learn/copy/unpriced";
 
 // Per-account performance math. Deliberately PURE — no DB, no server imports —
@@ -56,6 +57,16 @@ export const symbolsBehind = (prices: ReadonlyMap<string, PriceInfo>, lastClose:
     Array.from(prices.entries())
         .filter(([, info]) => typeof info.price !== 'number' || (typeof info.asOf === 'number' && info.asOf < lastClose))
         .map(([symbol]) => symbol);
+
+// The quote map without the quotes of symbols that have stopped quoting: one last fetched
+// before the last few sessions (lib/prices/gone.isGone). The same map back when none is.
+export const withoutGoneQuotes = (prices: Map<string, PriceInfo>, now: number): Map<string, PriceInfo> => {
+    const gone = Array.from(prices.entries()).filter(([, info]) => typeof info.price === 'number' && typeof info.asOf === 'number' && isGone(info.asOf, now));
+    if (gone.length === 0) return prices;
+    const kept = new Map(prices);
+    for (const [symbol] of gone) kept.set(symbol, {});
+    return kept;
+};
 
 // The quote map with a symbol's newest stored close, dated, standing in where it is the newer
 // price: for each symbol the quotes left without one, and — when `closeAt` says when a day's

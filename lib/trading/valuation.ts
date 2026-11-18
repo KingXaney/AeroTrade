@@ -10,7 +10,7 @@ import {getFreshQuotes, getSheetQuotes} from "@/lib/prices/quote-store";
 import {getLatestBars} from "@/lib/prices/store";
 import {addCalendarDays, getEasternDateString} from "@/lib/dates";
 import {CLOSE_FALLBACK_DAYS, LAST_CLOSE_LOOKBACK_DAYS} from "@/lib/trading/config";
-import {enrichPosition, symbolsBehind, withStoredCloses, type PriceInfo} from "@/lib/trading/analytics";
+import {enrichPosition, symbolsBehind, withoutGoneQuotes, withStoredCloses, type PriceInfo} from "@/lib/trading/analytics";
 import {getAccountsForUser, getCachedAccountsForUser, getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 import type {AccountWithPortfolio, EnrichedPosition, PaperPosition, PortfolioSummary} from '@/lib/trading/types';
 
@@ -68,7 +68,11 @@ export const buildSheetPriceMap = async (symbols: string[]): Promise<Map<string,
 // the usual page makes no bars read. A refusal therefore never moves a holding to an older basis.
 // Pages only: whatever acts on a price reads buildFreshPriceMap. A failed bars read is no fallback.
 export const buildHoldingsPriceMap = async (symbols: string[]): Promise<Map<string, PriceInfo>> => {
-    const live = await buildSheetPriceMap(symbols);
+    // A quote the sheet has not been able to renew for sessions is no longer the symbol's
+    // price: the symbol has stopped quoting (lib/prices/gone.ts). It is dropped here, so the
+    // holding is valued at its stored close and dated as such — what the snapshot job does —
+    // instead of at a stale number until the sheet finally lets the row go.
+    const live = withoutGoneQuotes(await buildSheetPriceMap(symbols), Date.now());
     const behind = symbolsBehind(live, lastSessionClose());
     if (behind.length === 0) return live;
     const today = getEasternDateString();
