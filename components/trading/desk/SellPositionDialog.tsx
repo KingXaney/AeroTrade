@@ -4,9 +4,9 @@ import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {cn} from "@/lib/utils";
-import {formatSignedPrice, formatPrice} from "@/lib/format";
+import {formatShares, formatSignedPrice, formatPrice} from "@/lib/format";
 import {placeOrder} from "@/lib/actions/trading.actions";
-import {estRealizedPnl} from "@/lib/trading/order-math";
+import {estRealizedPnl, sellableShares} from "@/lib/trading/order-math";
 import type {Lot} from "@/lib/trading/lots";
 import {SELL_NOTES_COPY} from "@/lib/learn/copy/receipts";
 import MicroLabel from "@/components/primitives/MicroLabel";
@@ -22,22 +22,27 @@ import type {EnrichedPosition} from '@/lib/trading/types';
 // `notes`: the learner's own notes on the shares still held (oldest first), when the page has them.
 const SellPositionDialog = ({position, accountId, notes, onClose}: {position: EnrichedPosition; accountId: string; notes?: readonly Lot[]; onClose: () => void}) => {
     const router = useRouter();
-    const [qty, setQty] = useState(String(position.quantity));
+    // Whole shares, up to every one held: a fraction of a share a split left goes with the
+    // last whole one, and a holding of less than one share sells as one (order-math.sellableShares).
+    const max = sellableShares(position.quantity);
+    const [qty, setQty] = useState(String(max));
     const [submitting, setSubmitting] = useState(false);
     // The dialog's position is the old account's while another account is being opened.
     const {pending: switching} = useAccountSwitch(accountId);
 
     const owned = position.quantity;
     const qtyNum = qty === '' ? 0 : parseInt(qty, 10);
-    const valid = qtyNum >= 1 && qtyNum <= owned;
+    const valid = qtyNum >= 1 && qtyNum <= max;
     const price = position.currentPrice;
-    const estProceeds = typeof price === 'number' && qtyNum > 0 ? price * qtyNum : null;
+    // What the fill will move: every share held once the order names them all.
+    const moved = qtyNum >= max ? owned : qtyNum;
+    const estProceeds = typeof price === 'number' && qtyNum > 0 ? price * moved : null;
 
     const presets = [
-        {label: '25%', value: Math.max(1, Math.floor(owned * 0.25))},
-        {label: '50%', value: Math.max(1, Math.floor(owned * 0.5))},
-        {label: '75%', value: Math.max(1, Math.floor(owned * 0.75))},
-        {label: 'Max', value: owned},
+        {label: '25%', value: Math.max(1, Math.floor(max * 0.25))},
+        {label: '50%', value: Math.max(1, Math.floor(max * 0.5))},
+        {label: '75%', value: Math.max(1, Math.floor(max * 0.75))},
+        {label: 'Max', value: max},
     ];
 
     const onConfirm = async () => {
@@ -65,7 +70,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                         Sell {position.symbol}
                     </DialogTitle>
                     <DialogDescription className="text-fg-muted">
-                        You own {owned} share{owned === 1 ? '' : 's'} of {position.company || position.symbol}.
+                        You own {formatShares(owned)} share{owned === 1 ? '' : 's'} of {position.company || position.symbol}.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -82,8 +87,8 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                             autoComplete="off"
                             className="w-full mt-1"
                         />
-                        {qtyNum > owned && (
-                            <p className="mt-1 text-xs text-negative">You only own {owned} share{owned === 1 ? '' : 's'}</p>
+                        {qtyNum > max && (
+                            <p className="mt-1 text-xs text-negative">You only own {formatShares(owned)} share{owned === 1 ? '' : 's'}</p>
                         )}
                     </div>
 
@@ -119,7 +124,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                     </div>
                     {/* The arithmetic a sell locks in, at the last price. */}
                     {(() => {
-                        const pnl = estRealizedPnl(typeof price === 'number' ? price : null, position.avgCost, qtyNum);
+                        const pnl = estRealizedPnl(typeof price === 'number' ? price : null, position.avgCost, moved);
                         return (
                             <div className="flex items-center justify-between text-[11px] text-fg-muted font-mono" data-testid="sell-est-pnl">
                                 <span>Est. realized P&L</span>
@@ -140,7 +145,7 @@ const SellPositionDialog = ({position, accountId, notes, onClose}: {position: En
                     )}
 
                     <ActionButton type="submit" variant="destructive" size="block" glow disabled={submitting || !valid || switching}>
-                        {submitting ? 'Selling…' : `Sell ${qtyNum || 0} share${qtyNum === 1 ? '' : 's'}`}
+                        {submitting ? 'Selling…' : `Sell ${formatShares(qtyNum > 0 ? moved : 0)} share${moved === 1 ? '' : 's'}`}
                     </ActionButton>
                 </form>
             </DialogContent>

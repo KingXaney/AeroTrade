@@ -35,6 +35,9 @@ import {
 } from "@/lib/income/accrual";
 import type {DividendPoint} from "@/lib/prices/types";
 import {accountEpoch} from "@/lib/trading/epoch";
+import type {PendingFillLike} from "@/lib/trading/pending";
+import {settlePendingFill} from "@/lib/trading/pending-fill";
+import {restateFill, toAppliedSplits} from "@/lib/trading/splits";
 
 type LeanAccount = {
     _id: unknown;
@@ -45,9 +48,11 @@ type LeanAccount = {
     createdAt: Date;
     positions?: {symbol: string; quantity: number}[];
     incomeThrough?: string;
+    pendingFill?: PendingFillLike;
+    splits?: Parameters<typeof toAppliedSplits>[0];
 };
 
-type LeanTrade = {symbol: string; side: 'buy' | 'sell'; quantity: number; total: number; createdAt: Date};
+type LeanTrade = {symbol: string; side: 'buy' | 'sell'; quantity: number; price: number; total: number; createdAt: Date};
 type LeanRow = {date: string; kind: 'interest' | 'dividend'; symbol?: string; amount: number; createdAt?: Date};
 
 
@@ -170,8 +175,14 @@ const sumBy = (rows: readonly LeanRow[]) => {
 };
 
 export const creditAccountIncome = async (accountId: string, {end, inputs}: {end: string; inputs: IncomeInputs}): Promise<CreditOutcome> => {
-    const account = await PaperAccount.findById(accountId).lean<LeanAccount | null>();
+    let account = await PaperAccount.findById(accountId).lean<LeanAccount | null>();
     if (!account) return {accountId, status: 'raced', reason: 'account gone'};
+    // A fill whose trade row never landed is recorded first: the books are rebuilt from rows.
+    if (account.pendingFill) {
+        await settlePendingFill(account);
+        account = await PaperAccount.findById(accountId).lean<LeanAccount | null>();
+        if (!account) return {accountId, status: 'raced', reason: 'account gone'};
+    }
 
     const inceptionAt = accountEpoch(account);
     const epoch = new Date(inceptionAt).getTime();
@@ -180,7 +191,11 @@ export const creditAccountIncome = async (accountId: string, {end, inputs}: {end
 
     // Filtered by timestamp, not ET date: leftovers of a reset that crashed mid-cascade are
     // older than the new inceptionAt even when they share its calendar day.
-    const trades = (await PaperTrade.find({accountId, createdAt: {$gte: inceptionAt}}).sort({createdAt: 1}).lean<LeanTrade[]>()).map(toIncomeTrade);
+    // In today's shares: a fill from before a split the account has applied is restated, the
+    // basis its stored position and the per-share dividends are in (lib/trading/splits.ts).
+    const splits = toAppliedSplits(account.splits);
+    const trades = (await PaperTrade.find({accountId, createdAt: {$gte: inceptionAt}}).sort({createdAt: 1}).lean<LeanTrade[]>())
+        .map((trade) => toIncomeTrade(restateFill(trade, splits)));
     const {rows: stored, copies} = distinctIncomeRows(await AccountIncome.find({accountId, epoch}).lean<LeanRow[]>());
     const credited = sumBy(stored.filter((row) => watermark !== null && row.date <= watermark));
 

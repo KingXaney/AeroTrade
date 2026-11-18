@@ -261,3 +261,13 @@ describe('formatPrice', () => {
         expect(formatPrice(319.974)).toBe('$319.97');
     });
 });
+
+describe('formatShares', () => {
+    it('prints a whole count as it is and a fraction to four places at most', async () => {
+        const {formatShares} = await import('@/lib/format');
+        expect(formatShares(100)).toBe('100');
+        expect(formatShares(7.5)).toBe('7.5');
+        expect(formatShares(10 / 3)).toBe('3.3333');
+        expect(formatShares(0.5)).toBe('0.5');
+    });
+});

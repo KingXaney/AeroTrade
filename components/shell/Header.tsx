@@ -15,7 +15,7 @@ type HeaderProps = {
     /** The audience's lists (navSectionsFor / navPagesFor): the drawer's rows and ⌘K's pages. */
     navSections?: readonly NavSection[];
     navPages?: readonly NavDestination[];
-    /** The lab's owner (lib/lab/owner.ts): the account menu then offers the lab's layout. */
+    /** The lab's owner (lib/lab/owner.ts): the account menu then offers the lab's layout, and ⌘K the owner's glossary terms. */
     owner?: boolean;
 };
 
@@ -42,7 +42,7 @@ function Header({user, initialStocks, initialTopics, navBadges, navSections, nav
 
                 {/* The one search trigger, at every width: ⌘K is a keyboard's shortcut, and a
                     phone has none. */}
-                <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics} pages={navPages}/>
+                <SearchCommand renderAs="text" label="Search stocks, topics and pages" initialStocks={initialStocks} initialTopics={initialTopics} pages={navPages} owner={owner}/>
 
                 <div className="flex items-center gap-3 shrink-0">
                     <UserDropdown user={user} friendRequests={navBadges.friendRequests ?? 0} owner={owner}/>

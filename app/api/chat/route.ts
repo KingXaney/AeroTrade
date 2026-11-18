@@ -1,13 +1,14 @@
-import {convertToModelMessages, streamText, stepCountIs, type UIMessage} from "ai";
+import {convertToModelMessages, streamText, stepCountIs} from "ai";
 import {createGoogleGenerativeAI} from "@ai-sdk/google";
 import {geminiApiKey} from "@/lib/ai/models";
-import {z} from "zod";
 import {advisorSystemPrompt} from "@/lib/chat/system-prompt";
 import {buildTools} from "@/lib/chat/tools";
 import {chatErrorBody, chatErrorStatus, type ChatErrorCode} from "@/lib/chat/errors";
+import {readChatRequest} from "@/lib/chat/request";
 import {getCurrentUser} from "@/lib/auth/session";
 import {isLabOwner} from "@/lib/lab/owner";
 import {takeRateLimit} from "@/lib/rate-limit";
+import {sameOriginRequest} from "@/lib/same-origin";
 import {CHAT_GLOBAL_KEY, chatUserDayKey, chatUserHourKey, resolveChatLimits} from "@/lib/chat/limits";
 
 // The transport only forwards the body text to the client, never the status — so the
@@ -25,28 +26,21 @@ const google = createGoogleGenerativeAI({
 export const runtime = 'nodejs'; // mongoose + better-auth need Node, not edge
 export const maxDuration = 30;
 
-// Bounds on what one request may cost: history is trimmed to the newest turns and
-// the total text is capped before anything reaches the model.
-const MAX_MESSAGES = 40;
-const MAX_TOTAL_CHARS = 24_000;
+// Bounds on what one request may cost. What it may carry in — the panel's own shape, trimmed to
+// the newest turns and capped in size before anything reaches the model — is lib/chat/request.ts.
 const MAX_OUTPUT_TOKENS = 2_048;
 
 // Resolved once per instance; a bad override is logged, never fatal.
 const limits = resolveChatLimits();
 if (limits.warning) console.warn(`Chat limits: ${limits.warning}`);
 
-const bodySchema = z.object({
-    messages: z.array(z.object({
-        id: z.string().max(200),
-        role: z.enum(['user', 'assistant', 'system']),
-        parts: z.array(z.record(z.string(), z.unknown())).max(50),
-    }).passthrough()).min(1).max(200),
-});
-
-const textLength = (message: UIMessage): number =>
-    message.parts.reduce((n, part) => n + (part.type === 'text' ? part.text.length : 0), 0);
-
 export async function POST(req: Request) {
+    // The panel's own fetch is the only caller, and a route handler has no origin check of its
+    // own (lib/same-origin.ts): anything else is refused before the session is read.
+    if (!sameOriginRequest(req.headers, req.url)) {
+        return fail('bad_request');
+    }
+
     const user = await getCurrentUser();
     if (!user) {
         return fail('unauthorized');
@@ -55,15 +49,13 @@ export async function POST(req: Request) {
     // The tools over the brains and the strategies, and the prompt's lines about them, are the
     // owner's alone (lib/lab/owner.ts).
     const owner = isLabOwner(user.email);
+    const tools = buildTools(userId, {owner});
 
-    const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-    if (!parsed.success) {
-        return fail('bad_request');
-    }
-    // Shape-checked above; the SDK's UIMessage union is too wide to express in zod.
-    const messages = parsed.data.messages.slice(-MAX_MESSAGES) as unknown as UIMessage[];
-    if (messages.reduce((n, m) => n + textLength(m), 0) > MAX_TOTAL_CHARS) {
-        return fail('conversation_too_long');
+    // Only what the panel sends is read: user text, and the assistant's text with the settled
+    // reads of this caller's own tools. Any other role or user part is a bad request.
+    const request = readChatRequest(await req.json().catch(() => null), Object.keys(tools));
+    if (!request.ok) {
+        return fail(request.code);
     }
 
     // Counted after validation so a rejected body spends nothing. User windows first:
@@ -75,8 +67,11 @@ export async function POST(req: Request) {
     const result = streamText({
         model: google('gemini-2.5-flash'),
         system: advisorSystemPrompt({owner}),
-        messages: await convertToModelMessages(messages),
-        tools: buildTools(userId, {owner}),
+        messages: await convertToModelMessages(request.messages),
+        // The system prompt is the line above and nothing else: readChatRequest takes no system
+        // message, and the SDK is told to refuse one outright.
+        allowSystemInMessages: false,
+        tools,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         stopWhen: stepCountIs(5), // allow tool → model → tool chains, capped
     });

@@ -20,6 +20,7 @@ export const SUBJECT_MAX = 110;
 export const EMAIL_FOOTER_COPY = {
     openApp: `Open ${SITE_NAME}`,
     preferences: 'Email preferences',
+    unsubscribe: 'Unsubscribe',
     allNews: 'All news',
     digestWhy: `You get this email because the daily brief is on in your ${SITE_NAME} settings.`,
     accountWhy: `You get this email because of activity on your ${SITE_NAME} account.`,
@@ -120,4 +121,39 @@ export const RESET_EMAIL_COPY = {
     notYou: 'If you did not ask for this, you can ignore this email. Your password stays as it is, and nobody can use this link without your inbox.',
     text: (url: string, minutes: number): string =>
         `Reset your ${SITE_NAME} password: ${url}\n\nThe link expires in ${minutes} minutes. If you did not ask for this, ignore this email: your password stays as it is.`,
+} as const;
+
+// The owner's alert (lib/jobs/functions/alerts.ts): a job that failed, or the jobs overdue on
+// their stamp. Sent to the owner list only; the error line is the job's own, quoted as text.
+export const JOB_ALERT_COPY = {
+    failed: {
+        subject: (label: string): string => `${SITE_NAME}: the ${label} job failed`,
+        hero: (label: string): string => `The ${label} job failed`,
+        preheader: (label: string): string => `${label} stopped with an error after its retries.`,
+        body: (schedule: string, when: string): string => `It runs ${schedule}. The run that stopped at ${when} had used its retries; the error it ended on is below.`,
+        errorLead: 'Error:',
+        lastGood: (ago: string | null): string => (ago ? `Its last completed run was ${ago}.` : 'It has not completed a run yet.'),
+    },
+    overdue: {
+        subject: (count: number): string => `${SITE_NAME}: ${count === 1 ? '1 job is' : `${count} jobs are`} overdue`,
+        hero: (count: number): string => (count === 1 ? 'One job is overdue' : `${count} jobs are overdue`),
+        preheader: 'A job has not completed a run in longer than its schedule allows.',
+        body: 'Each of these last completed a run longer ago than its schedule allows. A job that is not firing, or that fails before its last step, looks like this.',
+        row: (label: string, schedule: string, ago: string): string => `${label} (${schedule}): last completed ${ago}.`,
+    },
+    cta: 'Open the system view',
+    why: `You get this email because your address is on ${SITE_NAME}'s owner list. It is sent at most once per job per day.`,
+    text: (headline: string, lines: readonly string[], url: string): string => `${headline}\n\n${lines.join('\n')}\n\n${url}`,
+} as const;
+
+// The page the daily brief's Unsubscribe link opens (app/(reset)/unsubscribe).
+export const UNSUBSCRIBE_COPY = {
+    title: 'Unsubscribe from the daily brief',
+    body: `This turns off the daily brief for the ${SITE_NAME} account this link was sent to. Nothing else about the account changes, and the brief can be turned back on in Settings.`,
+    button: 'Unsubscribe',
+    doneTitle: 'You are unsubscribed',
+    doneBody: 'The daily brief is off for this account. No more of them will be sent.',
+    invalidBody: 'This unsubscribe link is not complete or is not one of ours. The daily brief can also be turned off in Settings, under Notifications.',
+    failedBody: 'The change could not be saved just now. Open the link again in a minute.',
+    settingsLink: 'Open notification settings',
 } as const;

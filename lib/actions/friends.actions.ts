@@ -5,15 +5,29 @@ import {Types} from "mongoose";
 import {connectToDatabase} from "@/database/mongoose";
 import Friendship from "@/database/models/friendship.model";
 import {getCurrentUserId} from "@/lib/auth/session";
+import {pendingRequestsFull, withinFriendRequestLimit} from "@/lib/friends/limits";
 import {findUserByEmail} from "@/lib/friends/store";
+import {FRIEND_REQUEST_COPY} from "@/lib/learn/copy/friends";
+import {takeRateLimit} from "@/lib/rate-limit";
 import type {ActionResult} from '@/lib/actions/types';
 
 // The friends' writes, each for the signed-in user. The reads are lib/friends/store.ts.
 
+// A request looks the address up among the accounts, and what follows says whether one is
+// registered there (the answers below, then the Sent list on /friends). So every call is counted
+// per reader by the hour, and refused while the reader's own requests waiting for an answer are
+// at their cap (lib/friends/limits.ts) — both before the lookup, so neither refusal says anything
+// about the address. A request that was sent is answered without the name the address is
+// registered under.
 export const sendFriendRequest = async (email: string): Promise<ActionResult> => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) return {success: false, message: 'Not authenticated'};
+        if (!(await withinFriendRequestLimit(userId, takeRateLimit))) return {success: false, message: FRIEND_REQUEST_COPY.tooFast};
+
+        await connectToDatabase();
+        const pending = await Friendship.countDocuments({requesterId: userId, status: 'pending'});
+        if (pendingRequestsFull(pending)) return {success: false, message: FRIEND_REQUEST_COPY.pendingFull};
 
         const target = await findUserByEmail(email);
         if (!target) return {success: false, message: 'No user found with that email'};
@@ -34,7 +48,7 @@ export const sendFriendRequest = async (email: string): Promise<ActionResult> =>
 
         await Friendship.create({requesterId: userId, addresseeId: target.id, status: 'pending'});
         revalidatePath('/friends');
-        return {success: true, message: `Friend request sent to ${target.name}`};
+        return {success: true, message: FRIEND_REQUEST_COPY.sent};
     } catch (error) {
         console.error('Error sending friend request:', error);
         return {success: false, message: 'Could not send request'};

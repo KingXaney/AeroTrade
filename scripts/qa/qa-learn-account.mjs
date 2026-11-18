@@ -516,8 +516,11 @@ try {
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     await page.locator('#trading-habits [data-testid=habits-hold]').waitFor({timeout: 30000});
     const habitTile = async (id) => text(`#trading-habits [data-testid=${id}]`);
-    // Distinct ET dates of the learner's seven fills: today's three and four earlier days.
-    const userDays = new Set([etDate(), ...[20, 18, 15, 8].map((n) => etDate(daysAgo(n)))]).size;
+    // Distinct ET dates of the learner's seven fills, read from the rows as stored: the three
+    // made minutes ago and four earlier days. (Not "today plus four": in the half hour after
+    // midnight ET, a fill from thirty minutes ago is yesterday's.)
+    const ownRows = await db.collection('papertrades').find({accountId, source: 'user', createdAt: {$gte: daysAgo(30)}}).project({createdAt: 1}).toArray();
+    const userDays = new Set(ownRows.map((row) => etDate(row.createdAt))).size;
     check('habits count only the learner\'s own fills in the last 30 days (the strategy round trip and the sale 35 days ago left out)',
         new RegExp(`7 fills on ${userDays} days`).test(await habitTile('habits-pace')) && /in the last 30 days/.test(await habitTile('habits-pace')), await habitTile('habits-pace'));
     check('hold time: winners a median of 3 days, losers 10', /winners 3 days · losers 10 days/.test(await habitTile('habits-hold'))

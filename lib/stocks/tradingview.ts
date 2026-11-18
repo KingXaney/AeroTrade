@@ -184,6 +184,31 @@ export const TRADE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     height: 640,
 });
 
+// The desk's chart sits beside the ticket from Tailwind's xl and under it below, where a chart
+// as tall as the desktop's would be most of a phone's screen. The query is xl's own width, in
+// rem as the stylesheet writes it, so the height turns exactly where the desk's columns do.
+export const TRADE_DESK_WIDE_QUERY = '(min-width: 80rem)';
+export const TRADE_CHART_HEIGHT = {wide: 560, narrow: 360} as const;
+
+// The chart's place, held in CSS at the same two heights from the first paint, so nothing under
+// the desk moves when the embed's frame arrives a second later. It goes on the embed's container:
+// the stylesheet sizes the widget's own box to 100% of that (`.tradingview-widget-container__widget`
+// in app/globals.css), so a height on the inner box, a class or an inline style, holds nothing.
+// Written out whole: Tailwind reads class names as text.
+export const TRADE_CHART_PLACE_CLASS = 'h-[360px] xl:h-[560px]';
+
+// The ticker tape over the desk. TradingView's adaptive mode draws it at one of two heights by
+// the width of its own frame (measured 2026-11-18: 58 px in a 1440 px window, 84 px from 1280 px
+// down to 320), and its frame arrives a second after the page. The place is held at the taller
+// of the two, the tape centred in it, so nothing under it moves whichever it turns out to be.
+export const TICKER_TAPE_HEIGHTS = {wide: 58, narrow: 84} as const;
+export const TICKER_TAPE_PLACE_CLASS = 'flex min-h-[84px] items-center';
+
+// The chart's height in px for what the browser said of that query. null — the server and the
+// hydrating render cannot know the width — is no height yet: the embed waits for the answer.
+export const tradeChartHeight = (wide: boolean | null): number | null =>
+    wide === null ? null : wide ? TRADE_CHART_HEIGHT.wide : TRADE_CHART_HEIGHT.narrow;
+
 // The market-wide embeds, each its script and its config. /markets (its ticker tape and tabs) and
 // the dashboard's TradingView widgets render these at their own heights; module-level, so a
 // config keeps a stable identity and an embed re-inits only on a theme change.

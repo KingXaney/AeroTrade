@@ -726,8 +726,12 @@ try {
         check('a double rebuy, a hand dealt: one request waits for the host (the second in the first\'s place), nothing bought yet', statuses === '200,200'
             && doc.state.requests.length === 1 && doc.state.requests[0].pid === buyer.pid && doc.state.requests[0].amount === DEFAULT_CONFIG.buyInMax
             && row(doc.state).bought === boughtBefore, `${statuses} ${JSON.stringify(doc.state.requests)}`);
-        const replay = await post(buyer, 'action', bodies[0]);
-        check('…and its id again is a duplicate', replay.status === 200 && replay.body?.duplicate === true);
+        // Whichever of the two landed first made the request; the other changed nothing, and a
+        // step that changes nothing keeps no id. So one of the ids, sent again, is a duplicate.
+        const replays = [await post(buyer, 'action', bodies[0]), await post(buyer, 'action', bodies[1])];
+        check('…and the id that made it, sent again, is a duplicate',
+            replays.every((q) => q.status === 200) && replays.some((q) => q.body?.duplicate === true),
+            replays.map((q) => `${q.status} ${q.body?.duplicate === true}`).join(', '));
         r = await hostOp(host, {op: 'approve', pid: buyer.pid});
         check('…the host approves it: the rebuy lands', r.status === 200 && r.body?.requests?.length === 0, `${r.status} ${r.text.slice(0, 120)}`);
         r = await hostOp(host, {op: 'approve', pid: buyer.pid});

@@ -3,6 +3,7 @@
 import {useState} from "react";
 import Link from "next/link";
 import SellPositionDialog from "@/components/trading/desk/SellPositionDialog";
+import CloseOutButton from "@/components/trading/portfolio/CloseOutButton";
 import type {Lot} from "@/lib/trading/lots";
 import TradeLink from "@/components/trading/TradeLink";
 import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
@@ -13,7 +14,14 @@ import type {EnrichedPosition} from '@/lib/trading/types';
 // HoldingsTable with an Action column, whose Sell opens a dialog where the user picks how
 // many shares to sell. /portfolio has no order panel, so the empty state links to the Trade Desk.
 // lotNotes: the learner's notes on the shares still held, by symbol (pages only).
-const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPosition[]; accountId: string; lotNotes?: Readonly<Record<string, readonly Lot[]>>}) => {
+// closable: holdings whose symbol has stopped quoting (lib/prices/gone.ts). No order can fill
+// for one, so its row offers the one thing that can: closing it at its last stored close.
+const PositionsTable = ({positions, accountId, lotNotes, closable}: {
+    positions: EnrichedPosition[];
+    accountId: string;
+    lotNotes?: Readonly<Record<string, readonly Lot[]>>;
+    closable?: Readonly<Record<string, {date: string; close: number}>>;
+}) => {
     // The dialog belongs to the account it was opened on: once the page is another account's,
     // it is gone (its position, quantity and price were the old account's).
     const [selling, setSelling] = useState<{accountId: string; position: EnrichedPosition} | null>(null);
@@ -33,7 +41,9 @@ const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPo
         <>
             <HoldingsTable
                 positions={positions}
-                actions={(p) => (
+                actions={(p) => (closable?.[p.symbol] ? (
+                    <CloseOutButton accountId={accountId} symbol={p.symbol} quantity={p.quantity} close={closable[p.symbol]} />
+                ) : (
                     <>
                         <TradeLink symbol={p.symbol} />
                         <button
@@ -44,7 +54,7 @@ const PositionsTable = ({positions, accountId, lotNotes}: {positions: EnrichedPo
                             Sell
                         </button>
                     </>
-                )}
+                ))}
             />
             {sellTarget && <SellPositionDialog position={sellTarget} accountId={accountId} notes={lotNotes?.[sellTarget.symbol]} onClose={() => setSellTarget(null)} />}
         </>

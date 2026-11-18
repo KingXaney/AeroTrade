@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {CASH_YIELD_DAYS, TICKET_TERMS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote, ticketTerms} from '@/lib/trading/order-math';
+import {CASH_YIELD_DAYS, TICKET_TERMS, affordableShares, checkOrder, describeOrderEffect, estRealizedPnl, isOrderSide, presetQuantities, sanitizeTradeNote, sellableShares, ticketTerms} from '@/lib/trading/order-math';
 import {interestOverDays} from '@/lib/income/accrual';
 import {TRADE_REASON_MAX} from '@/lib/trading/config';
 
@@ -198,5 +198,33 @@ describe('isOrderSide', () => {
         for (const value of ['short', 'BUY', 'Sell', '', ' buy', null, undefined, 1, {}, ['buy']]) {
             expect(isOrderSide(value), String(value)).toBe(false);
         }
+    });
+});
+
+// A holding can carry a fraction of a share (a split leaves one): the ticket still takes whole
+// shares, up to every one held, and a holding of less than one share sells as one.
+describe('a holding with a fraction of a share, on the ticket', () => {
+    it('counts the whole shares a sell may name', () => {
+        expect(sellableShares(10)).toBe(10);
+        expect(sellableShares(7.5)).toBe(7);
+        expect(sellableShares(0.5)).toBe(1);
+        expect(sellableShares(1.9999999999999998)).toBe(2);
+        expect(sellableShares(0)).toBe(0);
+    });
+
+    it('lets a holding of less than one share be sold, as one', () => {
+        expect(checkOrder({side: 'sell', quantity: 1, price: 20, cash: 0, owned: 0.5}).ok).toBe(true);
+        expect(checkOrder({side: 'sell', quantity: 2, price: 20, cash: 0, owned: 0.5})).toMatchObject({ok: false, message: 'You only own 0.5 shares'});
+        expect(presetQuantities('sell', {cash: 0, price: 20, owned: 0.5})?.at(-1)).toEqual({label: 'Max', value: 1});
+    });
+
+    it('caps a sell at the whole shares held and offers them as Max', () => {
+        expect(checkOrder({side: 'sell', quantity: 7, price: 20, cash: 0, owned: 7.5}).ok).toBe(true);
+        expect(checkOrder({side: 'sell', quantity: 8, price: 20, cash: 0, owned: 7.5})).toMatchObject({ok: false, message: 'You only own 7.5 shares'});
+        expect(presetQuantities('sell', {cash: 0, price: 20, owned: 7.5})?.at(-1)).toEqual({label: 'Max', value: 7});
+    });
+
+    it('still refuses a symbol that is not held', () => {
+        expect(checkOrder({side: 'sell', quantity: 1, price: 20, cash: 0, owned: 0}).ok).toBe(false);
     });
 });

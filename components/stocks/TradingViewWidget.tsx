@@ -9,7 +9,10 @@ interface TradingViewWidgetProps {
     title?: string;
     scriptUrl: string;
     config: Record<string, unknown>;
-    height?: number;
+    // null: not known yet. The title and the frame render; the embed waits for a number.
+    height?: number | null;
+    // Classes for the embed's container. A height here holds the embed's place before its frame
+    // arrives (the widget's own box is 100% of the container, by the stylesheet).
     className?: string;
 }
 
@@ -45,7 +48,7 @@ const TradingViewWidget = ({title, scriptUrl, config, height = 600, className}: 
                 </div>
             )}
             <div className={cn('tradingview-widget-container', className)} ref={containerRef}>
-                <div className="tradingview-widget-container__widget" style={{height, width: "100%" }}/>
+                <div className="tradingview-widget-container__widget" style={{height: height ?? undefined, width: "100%" }}/>
             </div>
         </div>
     );

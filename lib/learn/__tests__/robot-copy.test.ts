@@ -4,10 +4,11 @@
 // strategy or a thirteenth palette fails here, not in front of the reader.
 
 import {describe, expect, it} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {findBanned} from '@/lib/learn/banned';
 import {ROBOT_COPY, ROBOT_TIPS} from '@/lib/learn/copy/robot';
 import {ASK_MAX_CHARS} from '@/lib/chat/ask';
-import {GLOSSARY_KEYS} from '@/lib/learn/glossary';
 import {JOBS} from '@/lib/jobs/registry';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 import {capitalize, numberWord} from '@/lib/text';
@@ -63,8 +64,13 @@ describe('ROBOT_TIPS', () => {
         expect(text('strategies')).toContain(`${capitalize(numberWord(STRATEGIES.length))} rule-based`);
         expect(text('themes')).toContain(`${numberWord(PALETTE_IDS.length)} palettes`);
         expect(text('themes')).toContain(`${numberWord(STYLE_IDS.length)} visual styles`);
-        expect(text('learn-glossary')).toContain(`${GLOSSARY_KEYS.length} terms`);
         expect(text('morning-briefing')).toContain(JOBS.marketBriefing.health.schedule.replace('daily ', ''));
+    });
+
+    it('imports nothing, so the launcher on every page carries no catalog', () => {
+        const source = readFileSync(fileURLToPath(new URL('../copy/robot.ts', import.meta.url)), 'utf8');
+        expect(source).not.toMatch(/^\s*import\s/m);
+        expect(text('learn-glossary')).toContain('/glossary');
     });
 
     it('offers the existing "what\'s new" chip as a prompt, so the chat already answers it', () => {

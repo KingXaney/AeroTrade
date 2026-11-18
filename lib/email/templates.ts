@@ -5,7 +5,7 @@
 
 import {bulletList, button, hero, linkOrText, paragraph, paragraphHtml, renderEmail} from "@/lib/email/layout";
 import {escapeHtml} from "@/lib/news/sanitize";
-import {EMAIL_FOOTER_COPY, RESET_EMAIL_COPY, WELCOME_EMAIL_COPY} from "@/lib/learn/copy/email";
+import {EMAIL_FOOTER_COPY, JOB_ALERT_COPY, RESET_EMAIL_COPY, WELCOME_EMAIL_COPY} from "@/lib/learn/copy/email";
 
 const base = (appUrl: string): string => String(appUrl ?? '').replace(/\/+$/, '');
 
@@ -45,3 +45,30 @@ export const renderPasswordResetEmail = ({appUrl, name, resetUrl, minutes}: {app
         footerLinks: [{label: EMAIL_FOOTER_COPY.openApp, url: `${base(appUrl)}/`}],
         footerLines: [EMAIL_FOOTER_COPY.accountWhy, EMAIL_FOOTER_COPY.copyright],
     });
+
+// The owner's alert: a headline, the lines under it (each one sentence, already worded by
+// JOB_ALERT_COPY and escaped here), an optional quoted error and the way to the system view.
+export const renderJobAlertEmail = ({appUrl, title, preheader, headline, lines, error}: {
+    appUrl: string;
+    title: string;
+    preheader: string;
+    headline: string;
+    lines: readonly string[];
+    error?: string;
+}): string => {
+    const root = base(appUrl);
+    return renderEmail({
+        title,
+        preheader,
+        bodyHtml: [
+            hero(headline),
+            ...lines.map((line) => paragraph(line)),
+            error !== undefined
+                ? paragraphHtml(`<strong>${escapeHtml(JOB_ALERT_COPY.failed.errorLead)}</strong> <span style="word-break: break-word;">${escapeHtml(error)}</span>`, 'small')
+                : '',
+            button(`${root}/brain?view=system`, JOB_ALERT_COPY.cta),
+        ].join(''),
+        footerLinks: [{label: EMAIL_FOOTER_COPY.openApp, url: `${root}/`}],
+        footerLines: [JOB_ALERT_COPY.why, EMAIL_FOOTER_COPY.copyright],
+    });
+};

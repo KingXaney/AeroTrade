@@ -14,7 +14,7 @@ import TradeDesk from "@/components/trading/desk/TradeDesk";
 import MarketStatus from "@/components/stocks/MarketStatus";
 import TradingViewWidget from "@/components/stocks/TradingViewWidget";
 import MarketScan, {isScanViewId} from "@/components/stocks/MarketScan";
-import {MARKET_EMBEDS} from "@/lib/stocks/tradingview";
+import {MARKET_EMBEDS, TICKER_TAPE_PLACE_CLASS} from "@/lib/stocks/tradingview";
 import {marketStatus} from "@/lib/prices/market-hours";
 import {describeQueuedFill} from "@/lib/learn/copy/market";
 import {MARKETS_PAGE_COPY} from "@/lib/learn/copy/trade";
@@ -95,11 +95,15 @@ const TradePage = async ({searchParams}: TradePageProps) => {
 
             {/* The market's pulse, always on: the one embed the overview kept above its views. */}
             <Panel pad={3}>
-                <TradingViewWidget
-                    scriptUrl={MARKET_EMBEDS.tickerTape.script}
-                    config={MARKET_EMBEDS.tickerTape.config}
-                    height={70}
-                />
+                {/* Held at the tape's taller height from the first paint: its frame comes a second
+                    later, and the desk under it must not move when it does. */}
+                <div className={TICKER_TAPE_PLACE_CLASS}>
+                    <TradingViewWidget
+                        scriptUrl={MARKET_EMBEDS.tickerTape.script}
+                        config={MARKET_EMBEDS.tickerTape.config}
+                        height={70}
+                    />
+                </div>
             </Panel>
 
             {/* The active account's desk, last fill and positions: out of reach while another

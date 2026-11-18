@@ -2,7 +2,7 @@
 // links every definition to the page that shows the number, so a term is never read
 // in the abstract when the app can show the real one.
 
-import {GLOSSARY, GLOSSARY_KEYS, type GlossaryEntry, type GlossaryKey} from "@/lib/learn/glossary";
+import {GLOSSARY, GLOSSARY_KEYS, searchGlossary, type GlossaryEntry, type GlossaryKey} from "@/lib/learn/glossary";
 
 // `owner`: a page that is the owner's alone (lib/lab/owner.ts) — both brains, the trading agent world
 // and the strategies; the glossary page leaves those groups out for anyone else (glossaryGroupsFor).
@@ -111,3 +111,16 @@ export const GLOSSARY_GROUPS: readonly GlossaryGroup[] = (['board', 'portfolio',
 // the owner's alone.
 export const glossaryGroupsFor = ({owner}: {owner: boolean}): readonly GlossaryGroup[] =>
     owner ? GLOSSARY_GROUPS : GLOSSARY_GROUPS.filter((group) => !group.home.owner);
+
+// The same reader's entries, as /glossary renders them: what the front door counts (the account
+// anyone gets, owner: false — lib/learn/copy/landing.ts) and what ⌘K may offer.
+export const glossaryKeysFor = (audience: {owner: boolean}): readonly GlossaryKey[] =>
+    glossaryGroupsFor(audience).flatMap((group) => group.keys);
+
+const homeOf = (entry: GlossaryEntry): Home => HOMES[groupOf(entry)];
+
+// ⌘K's Learn rows for one reader (components/shell/SearchCommand.tsx). A row opens /glossary#key,
+// so it is offered only for an entry that page renders for them: anyone but the owner never gets
+// a row to an anchor the page lacks. Narrowed before the cap, so a hidden term takes no row.
+export const searchGlossaryFor = (query: string, limit: number, {owner}: {owner: boolean}): GlossaryEntry[] =>
+    searchGlossary(query, limit, owner ? undefined : (entry) => !homeOf(entry).owner);

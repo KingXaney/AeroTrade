@@ -1,7 +1,7 @@
 import {inngest} from "@/lib/jobs/client";
 import {recordJobRun} from "@/lib/jobs/job-runs";
 import {JOBS, triggersOf} from "@/lib/jobs/registry";
-import {inferText} from "@/lib/ai/infer";
+import {inferText, isDailyQuotaExhausted} from "@/lib/ai/infer";
 import {
     applyExtractionBatch,
     buildExtractionPrompt,
@@ -37,26 +37,39 @@ export const updateNewsBrain = inngest.createFunction(
         let readEmpty = 0;
         const batches = extractionBatches(queue.articles);
 
+        // A batch that fails (the model's daily quota, an outage that outlasts the retries) must
+        // not cost the run the batches already applied: `apply-batch` has stamped their articles
+        // as read, so the next run never queues them again, and their folds exist only here until
+        // `fold-brain`. So a failed batch ends the loop, never the function, and what was
+        // applied is folded. A batch that was never applied carries no stamp and is queued again
+        // tomorrow. The stamp says where the run stopped.
+        let stoppedAt: number | null = null;
         for (let b = 0; b < batches.length; b++) {
             if (b > 0) await step.sleep(`extract-throttle-${b}`, EXTRACTION_THROTTLE_DELAY);
             const batch = batches[b];
 
-            const prompt = buildExtractionPrompt(batch, queue.activeThemes);
-            const response = await inferText(step, {task: 'extraction', stepId: `extract-batch-${b}`, prompt});
+            try {
+                const prompt = buildExtractionPrompt(batch, queue.activeThemes);
+                const response = await inferText(step, {task: 'extraction', stepId: `extract-batch-${b}`, prompt});
 
-            // Fold data must flow through the step's RETURN value: on an Inngest replay,
-            // memoized steps don't re-execute their callbacks, so anything pushed into
-            // function-scope arrays inside the callback would be lost.
-            const applied = await step.run(`apply-batch-${b}`, async () => applyExtractionBatch({
-                index: b,
-                batch,
-                text: response.text,
-                model: response.model,
-                activeThemes: queue.activeThemes,
-            }));
-            folds.push(...applied.folds);
-            extractedIds.push(...applied.ids);
-            readEmpty += applied.read;
+                // Fold data must flow through the step's RETURN value: on an Inngest replay,
+                // memoized steps don't re-execute their callbacks, so anything pushed into
+                // function-scope arrays inside the callback would be lost.
+                const applied = await step.run(`apply-batch-${b}`, async () => applyExtractionBatch({
+                    index: b,
+                    batch,
+                    text: response.text,
+                    model: response.model,
+                    activeThemes: queue.activeThemes,
+                }));
+                folds.push(...applied.folds);
+                extractedIds.push(...applied.ids);
+                readEmpty += applied.read;
+            } catch (error) {
+                console.error(`Brain extraction batch ${b} of ${batches.length} failed${isDailyQuotaExhausted(error) ? ' (the model\'s daily quota)' : ''}:`, error);
+                stoppedAt = b;
+                break;
+            }
         }
 
         const verifiedTickers = await step.run('verify-new-tickers', async () => verifyNewTickers(folds, queue.articles));
@@ -66,7 +79,7 @@ export const updateNewsBrain = inngest.createFunction(
 
         // A replayed fold step from before the repeat check has no count: say nothing then.
         const repeats = foldResult.repeats ?? 0;
-        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted${readEmpty > 0 ? `, ${readEmpty} read with nothing to tag` : ''}${repeats > 0 ? `, ${repeats} repeated ${repeats === 1 ? 'mention' : 'mentions'} counted as attention only` : ''}, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned`;
+        const summary = `Brain updated: ${inserted} articles ingested, ${extractedIds.length} extracted${readEmpty > 0 ? `, ${readEmpty} read with nothing to tag` : ''}${repeats > 0 ? `, ${repeats} repeated ${repeats === 1 ? 'mention' : 'mentions'} counted as attention only` : ''}, ${foldResult.entitiesTouched} entities touched, ${foldResult.deleted} pruned${stoppedAt !== null ? `; stopped at batch ${stoppedAt + 1} of ${batches.length}, the rest are read tomorrow` : ''}`;
         await step.run('record-job-run', async () => recordJobRun(JOBS.newsBrain.id, summary));
         return {success: true, message: summary};
     },

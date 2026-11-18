@@ -250,9 +250,9 @@ their cache; every job's own pacing.
   they are not counted in the budget.
 - The other account actions' render-twice pattern (create, rename, reset, delete, place order): each
   changed stored rows and now costs no Finnhub quote either way.
-- `Model.init()` is still awaited by `lib/email/digest-store` (its one caller before this change);
-  on a process whose model was compiled while the connection was opening it is rejected for good.
-  The quote store builds its own index instead; the digest claim is left as it was.
+- `Model.init()` was still awaited by `lib/email/digest-store` (its one caller before this
+  change); on a process whose model was compiled while the connection was opening it is rejected
+  for good. Fixed on 2026-11-18: both stores build their index through `database/index-guard.ts`.
 - In `next dev`, an HMR refresh can hand `fetchQuote` an old response body, which the sheet then
   stamps as fetched now. Development only.
 

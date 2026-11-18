@@ -6,6 +6,8 @@
 //   npm run trigger -- news                        today's digest emails
 //   npm run trigger -- news <email>                a test brief to that one opted-in reader
 //   npm run trigger -- snapshots                   daily account + benchmark snapshots
+//   npm run trigger -- alerts                      mail the owner about every job overdue on its stamp (the daily check)
+//   npm run trigger -- splits                      check held symbols for stock splits and apply them to the accounts
 //   npm run trigger -- income                      credit interest + dividends through yesterday (back-credits new accounts)
 //   npm run trigger -- topics                      refresh every followed keyword set
 //   npm run trigger -- briefs                      generate today's topic briefs
@@ -30,6 +32,8 @@ const EVENTS = {
     navigator: 'app/run.ai.navigator',
     news: 'app/send.daily.news',
     snapshots: 'app/record.daily.snapshots',
+    splits: 'app/apply.stock.splits',
+    alerts: 'app/check.job.health',
     income: 'app/credit.account.income',
     topics: 'app/refresh.topic.feeds',
     briefs: 'app/generate.topic.briefs',

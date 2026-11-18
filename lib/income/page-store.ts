@@ -7,8 +7,9 @@ import AccountIncome from "@/database/models/account-income.model";
 import {getEasternDateString} from "@/lib/dates";
 import {getDividendPoints, getLatestRatePoint} from "@/lib/prices/store";
 import {apyFromDiscount, distinctIncomeRows, groupIncomeActivity, usableRate, withReceipts, type IncomeView} from "@/lib/income/accrual";
-import {getOwnedAccount} from "@/lib/trading/accounts";
+import {getCachedOwnedAccount} from "@/lib/trading/accounts";
 import {getTradeLedger} from "@/lib/trading/ledger";
+import {restateDividend, toAppliedSplits} from "@/lib/trading/splits";
 import {accountEpoch} from "@/lib/trading/epoch";
 import type {AccountIncomeSummary} from '@/lib/income/types';
 
@@ -41,7 +42,7 @@ export const getIncomeSummary = async (account: {incomeTotals?: {interest?: numb
 // rate series and no price metas: every interest receipt rebuilds from its own rows.
 export const getIncomeActivity = async (userId: string, accountId: string): Promise<IncomeView | null> => {
     try {
-        const account = await getOwnedAccount(userId, accountId);
+        const account = await getCachedOwnedAccount(userId, accountId);
         if (!account) return null;
         if (!account.incomeThrough) return {interestByMonth: [], dividends: [], missed: []};
         const inceptionAt = accountEpoch(account);
@@ -58,7 +59,12 @@ export const getIncomeActivity = async (userId: string, accountId: string): Prom
         // ledger already starts at inceptionAt; an account without one starts at createdAt here.
         const fills = ledger.filter((t) => t.createdAt >= epoch);
         const points = await getDividendPoints(fills.map((t) => t.symbol), {from: getEasternDateString(inceptionAt), to: account.incomeThrough});
-        return withReceipts(groupIncomeActivity(distinctIncomeRows(rows).rows), fills, points);
+        // A dividend paid before a split the account has applied reads in today's shares, as
+        // the ledger beside it does (lib/trading/splits.ts): the amount paid is untouched.
+        // Each row is restated before it is grouped, while it still carries when it was
+        // written: a row the job wrote after the split was applied is in today's shares already.
+        const splits = toAppliedSplits(account.splits);
+        return withReceipts(groupIncomeActivity(distinctIncomeRows(rows).rows.map((row) => restateDividend(row, splits))), fills, points);
     } catch (error) {
         console.error('Error reading income activity:', error);
         return null;

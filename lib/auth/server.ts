@@ -5,6 +5,7 @@ import { nextCookies} from "better-auth/next-js";
 import { after } from "next/server";
 import { sendPasswordResetEmail } from "@/lib/email/send";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth/validation";
+import { deleteUserData } from "@/lib/account/delete-store";
 
 function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
     return betterAuth({
@@ -30,6 +31,19 @@ function createAuthInstance(db: Parameters<typeof mongodbAdapter>[0]) {
             sendResetPassword: async ({user, token}) => {
                 after(() => sendPasswordResetEmail({email: user.email, name: user.name, token})
                     .catch((error) => console.error('Password reset email failed', error)));
+            },
+        },
+        user: {
+            // Deleting an account (lib/actions/account.actions.deleteMyAccount) is the library's
+            // own call: it verifies the session and the password, then runs this, then removes
+            // the user, its credentials and its sessions. Everything the reader stored goes
+            // first (lib/account/delete-store.ts), so a cascade that fails leaves the account in
+            // place to try again, and never leaves stored rows that no user owns.
+            deleteUser: {
+                enabled: true,
+                beforeDelete: async (user) => {
+                    await deleteUserData(user.id);
+                },
             },
         },
         session: {

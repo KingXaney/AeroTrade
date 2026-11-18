@@ -20,6 +20,7 @@ export const config = {
         // app/icon.svg's tab icon, which the logged-out pages need too. welcome is the landing
         // page under its own address. play/ is a poker night table (/play/CODE), opened by guests
         // with no account; it keeps its slash so /play, /players and /playground stay gated.
-        '/((?!api|_next/static|_next/image|icon.svg|sign-in|sign-up|forgot-password|reset-password|welcome|assets|play/).*)',
+        // unsubscribe is the daily brief's footer link, opened from a mail client, signed out.
+        '/((?!api|_next/static|_next/image|icon.svg|sign-in|sign-up|forgot-password|reset-password|unsubscribe|welcome|assets|play/).*)',
     ],
 };

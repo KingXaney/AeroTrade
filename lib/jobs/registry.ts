@@ -42,18 +42,30 @@ export const JOBS = {
         trigger: 'news',
         health: {label: 'News email', schedule: 'daily 12:00 ET', staleAfterHours: 30},
     },
-    // Weekdays only, so Monday morning is ~66h after Friday's run.
+    // Weekdays only, so Monday morning is ~66h after Friday's run. The 16:40 pass writes only
+    // the accounts the first left without a close for the day (a quote that did not answer at
+    // 16:10), so it asks Finnhub about those alone.
     snapshots: {
         id: 'daily-account-snapshots',
         event: 'app/record.daily.snapshots',
-        crons: ['TZ=America/New_York 10 16 * * 1-5'],
+        crons: ['TZ=America/New_York 10 16 * * 1-5', 'TZ=America/New_York 40 16 * * 1-5'],
         trigger: 'snapshots',
         health: {label: 'Account snapshots', schedule: 'weekdays 16:10 ET', staleAfterHours: 80},
+    },
+    // Ten minutes after the open a split takes effect at; the snapshot job checks again at 16:10.
+    stockSplits: {
+        id: 'stock-splits',
+        event: 'app/apply.stock.splits',
+        crons: ['TZ=America/New_York 40 9 * * 1-5'],
+        trigger: 'splits',
+        health: {label: 'Stock splits', schedule: 'weekdays 09:40 ET', staleAfterHours: 80},
     },
     navigatorWeekly: {
         id: 'ai-navigator-weekly',
         event: 'app/run.ai.navigator',
-        crons: ['TZ=America/New_York 0 10 * * 1'],
+        // Tuesday is the retry: for a Monday the market was closed, or one whose quotes were
+        // refused. It does nothing when no enrolment is still waiting for its week.
+        crons: ['TZ=America/New_York 0 10 * * 1', 'TZ=America/New_York 0 10 * * 2'],
         trigger: 'navigator',
         health: {label: 'AI navigator (weekly)', schedule: 'Mondays 10:00 ET', staleAfterHours: 8 * 24},
     },
@@ -187,6 +199,16 @@ export const JOBS = {
         crons: ['TZ=America/New_York 30 8 * * 1', 'TZ=America/New_York 30 8 * * 2'],
         trigger: 'agent-world',
         health: {label: 'Trading agent world', schedule: 'Mondays 08:30 ET', staleAfterHours: 8 * 24},
+    },
+    // The owner's alert (lib/jobs/functions/alerts.ts). Its wrapper adds Inngest's own failure
+    // event to these triggers: a job that fails is mailed at once. The cron is the daily check
+    // for jobs overdue on their stamp, after the night's jobs and before the open.
+    jobAlerts: {
+        id: 'job-alerts',
+        event: 'app/check.job.health',
+        crons: ['TZ=America/New_York 0 9 * * *'],
+        trigger: 'alerts',
+        health: {label: 'Job alerts', schedule: 'daily 09:00 ET', staleAfterHours: 30},
     },
 } as const satisfies Record<string, JobDefinition>;
 

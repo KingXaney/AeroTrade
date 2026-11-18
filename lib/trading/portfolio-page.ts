@@ -3,7 +3,8 @@
 // rows, the return bridge, the chart's drawdown band and the trade log drawn from the ledger.
 // Pure; the reads are getPortfolioPageView (lib/trading/portfolio-page-store.ts).
 
-import {drawdownBand, HOLDINGS_COPY} from "@/lib/learn/copy/portfolio";
+import {drawdownBand, HOLDINGS_COPY, SPLIT_COPY} from "@/lib/learn/copy/portfolio";
+import {splitLabel} from "@/lib/trading/splits";
 import {toComparisonRows, toSwitcherAccounts, type ComparisonRow, type ComparisonStat, type SwitcherAccount} from "@/lib/trading/active-account";
 import {countAtClose, countUnpriced, oldestQuoteAt} from "@/lib/trading/analytics";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
@@ -36,6 +37,8 @@ export type PortfolioPageReads = {
     // picker trades, the decision item behind each of its fills on the log.
     tradedBy?: TradedBy;
     fillReplays?: Record<string, FillReplay>;
+    // The holdings whose symbol has stopped quoting (lib/prices/gone.ts), by symbol.
+    goneSymbols?: readonly string[];
 };
 
 export type PortfolioTradeLog = {
@@ -46,6 +49,15 @@ export type PortfolioTradeLog = {
     exportHref: string;
     // By trade id: the one "What the picker saw" a culture fill carries (invariant 12).
     replays: Record<string, FillReplay>;
+    // Said once under the log when a fill on it was restated after a stock split; null otherwise.
+    splitNote: string | null;
+};
+
+// The one line under the trade log: each split of the account that restated a fill shown there.
+const splitNoteFor = (trades: readonly PaperTradeRecord[], splits: AccountWithPortfolio['account']['splits']): string | null => {
+    const restated = new Set(trades.filter((trade) => trade.restated).map((trade) => trade.symbol.toUpperCase()));
+    const shown = (splits ?? []).filter((split) => restated.has(split.symbol.toUpperCase()));
+    return shown.length > 0 ? SPLIT_COPY.note(shown.map((split) => ({symbol: split.symbol, label: splitLabel(split), exDate: split.exDate}))) : null;
 };
 
 export type PortfolioPageView = {
@@ -68,6 +80,9 @@ export type PortfolioPageView = {
     // Everything drawn from the ledger — hidden, not shown empty, when the ledger read failed.
     lotNotes: Record<string, Lot[]> | undefined;
     tradeLog: PortfolioTradeLog | null;
+    // Holdings that can only be closed at their last stored close: the symbol has stopped
+    // quoting. By symbol, with the close the page is valuing it at.
+    closable: Record<string, {date: string; close: number}>;
 };
 
 export const toPortfolioPageView = (
@@ -108,6 +123,12 @@ export const toPortfolioPageView = (
             buyNotesBySellId: buyNotesBySellId(ledger),
             exportHref: accountExportHref(account.id),
             replays: reads.fillReplays ?? {},
+            splitNote: splitNoteFor(ledger.slice(-TRADE_HISTORY_LIMIT), account.splits),
         } : null,
+        closable: Object.fromEntries(portfolio.positions
+            .filter((position) => (reads.goneSymbols ?? []).includes(position.symbol.toUpperCase()))
+            .flatMap((position) => (position.closeDate && typeof position.currentPrice === 'number'
+                ? [[position.symbol, {date: position.closeDate, close: position.currentPrice}]]
+                : []))),
     };
 };

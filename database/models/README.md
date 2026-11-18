@@ -6,9 +6,10 @@ reads and writes live. Change a field here, then in the store module named besid
 
 | Model | Feature | Read and written by |
 |---|---|---|
-| `paper-account` | trading | `lib/trading/accounts`, `ledger`, `valuation`, `lifecycle`, `orders` |
+| `paper-account` | trading | `lib/trading/accounts`, `ledger`, `valuation`, `lifecycle`, `orders` (which also writes `pendingFill`, the trade row a fill is about to insert; `lib/trading/pending-fill` settles it), `lib/trading/splits-store` (`splits`, `splitRev`) |
 | `paper-trade` | trading | `lib/trading/ledger`, `orders`, `lifecycle` |
-| `account-snapshot` | trading | `lib/trading/snapshots` (the nightly write), `valuation`, `analytics-store` |
+| `account-snapshot` | trading | `lib/trading/snapshots` (the nightly write: `closedAt` marks a row the job wrote, `atClose` the holdings it valued at a stored close), `valuation`, `analytics-store` |
+| `stock-split` | trading | `lib/trading/splits-store` — one row per symbol and ex-date as Yahoo states it, with the close before it in the new basis; each account applies it to itself once |
 | `account-income` | income | `lib/income/store` (the nightly credit), `lib/income/page-store` |
 | `benchmark-snapshot` | prices | `lib/prices/benchmark-store` (cold-start fallback for the SPY benchmark) |
 | `price-bar` | prices | `lib/prices/store` — every bar, dividend and T-bill read goes through it |
@@ -41,7 +42,7 @@ reads and writes live. Change a field here, then in the store module named besid
 | `friendship` | friends | `lib/friends/store`; `lib/actions/friends.actions` writes |
 | `user-preferences` | settings | `lib/settings/preferences-store`, plus each feature's own sub-document: `lib/dashboard/layout-store` (layout), `lib/theme/store` (appearance), `lib/news/feed-store` (feed, the `newsSeenAt` stamp), `lib/strategies/follows`, `lib/learn` stores and `lib/lab/store` (`learn`: the lesson stamps, the game widgets on Lab › Today in their layout `labLayout` — and the older `labWidgets` list, read until a layout is saved), `lib/poker-night/prefs-store` (`pokerNight`: the name and look an account sits down with) |
 | `digest-send` | email | `lib/email/digest-store` — the daily brief's one-per-reader-per-day claim |
-| `job-run` | jobs | `lib/jobs/job-runs` (each run's stamp), `lib/jobs/health` (the status strip) |
+| `job-run` | jobs | `lib/jobs/job-runs` (a completed run's stamp, which clears the error), `lib/jobs/alerts-store` (a failed run's error, the once-a-day alert claim), `lib/jobs/health` (the status strip) |
 | `broker-link` | broker | `lib/broker/store` — the owner's Alpaca link: the paper account it mirrors, active or paused, and its last syncs (orders as sent, Alpaca's answers), newest first; one per user, the keys never stored |
 | `agent-world-session` | agent world | `lib/agent-world/store` — one trading agent world session (weekly, manual or preview): its small head (status, seq and version, the runs' ratings, cost, limits), its orders, decision and fills, its Paperclip issue; `env` on every row and index, the weekly session's id its week (the claim) |
 | `agent-world-run` | agent world | `lib/agent-world/store` — one symbol's run in a session: each role's stage, the reports, the debate and the risk desk's turns, every fetch and its provider, the rating; written one event at a time under a seq guard |

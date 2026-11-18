@@ -117,7 +117,7 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 <SectionHeading>
                     Holdings
                 </SectionHeading>
-                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} />
+                <PositionsTable positions={portfolio.positions} accountId={account.id} lotNotes={view.lotNotes} closable={view.closable} />
             </Panel>
 
             {/* What the app works out from them */}
@@ -166,6 +166,10 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                             return replay ? <FillReplay replay={replay} /> : null;
                         }}
                     />
+                    {/* Once, under the log: which split restated a fill shown in it. */}
+                    {tradeLog.splitNote && (
+                        <p className="mt-3 text-xs text-fg-muted" data-testid="split-note">{tradeLog.splitNote}</p>
+                    )}
                 </Panel>
             )}
             </AccountRegion>

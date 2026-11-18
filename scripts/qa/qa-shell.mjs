@@ -1,17 +1,23 @@
 // The app shell (components/shell, lib/shell): the icon rail lists the five sections every account
 // has (the owner's seven: Strategies and Brain are theirs alone, lib/lab/owner.ts) and names each
 // on hover, Portfolio and News open their cards, a section's other pages are tabs on the page,
-// ⌘K works by keyboard alone and finds a page by name, the mobile drawer stands in for the rail
+// ⌘K works by keyboard alone and finds a page by name (Enter runs nothing while the stock search for
+// the typed query is out, and opens the first stock once it has answered — never the Follow row
+// while anything else was found), the mobile drawer stands in for the rail
 // and closes after navigating, and the drawer's Logout signs out and lands on /sign-in. Also
-// friends: a sent request is listed with its age, and the recipient sees a dot on the avatar and
-// a count in the account menu. Anyone but the owner meets none of the owner's pages: each sends
-// them Home, the routes answer 401, and nothing on their own pages leads there.
+// friends: a sent request is toasted without the name its address is registered under and listed
+// with its age, one past the cap of requests waiting or past the hour's count is refused, and the
+// recipient sees a dot on the avatar and a count in the account menu. Anyone but the owner meets
+// none of the owner's pages: each sends them Home, the routes answer 401, and nothing on their own
+// pages leads there.
 // Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {BASE, HOME_URL, MONGO, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('shell');
+// The harness's Finnhub stand-in (start-finnhub-stub.mjs): ⌘K's stock search answers from it.
+const FINNHUB_STUB = `http://localhost:${process.env.QA_FINNHUB_PORT ?? 8791}`;
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -136,14 +142,115 @@ try {
     await page.keyboard.type('act');
     check('…and finds a page by name', await page.locator('[data-page-hit="/history"]').count() === 1);
     for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
-    await page.keyboard.type('AAPL');
-    await page.waitForTimeout(1200); // debounced server search
-    // Arrow + Enter alone — never a mouse. This is what the raw <li>/<Link> rows broke.
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-    await page.waitForURL(/\/(stocks|topics)\//, {timeout: 10000}).catch(() => {});
-    check('arrow + Enter navigates from the palette', /\/(stocks|topics)\//.test(page.url()), page.url());
+    // A stock query by keyboard alone. Enter runs the selected row, and cmdk selects the first row
+    // that can be run after every keystroke: a ticker and Enter once followed a topic of that name,
+    // the Follow row standing before the stocks and before the search had answered. The stand-in
+    // lists two symbols no other suite searches for (the search is cached by its address).
+    await fetch(`${FINNHUB_STUB}/__search?QSHA=QA%20Shell%20Alpha&QSHB=QA%20Shell%20Beta`);
+    const paletteRows = () => page.evaluate(() => {
+        const kind = (el) => ['page', 'learn', 'stock'].find((k) => el.hasAttribute(`data-${k}-hit`)) ?? (el.hasAttribute('data-topic-row') ? 'topic' : 'other');
+        const items = [...document.querySelectorAll('[cmdk-list] [cmdk-item]')];
+        const selected = items.find((el) => el.getAttribute('aria-selected') === 'true');
+        const topic = document.querySelector('[cmdk-list] [data-topic-row]');
+        return {
+            kinds: items.map(kind).join(','),
+            topic: topic ? `${topic.getAttribute('data-topic-row')}${topic.getAttribute('aria-disabled') === 'true' ? ', disabled' : ''}` : null,
+            selected: selected ? selected.getAttribute('data-stock-hit') ?? kind(selected) : null,
+        };
+    });
+    await page.keyboard.type('QSH');
+    // Inside the search's debounce: nothing has answered for "QSH" yet.
+    const searching = await paletteRows();
+    check('while the stock search is out ⌘K draws no stock row, its Follow row waits and no row is selected',
+        searching.kinds === 'topic' && searching.topic === 'waiting, disabled' && searching.selected === null, JSON.stringify(searching));
+    await page.locator('[data-stock-hit="QSHA"]').waitFor({timeout: 15000}).catch(() => {});
+    const answered = await paletteRows();
+    check('once it answers, the stocks stand before the Follow row and the first stock is selected',
+        answered.kinds === 'stock,stock,topic' && answered.topic === 'ready' && answered.selected === 'QSHA', JSON.stringify(answered));
     await shot('01-palette-keyboard');
+    // Arrows + Enter alone — never a mouse. This is what the raw <li>/<Link> rows broke.
+    await page.keyboard.press('ArrowDown');
+    const moved = (await paletteRows()).selected;
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/stocks\/QSHA$/, {timeout: 10000}).catch(() => {});
+    check('the arrows move the selection and Enter opens the first stock',
+        moved === 'QSHB' && /\/stocks\/QSHA$/.test(page.url()), `${moved} ${page.url()}`);
+
+    // An Enter pressed while the search is out is kept for it, not dropped: a ticker typed and
+    // entered in one go opens its stock once the search answers, and follows no topic of its name.
+    await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
+    for (let i = 0; i < 5 && !(await page.locator('[cmdk-input]').isVisible()); i++) {
+        await page.keyboard.press('Meta+k');
+        await page.waitForSelector('[cmdk-input]', {timeout: 3000}).catch(() => {});
+    }
+    await page.keyboard.type('QSHB');
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/stocks\/QSHB$/, {timeout: 15000}).catch(() => {});
+    check('an Enter pressed while the stock search is out opens the first stock once it answers, and follows no topic',
+        /\/stocks\/QSHB$/.test(page.url()) && await db.collection('topics').countDocuments({name: {$in: ['QSH', 'QSHB']}}) === 0, page.url());
+
+    // --- a long list of stocks, and a search that does not answer ---------------
+    // The topic row is the list's last, after as many as 25 stocks in a list 400 px tall with no
+    // scrollbar: it is pinned to the list's foot, and the row the arrows reach is never under it.
+    const many = Array.from({length: 12}, (_, i) => `QST${String.fromCharCode(65 + i)}`);
+    await fetch(`${FINNHUB_STUB}/__search?${many.map((s) => `${s}=QA%20Long%20${s.slice(-1)}`).join('&')}`);
+    await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
+    // A press before Home has hydrated is lost, and a second press closes the palette again.
+    for (let i = 0; i < 5 && !(await page.locator('[cmdk-input]').isVisible()); i++) {
+        await page.keyboard.press('Meta+k');
+        await page.waitForSelector('[cmdk-input]', {timeout: 3000}).catch(() => {});
+    }
+    await page.keyboard.type('QST');
+    await page.locator('[data-stock-hit="QSTL"]').waitFor({state: 'attached', timeout: 15000}).catch(() => {});
+    const pinned = () => page.evaluate(() => {
+        const list = document.querySelector('[cmdk-list]');
+        const topic = document.querySelector('[cmdk-list] [data-topic-row]');
+        const selected = document.querySelector('[cmdk-list] [cmdk-item][aria-selected="true"]');
+        if (!list || !topic) return null;
+        const box = (el) => el.getBoundingClientRect();
+        const foot = topic.closest('.search-topic') ?? topic;
+        return {
+            stocks: document.querySelectorAll('[cmdk-list] [data-stock-hit]').length,
+            scrolls: list.scrollHeight > list.clientHeight + 1,
+            topicInSight: box(topic).top >= box(list).top - 1 && box(topic).bottom <= box(list).bottom + 1,
+            selected: selected?.getAttribute('data-stock-hit') ?? null,
+            selectedClear: selected ? box(selected).bottom <= box(foot).top + 1 : null,
+        };
+    });
+    const longList = await pinned();
+    check('with twelve stocks found the list scrolls and the topic row is still in sight',
+        longList?.stocks === 12 && longList.scrolls && longList.topicInSight && longList.selected === 'QSTA', JSON.stringify(longList));
+    for (let i = 0; i < 11; i++) await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(250);
+    const lastStock = await pinned();
+    check('…and the last stock the arrows reach is clear of it',
+        lastStock?.selected === 'QSTL' && lastStock.selectedClear === true && lastStock.topicInSight, JSON.stringify(lastStock));
+    await shot('01b-palette-long-list');
+
+    // A search past the reader's count does not answer (lib/prices/action-limits.ts). That is
+    // not "No stocks found": the palette says so and the Follow row goes on waiting — with no
+    // stock row it would be Enter's, and a ticker and Enter would follow a topic of its name.
+    const first = await db.collection('user').findOne({email: firstEmail});
+    const searchKey = `search:${String(first?._id)}`;
+    await db.collection('ratelimits').updateOne({key: searchKey},
+        {$set: {count: 60, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('QSU');
+    const unanswered = page.locator('[data-search-unanswered]');
+    await unanswered.waitFor({timeout: 15000}).catch(() => {});
+    const refused = await paletteRows();
+    const listText = await page.locator('[cmdk-list]').innerText().catch(() => '');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    check('a search past the reader\'s count is said as unanswered, never as "No stocks found", and the Follow row waits',
+        await unanswered.count() === 1 && !/No stocks found/i.test(listText)
+        && refused.kinds === 'topic' && refused.topic === 'waiting, disabled' && refused.selected === null, `${JSON.stringify(refused)} ${listText.slice(0, 120)}`);
+    check('…so Enter follows no topic of that name',
+        await page.locator('[cmdk-input]').isVisible() && await db.collection('topics').countDocuments({name: 'QSU'}) === 0);
+    await db.collection('ratelimits').deleteMany({key: {$in: [searchKey, `search:hour:${String(first?._id)}`]}});
+    await page.keyboard.press('Escape');
+    await fetch(`${FINNHUB_STUB}/__search?QSHA=QA%20Shell%20Alpha&QSHB=QA%20Shell%20Beta`);
 
     // --- below lg: the drawer stands in for the rail ---------------------------
     await page.setViewportSize({width: 390, height: 844});
@@ -175,8 +282,18 @@ try {
     const second = await browser.newPage({viewport: {width: 1440, height: 900}});
     const secondEmail = await signUp(second, 'two');
     await second.goto(`${BASE}/friends`, {waitUntil: 'networkidle'});
-    await second.fill('input[type="email"]', firstEmail);
-    await second.locator('form button[type="submit"], button:has-text("Send")').first().click();
+    const sendRequest = async (email) => {
+        await second.fill('input[type="email"]', email);
+        await second.locator('form button[type="submit"], button:has-text("Send")').first().click();
+    };
+    const friendToast = (text) => second.locator('[data-sonner-toast]').filter({hasText: text}).first();
+    await sendRequest(firstEmail);
+    // The toast says a request was sent and names nobody: the name the address is registered
+    // under ("QA one") is not the sender's to learn from it (lib/learn/copy/friends.ts).
+    await friendToast('Friend request sent').waitFor({timeout: 15000}).catch(() => {});
+    const sentToast = await friendToast('Friend request sent').innerText().catch(() => '');
+    check('a sent request is toasted without the name its address is registered under',
+        /Friend request sent/.test(sentToast) && !/QA one/.test(sentToast), sentToast);
     await second.waitForTimeout(1500);
     check('sent request shows in the Sent panel',
         await second.getByText('Sent (1)').count() > 0);
@@ -189,6 +306,28 @@ try {
     await second.reload({waitUntil: 'networkidle'});
     const waiting = await second.getByText(/Waiting · sent/).first().innerText().catch(() => '');
     check('a three-day-old sent request says so', backdated.modifiedCount === 1 && /sent 3 days ago/.test(waiting), waiting);
+
+    // A friend request is counted per reader by the hour, and refused while 20 of the reader's
+    // own wait for an answer (lib/friends/limits.ts) — both before the address is looked up.
+    // Nineteen more pending rows, to nobody, fill the cap beside the one above; then the counter
+    // is set to its limit of 10 rather than spent by ten requests.
+    const senderId = String(sender?._id);
+    await db.collection('friendships').insertMany(Array.from({length: 19}, (_, i) => ({
+        requesterId: senderId, addresseeId: `qa-shell-nobody-${i}`, status: 'pending', createdAt: new Date(), updatedAt: new Date(),
+    })));
+    await sendRequest(`qanobody${Date.now()}@example.com`);
+    const capped = await friendToast('You have 20 friend requests waiting for an answer').waitFor({timeout: 15000}).then(() => true, () => false);
+    check('a request while 20 of the reader\'s own wait is refused with the cap\'s sentence', capped);
+    await db.collection('friendships').deleteMany({requesterId: senderId, addresseeId: /^qa-shell-nobody-/});
+    const requestKey = `friends:request:${senderId}`;
+    await db.collection('ratelimits').updateOne({key: requestKey},
+        {$set: {count: 10, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 3_600_000)}}, {upsert: true});
+    await sendRequest(`qanobody${Date.now()}@example.com`);
+    const limited = await friendToast('That was a lot of friend requests in an hour').waitFor({timeout: 15000}).then(() => true, () => false);
+    check('a request past the reader\'s count for the hour is refused with the limit\'s sentence', limited);
+    check('…and neither refusal sent anything',
+        await db.collection('friendships').countDocuments({requesterId: senderId}) === 1);
+    await db.collection('ratelimits').deleteMany({key: requestKey});
 
     // The recipient should now see a badge without visiting /friends.
     await page.setViewportSize({width: 1440, height: 900});
@@ -216,6 +355,14 @@ try {
     // A strategy watches SPY, so its page has content of its own with no quote key.
     await ownerPage.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
     check('a stock page lights Markets', await ownerPage.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
+    // ⌘K's Learn rows follow the reader's own glossary (lib/learn/where.ts searchGlossaryFor): the
+    // owner's reaches the terms homed on the owner's pages. The palette listens from an effect.
+    await ownerPage.goto(`${BASE}/glossary`, {waitUntil: 'networkidle'});
+    await ownerPage.keyboard.press('Meta+k');
+    await ownerPage.waitForSelector('[cmdk-input]', {timeout: 15000});
+    await ownerPage.keyboard.type('thesis');
+    await ownerPage.locator('[data-learn-hit="thesis"]').waitFor({timeout: 15000}).catch(() => {});
+    check("⌘K offers the owner a glossary term homed on the owner's pages", await ownerPage.locator('[data-learn-hit="thesis"]').count() === 1);
     await ownerPage.close();
 
     // --- anyone but the owner: none of the owner's pages, routes, widgets or chips ---
@@ -248,6 +395,17 @@ try {
     await page.keyboard.type('brain');
     await page.waitForTimeout(300);
     check('⌘K finds neither the strategies nor a brain for anyone else', stratHits === 0 && await page.locator('[data-page-hit]').count() === 0);
+    // A Learn row opens /glossary#term, and this reader's glossary leaves the owner's groups out:
+    // a term homed there (the brain's "thesis") is not offered, while their own terms still are.
+    for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('thesis');
+    await page.waitForTimeout(300);
+    const thesisHits = await page.locator('[data-learn-hit]').count();
+    for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('drawdown');
+    await page.locator('[data-learn-hit="max-drawdown"]').waitFor({timeout: 15000}).catch(() => {});
+    check("…nor a glossary term homed on the owner's pages, while the reader's own terms are still found",
+        thesisHits === 0 && await page.locator('[data-learn-hit="max-drawdown"]').count() === 1, String(thesisHits));
     await page.keyboard.press('Escape');
     await page.getByRole('button', {name: 'Open Aero-AI Assistant'}).click();
     const chips = page.getByRole('button', {name: "What's new in my topics?"});
@@ -283,6 +441,12 @@ try {
     check('…the three pillars and the not-advice line',
         await page.locator('#landing-news, #landing-learn, #landing-practise').count() === 3
         && /never gives financial advice/.test(await page.locator('[data-landing-disclaimer]').innerText()));
+    // The front door describes only what every account can open (lib/learn/copy/landing.ts): the
+    // strategies and both brains are the owner's alone, so no pillar names them.
+    const OWNERS_ALONE = /strateg|navigator|narrative/i;
+    const pillarsText = (await page.locator('#landing-news, #landing-learn, #landing-practise').allInnerTexts()).join(' ');
+    check("…which name the account's measure against the S&P 500 and no page that is the owner's alone",
+        /S&P 500/.test(pillarsText) && /poker night/i.test(pillarsText) && !OWNERS_ALONE.test(pillarsText), pillarsText.slice(0, 160));
     const styleBefore = await page.evaluate(() => document.documentElement.dataset.style);
     await page.locator('[data-theme-demo="gruvbox-brutal"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.style === 'brutalist', null, {timeout: 5000}).catch(() => {});
@@ -298,10 +462,16 @@ try {
     await page.waitForURL(/\/sign-up/, {timeout: 15000}).catch(() => {});
     check('its button opens sign-up, whose logo leads back to it', /\/sign-up/.test(page.url())
         && await page.locator('a.auth-logo[href="/"]').count() === 1);
+    // Beside the form (components/auth/AuthShell, the pillars' first points from md up).
+    await page.setViewportSize({width: 1440, height: 900});
+    const beside = await page.locator('.auth-right-section').innerText();
+    check("…and the column beside the form says the same, with no page that is the owner's alone",
+        /S&P 500/.test(beside) && !OWNERS_ALONE.test(beside), beside.slice(0, 160));
 } catch (err) {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
 } finally {
+    await fetch(`${FINNHUB_STUB}/__search`).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }

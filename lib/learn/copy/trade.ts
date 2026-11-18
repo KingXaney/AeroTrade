@@ -44,6 +44,13 @@ export const ACCOUNT_COPY = {
 export const queueLine = (nextOpenLabel: string): string =>
     `Paper fills now at the last close · a real broker would queue this to ${nextOpenLabel}`;
 
+// placeOrder's answer to an order past the reader's count for the minute
+// (lib/prices/action-limits.ts ORDER_USER_LIMIT): refused before any price is asked for, so
+// nothing was placed. The ticket and the sell dialog toast it as they toast any refusal.
+export const ORDER_COPY = {
+    tooFast: 'That was a lot of orders in a minute. Wait a moment, then place this one again.',
+} as const;
+
 // The Markets page (/trade), the section's first page since the Markets overview and the Trade
 // Desk became one page (2026-10-13): its header, the open positions panel and the market scan.
 // Held to the 'copy' tier by lib/learn/__tests__/trade-copy.test.ts.

@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {cn} from "@/lib/utils";
-import {formatPct, getChangeColorClass} from "@/lib/format";
+import {formatPct, formatShares, getChangeColorClass} from "@/lib/format";
 import SellPositionDialog from "@/components/trading/desk/SellPositionDialog";
 import type {Lot} from "@/lib/trading/lots";
 import UnpricedNote from "@/components/trading/UnpricedNote";
@@ -35,7 +35,7 @@ const OpenPositionsStrip = ({positions, accountId, lotNotes}: {positions: Enrich
                     <RowCard key={p.symbol} className="flex items-center gap-3 px-3 py-2 border-line-strong/25 shrink-0">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-fg font-mono">
-                                {p.symbol} <span className="text-fg-muted font-normal">×{p.quantity}</span>
+                                {p.symbol} <span className="text-fg-muted font-normal">×{formatShares(p.quantity)}</span>
                             </span>
                             {p.priceStale ? (
                                 <span className="text-[11px] text-fg-muted font-mono" title={UNPRICED_CELL_TITLE}>—</span>

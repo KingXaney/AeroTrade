@@ -48,7 +48,7 @@ OWNER_EMAILS=$(cd "$QA_DIR" && node --input-type=module -e "import {OWNER_EMAILS
 # no terrain before any SPY history exists, so it runs before qa-landing seeds one (and the app
 # caches the Tiingo stand-in's answer for an hour); qa-learn wipes and reseeds strategyruns, so it
 # runs after qa-strategies. A suite missing here runs last.
-ALL=(auth styles shell home landing chat topics-refresh trading steady-prices topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
+ALL=(auth account styles shell home landing chat topics-refresh trading steady-prices books job-alerts topics news-feed strategies income learn lab learn-account games poker poker-night poker-night-modes chat-tutor email culture broker agent-world agent-office)
 
 KEEP_UP=0
 NAMES=()
@@ -225,7 +225,7 @@ rm -rf "$ROOT/.next"
     PAPERCLIP_URL="http://localhost:$PAPERCLIP_PORT" PAPERCLIP_API_KEY=qa-paperclip-key PAPERCLIP_COMPANY_ID=11111111-1111-4111-8111-111111111111 \
     PAPERCLIP_BOARD_URL="http://localhost:$PAPERCLIP_PORT" \
     INNGEST_DEV=1 INNGEST_BASE_URL="http://localhost:$INNGEST_PORT" JOB_CRONS=off \
-    FINNHUB_API_KEY=qa-finnhub-key NEXT_PUBLIC_FINNHUB_API_KEY= FINNHUB_API_URL="http://localhost:$FINNHUB_PORT" QUOTE_SESSION=open \
+    FINNHUB_API_KEY=qa-finnhub-key NEXT_PUBLIC_FINNHUB_API_KEY= FINNHUB_API_URL="http://localhost:$FINNHUB_PORT" QUOTE_SESSION=open STOCK_SPLIT_DETECTION=off \
     NODEMAILER_EMAIL= NODEMAILER_PASSWORD= \
     ABLY_API_KEY= POKER_NIGHT_REALTIME= NEXT_PUBLIC_PN_RT_FAKE=1 \
     npm run dev) >"$LOGS/_dev.log" 2>&1 &

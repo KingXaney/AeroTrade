@@ -48,6 +48,7 @@ export type PaperTradeRecord = {
     reason?: string;          // why an automated fill happened, in the rule's own words
     accountName?: string;     // set when trades from several accounts are listed together
     createdAt: number;        // epoch milliseconds
+    restated?: true;          // filled before a stock split: quantity and price are in today's shares (lib/trading/splits.ts)
 };
 
 export type PaperAccountSummary = {
@@ -57,6 +58,8 @@ export type PaperAccountSummary = {
     createdAt: number;        // epoch ms
     // Interest and dividends credited so far (lib/income/accrual.ts); absent before the first credit.
     income?: {interest: number; dividends: number};
+    // Stock splits the account has applied (lib/trading/splits.ts); absent when none.
+    splits?: {symbol: string; exDate: string; numerator: number; denominator: number}[];
 };
 
 export type AccountWithPortfolio = {

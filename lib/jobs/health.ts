@@ -13,22 +13,27 @@ export type JobHealth = {
     lastRunAt: number | null;     // epoch ms
     lastMessage: string | null;
     staleAfterHours: number;
+    // The error of a failed run that no completed run has followed yet, and when it failed.
+    lastError: string | null;
+    lastErrorAt: number | null;
 };
 
 // Cadence-aware staleness (lib/jobs/registry.ts): daily jobs get slack for one miss; the
 // weekday jobs skip weekends; the navigator is weekly; on-demand jobs never go stale.
 // Every job that stamps a JobRun, in registry order.
-const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage'>> = JOB_LIST.flatMap((job) =>
+const JOB_DEFINITIONS: Array<Omit<JobHealth, 'lastRunAt' | 'lastMessage' | 'lastError' | 'lastErrorAt'>> = JOB_LIST.flatMap((job) =>
     job.health ? [{jobId: job.id, ...job.health}] : []);
 
-const withStamps = (defs: typeof JOB_DEFINITIONS, runs: {jobId: string; lastRunAt: Date; lastMessage?: string}[]): JobHealth[] => {
+const withStamps = (defs: typeof JOB_DEFINITIONS, runs: {jobId: string; lastRunAt?: Date; lastMessage?: string; lastError?: string; lastErrorAt?: Date}[]): JobHealth[] => {
     const runByJob = new Map(runs.map((r) => [r.jobId, r]));
     return defs.map((def) => {
         const run = runByJob.get(def.jobId);
         return {
             ...def,
-            lastRunAt: run ? new Date(run.lastRunAt).getTime() : null,
-            lastMessage: run?.lastMessage ?? null,
+            lastRunAt: run?.lastRunAt ? new Date(run.lastRunAt).getTime() : null,
+            lastMessage: run?.lastMessage || null,
+            lastError: run?.lastError ?? null,
+            lastErrorAt: run?.lastErrorAt ? new Date(run.lastErrorAt).getTime() : null,
         };
     });
 };

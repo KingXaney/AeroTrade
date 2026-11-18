@@ -20,6 +20,9 @@ export const SHELL_COPY = {
     newsDot: (topics: number): string => `new in ${topics} ${topics === 1 ? 'topic' : 'topics'} since you last looked`,
     // "Portfolio, 2 holdings valued at cost".
     unpricedDot: (holdings: number): string => `${holdings} ${holdings === 1 ? 'holding' : 'holdings'} valued at cost`,
+    // ⌘K, where its stock rows would stand: the search was asked and did not answer — the
+    // reader's count for the minute is spent, or the price feed gave nothing back.
+    searchUnanswered: 'The stock search did not answer. Type it again in a moment.',
 } as const;
 
 // What a dot on a rail icon says to a screen reader. Watchlist and friend-request counts sit beside

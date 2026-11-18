@@ -169,7 +169,12 @@ const toStock = (hit: FinnhubSearchResult): Stock => {
 // Searches Finnhub for stocks matching the query. Empty query → POPULAR_STOCK_SYMBOLS as a curated default.
 // Takes no user id: client components call it through lib/actions/stocks.actions, a public endpoint, and an id
 // passed in would let anyone read another user's watchlist. The chat tool joins its own user's.
-export const searchStocks = async (query?: string): Promise<Stock[]> => {
+export const searchStocks = async (query?: string): Promise<Stock[]> => (await findStocks(query)) ?? [];
+
+// The same search, telling "found nothing" ([]) from "Finnhub did not answer" (null): a box a
+// person is typing in says which (lib/actions/stocks.actions.ts), since a search that failed
+// has not found that there is no such stock.
+export const findStocks = async (query?: string): Promise<Stock[] | null> => {
     try {
         const q = (query || '').trim();
         if (!q) {
@@ -200,7 +205,7 @@ export const searchStocks = async (query?: string): Promise<Stock[]> => {
         return out;
     } catch (error) {
         console.error('Error searching stocks:', error);
-        return [];
+        return null;
     }
 };
 
