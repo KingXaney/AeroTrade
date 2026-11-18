@@ -1,7 +1,8 @@
 // Paper trading (lib/trading, /trade, /portfolio, /history): a new user's "Main account", trade
 // deep links and the trade `source` chip, the CSV export (a note that looks like a formula exports
 // as text), the order ticket's presets, advisory checks and 200-character note, what the cash left
-// would earn, chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
+// would earn, the desk's order (the ticket before a shorter chart below 1280 px, the chart beside it
+// from there), chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
 // tables that label themselves below md, the account comparison (a layout saved with the old
 // 'strategy-comparison' id included), and /history's trade feed, which, like every trade read,
 // leaves out a row from before its account's inception. Also /watchlist's own add dialog (a stock
@@ -42,6 +43,24 @@ const quoteStub = async (route) => {
     if (stubbed !== body) quotesStubbed++;
     return route.fulfill({response, body: stubbed});
 };
+// Where the trade desk's two halves are: the ticket by its symbol field, the chart by its heading
+// (document coordinates), which comes first in the document, and the height the chart was asked for.
+const deskLayout = () => page.evaluate(() => {
+    const box = (el) => {
+        const r = el?.getBoundingClientRect();
+        return r ? {x: Math.round(r.x), y: Math.round(r.y + scrollY), bottom: Math.round(r.bottom + scrollY)} : null;
+    };
+    const desk = document.querySelector('[data-trade-desk]');
+    const ticket = desk?.querySelector('#order-symbol') ?? null;
+    const chart = [...(desk?.querySelectorAll('h3') ?? [])].find((h) => h.textContent.trim() === 'Advanced Chart') ?? null;
+    return {
+        height: desk?.getAttribute('data-chart-height') ?? null,
+        ticket: box(ticket),
+        chart: box(chart),
+        ticketFirst: Boolean(ticket && chart && (ticket.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    };
+});
+const chartHeightIs = (want) => page.waitForFunction((h) => document.querySelector('[data-trade-desk]')?.getAttribute('data-chart-height') === h, want, {timeout: 30000}).catch(() => {});
 // The ^IRX row this suite seeds, removed again so later suites see the database they expect.
 let seededRate = null;
 // The stored closes the at-close check seeds for two symbols nobody else uses, removed the same way.
@@ -293,11 +312,47 @@ try {
     // The button is uppercased by CSS, and innerText follows it.
     check('the stock page has an explicit Trade button', /trade/i.test(await page.locator('a[href="/trade?symbol=AAPL"]').first().innerText()));
 
+    // --- the desk below 1280 px: the ticket leads, over a shorter chart -----------------------
+    // Home's first step for a new account opens this address. The chart used to come first at
+    // its desktop height, so a phone opened on a screen of chart with the ticket under it.
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#order-symbol').waitFor({timeout: 30000});
+    await chartHeightIs('360');
+    const phoneDesk = await deskLayout();
+    check('at 390px the order ticket comes before the chart, on the first screen',
+        phoneDesk.ticket !== null && phoneDesk.chart !== null && phoneDesk.ticket.y < phoneDesk.chart.y && phoneDesk.ticket.bottom <= 844,
+        JSON.stringify(phoneDesk));
+    check('…in the document too, so the keyboard reaches it before the chart\'s frame', phoneDesk.ticketFirst);
+    check('…and the chart under it is asked for at 360 px', phoneDesk.height === '360', String(phoneDesk.height));
+    // The embed itself is TradingView's, over the network: measured when it arrives, else said.
+    const phoneFrame = page.locator('[data-trade-desk] .tradingview-widget-container iframe').first();
+    if (await phoneFrame.waitFor({timeout: 20000}).then(() => true, () => false)) {
+        const frameHeight = Math.round((await phoneFrame.boundingBox())?.height ?? 0);
+        check('…which is the height its frame is drawn at', frameHeight >= 330 && frameHeight <= 390, `${frameHeight}px`);
+    } else {
+        console.log('SKIP  the chart frame\'s height at 390px  — the TradingView embed did not load');
+    }
+    await shot('02b-desk-390');
+    // Widening the same page past xl stands the two side by side, at the chart's full height.
+    await page.setViewportSize({width: 1440, height: 900});
+    await chartHeightIs('560');
+    const widened = await deskLayout();
+    check('widening the window to 1440px puts the chart left of the ticket at 560 px',
+        widened.height === '560' && widened.ticket !== null && widened.chart !== null && widened.chart.x < widened.ticket.x,
+        JSON.stringify(widened));
+
     // --- the order ticket ---------------------------------------------------------------
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
     const symbolInput = page.locator('#order-symbol');
     await hydrated(symbolInput);
     check('deep link prefills the ticket', (await symbolInput.inputValue()) === 'AAPL');
+    await chartHeightIs('560');
+    const wideDesk = await deskLayout();
+    check('at 1440px the chart and the ticket share a row, the chart on the left at 560 px',
+        wideDesk.height === '560' && wideDesk.ticket !== null && wideDesk.chart !== null
+        && wideDesk.chart.x < wideDesk.ticket.x && Math.abs(wideDesk.ticket.y - wideDesk.chart.y) < 200,
+        JSON.stringify(wideDesk));
     // exact: the page header's "live prices" would otherwise match a substring search
     check('the ticket says Last Price, not Live Price', await page.getByText('Last Price', {exact: true}).count() === 1 && await page.getByText('Live Price', {exact: true}).count() === 0);
     const ticket = page.locator('form').first();

@@ -1,5 +1,9 @@
 import {describe, expect, it} from 'vitest';
-import {MARKET_EMBEDS, tvScript} from '@/lib/stocks/tradingview';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {MARKET_EMBEDS, TRADE_CHART_HEIGHT, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from '@/lib/stocks/tradingview';
+
+const read = (path: string): string => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
 
 describe('tvScript', () => {
     it('builds the embed script URL every TradingView surface loads', () => {
@@ -23,5 +27,39 @@ describe('MARKET_EMBEDS', () => {
     it('keeps the two screeners apart by their config', () => {
         expect(MARKET_EMBEDS.stockScreener.config).toMatchObject({defaultScreen: 'most_capitalized', market: 'america'});
         expect(MARKET_EMBEDS.cryptoScreener.config).toMatchObject({screener_type: 'crypto_mkt'});
+    });
+});
+
+// The trade desk (components/trading/desk/TradeDesk): chart beside the ticket from xl, under it
+// below. Nothing here renders a component — the browser suite (qa-trading) measures the page —
+// so these hold the pieces the layout is made of to each other.
+describe('the trade desk chart', () => {
+    it('is the full chart beside the ticket and the shorter one under it', () => {
+        expect(tradeChartHeight(true)).toBe(560);
+        expect(tradeChartHeight(false)).toBe(360);
+        expect(TRADE_CHART_HEIGHT.narrow).toBeLessThan(TRADE_CHART_HEIGHT.wide);
+    });
+
+    it('has no height until the browser has said how wide it is', () => {
+        expect(tradeChartHeight(null)).toBeNull();
+    });
+
+    // The height is chosen in JS and the columns in CSS: they must turn at the same width.
+    it('asks at the width where the desk goes side by side', () => {
+        const xl = /--breakpoint-xl:\s*([^;]+);/.exec(read('node_modules/tailwindcss/theme.css'))?.[1].trim();
+        expect(xl).toBeDefined();
+        expect(TRADE_DESK_WIDE_QUERY).toBe(`(min-width: ${xl})`);
+        expect(read('app/globals.css')).not.toMatch(/--breakpoint-xl\s*:/);
+        expect(read('components/trading/desk/TradeDesk.tsx')).toContain('xl:grid-cols-3');
+    });
+
+    // Below xl the two stack in document order, and the keyboard and a screen reader follow that
+    // order at every width: the ticket is reached without crossing the embed's frame.
+    it('comes after the ticket in the document', () => {
+        const desk = read('components/trading/desk/TradeDesk.tsx');
+        const ticket = desk.indexOf('<OrderPanel');
+        const chart = desk.indexOf('<TradingViewWidget');
+        expect(ticket).toBeGreaterThan(-1);
+        expect(chart).toBeGreaterThan(ticket);
     });
 });

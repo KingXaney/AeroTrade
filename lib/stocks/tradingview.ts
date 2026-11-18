@@ -184,6 +184,17 @@ export const TRADE_CHART_WIDGET_CONFIG = (symbol: string) => ({
     height: 640,
 });
 
+// The desk's chart sits beside the ticket from Tailwind's xl and under it below, where a chart
+// as tall as the desktop's would be most of a phone's screen. The query is xl's own width, in
+// rem as the stylesheet writes it, so the height turns exactly where the desk's columns do.
+export const TRADE_DESK_WIDE_QUERY = '(min-width: 80rem)';
+export const TRADE_CHART_HEIGHT = {wide: 560, narrow: 360} as const;
+
+// The chart's height in px for what the browser said of that query. null — the server and the
+// hydrating render cannot know the width — is no height yet: the embed waits for the answer.
+export const tradeChartHeight = (wide: boolean | null): number | null =>
+    wide === null ? null : wide ? TRADE_CHART_HEIGHT.wide : TRADE_CHART_HEIGHT.narrow;
+
 // The market-wide embeds, each its script and its config. /markets (its ticker tape and tabs) and
 // the dashboard's TradingView widgets render these at their own heights; module-level, so a
 // config keeps a stable identity and an embed re-inits only on a theme change.
