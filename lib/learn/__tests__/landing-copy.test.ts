@@ -4,8 +4,9 @@
 import {describe, expect, it} from 'vitest';
 import {findBanned} from '@/lib/learn/banned';
 import {LANDING_BALANCE, LANDING_COPY} from '@/lib/learn/copy/landing';
-import {STRATEGIES} from '@/lib/strategies/catalog';
 import {GLOSSARY_KEYS} from '@/lib/learn/glossary';
+import {glossaryKeysFor} from '@/lib/learn/where';
+import {DEFAULT_TOPIC_NAMES} from '@/lib/topics/starters';
 
 const strings = (value: unknown): string[] => {
     if (typeof value === 'string') return [value];
@@ -36,11 +37,37 @@ describe('LANDING_COPY', () => {
     it('takes its numbers from the constants the app uses', () => {
         expect(LANDING_BALANCE).toBe('$100,000.00');
         expect(LANDING_COPY.subtitle).toContain('$100,000');
-        const practise = LANDING_COPY.pillars.find((p) => p.id === 'practise');
-        expect(practise?.points[0]).toContain(`${STRATEGIES.length} rule-based strategies`);
+        const news = LANDING_COPY.pillars.find((p) => p.id === 'news');
+        expect(news?.points[0]).toContain(`${DEFAULT_TOPIC_NAMES.length} topics`);
         const learn = LANDING_COPY.pillars.find((p) => p.id === 'learn');
         expect(learn?.points[0]).toContain('each day');
-        expect(learn?.points[1]).toContain(`${GLOSSARY_KEYS.length} terms`);
+        // The glossary as an account that is not the owner's sees it (lib/learn/where.ts): the
+        // page reads no session, so it counts what every account gets.
+        const terms = glossaryKeysFor({owner: false}).length;
+        expect(terms).toBeGreaterThan(50);
+        expect(terms).toBeLessThan(GLOSSARY_KEYS.length);
+        expect(learn?.points[1]).toContain(`${terms} terms`);
+        expect(learn?.points[1]).not.toContain(`${GLOSSARY_KEYS.length} terms`);
+    });
+
+    // The strategies, both brains (the AI Navigator and its narratives among them), the trading
+    // agent world and the lab are the owner's alone (lib/lab/owner.ts): a new account has no way
+    // to open them, so the front door and the auth pages' right column never name them.
+    it('describes only what every account can open', () => {
+        for (const text of all) {
+            expect(text, text).not.toMatch(/\bstrateg(y|ies)\b|\bnavigator\b|\bnarratives?\b|\bbrains?\b|\bagent world\b|\blab\b|\bpickers?\b/i);
+        }
+    });
+
+    it('says what every account has: its measure, its income, its topics, the games', () => {
+        const point = (id: string, i: number): string => LANDING_COPY.pillars.find((p) => p.id === id)?.points[i] ?? '';
+        expect(point('practise', 0)).toContain('S&P 500');
+        expect(point('practise', 1)).toMatch(/interest/);
+        expect(point('practise', 1)).toMatch(/dividends/);
+        expect(point('news', 2)).toMatch(/daily email/);
+        expect(point('learn', 2)).toMatch(/puzzle/);
+        expect(point('learn', 2)).toMatch(/games/);
+        expect(point('learn', 2)).toMatch(/poker night/);
     });
 
     it('says plainly that no real money is involved', () => {

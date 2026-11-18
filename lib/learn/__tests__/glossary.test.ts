@@ -109,6 +109,16 @@ describe('lookups', () => {
         expect(searchGlossary('zzzz')).toEqual([]);
     });
 
+    it('searches only the entries a caller keeps, and caps after that', () => {
+        const all = searchGlossary('sma', 2).map((e) => e.key);
+        expect(all).toHaveLength(2);
+        const kept = searchGlossary('sma', 2, (entry) => entry.key !== all[0]).map((e) => e.key);
+        expect(kept).toHaveLength(2);
+        expect(kept).not.toContain(all[0]);
+        expect(kept[0]).toBe(all[1]);
+        expect(searchGlossary('draw', 5, () => false)).toEqual([]);
+    });
+
     it('maps a matched article term to a concept and a name to nothing', () => {
         expect(conceptForTerm('fomc')?.key).toBe('fomc');
         expect(conceptForTerm('federal reserve')?.key).toBe('fomc');

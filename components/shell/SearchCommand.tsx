@@ -10,7 +10,7 @@ import {searchStocks} from "@/lib/actions/stocks.actions";
 import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
 import {useDebounce} from "@/hooks/useDebounce";
-import {searchGlossary} from "@/lib/learn/glossary";
+import {searchGlossaryFor} from "@/lib/learn/where";
 import {NAV_PAGES, searchPages, type NavDestination} from "@/lib/shell/navigation";
 import type {Stock} from '@/lib/stocks/types';
 import type {TopicLink} from '@/lib/topics/types';
@@ -21,6 +21,7 @@ type SearchCommandProps = {
     initialStocks: Stock[];
     initialTopics?: TopicLink[];   // followed topics, so ⌘K opens instead of duplicating
     pages?: readonly NavDestination[];   // the audience's pages (navPagesFor); the full registry by default
+    owner?: boolean;   // the owner (lib/lab/owner.ts): the Learn rows then reach the terms homed on the owner's pages too
 };
 
 // Anything shorter reads as a ticker prefix, not a topic.
@@ -32,6 +33,7 @@ export default function SearchCommand({
     initialStocks,
     initialTopics = [],
     pages = NAV_PAGES,
+    owner = false,
 }: SearchCommandProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -48,8 +50,9 @@ export default function SearchCommand({
     const topicQuery = searchTerm.trim();
     const canFollow = topicQuery.length >= TOPIC_MIN_CHARS && topicQuery.length <= NAME_MAX;
     const existingTopic = canFollow ? initialTopics.find((t) => t.name.toLowerCase() === topicQuery.toLowerCase()) : undefined;
-    // Glossary rows are matched client-side against a pure registry: no request, no key.
-    const learnHits = searchGlossary(topicQuery, 4);
+    // Glossary rows are matched client-side against a pure registry: no request, no key. Only the
+    // entries the reader's /glossary renders (glossaryGroupsFor), so no row opens a missing anchor.
+    const learnHits = searchGlossaryFor(topicQuery, 4, {owner});
     // Pages are matched the same way, against the navigation registry: with the rail showing
     // icons only, the palette is also how a page is reached by name.
     const pageHits = searchPages(topicQuery, 4, pages);

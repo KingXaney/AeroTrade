@@ -2,18 +2,25 @@
 // sign-in form (components/auth/AuthShell.tsx). It describes what the app does and promises
 // nothing about money: the test holds each line to the 'copy' tier of lib/learn/banned.ts.
 //
-// Every number is read from the constant the app itself uses, so the page cannot claim eight
-// strategies after a ninth is added, and nothing here is a testimonial, a user count or a
+// It describes only what every account can open. The strategies, both brains (the AI Navigator
+// among them), the trading agent world and the lab are the owner's alone (lib/lab/owner.ts), so
+// no line here names them: the front door never offers a page a new account will not have.
+//
+// Every number is read from the constant the app itself uses, so the page cannot claim six
+// topics after a seventh is added, and nothing here is a testimonial, a user count or a
 // return figure — there is none to quote.
 
-import {GLOSSARY_KEYS} from "@/lib/learn/glossary";
-import {STRATEGIES} from "@/lib/strategies/catalog";
+import {glossaryKeysFor} from "@/lib/learn/where";
 import {PALETTE_IDS} from "@/lib/theme/palettes";
 import {STYLE_IDS} from "@/lib/theme/styles";
 import {DEFAULT_TOPIC_NAMES} from "@/lib/topics/starters";
 import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 
 const dollars = (amount: number): string => `$${amount.toLocaleString('en-US')}`;
+
+// The glossary as an account that is not the owner's sees it: the page reads no session, so it
+// counts the terms /glossary renders for anyone.
+const GLOSSARY_TERMS = glossaryKeysFor({owner: false}).length;
 
 export type LandingPillar = {
     id: 'news' | 'learn' | 'practise';
@@ -43,7 +50,7 @@ export const LANDING_COPY = {
             body: 'Rates, chips, energy, policy: the stories that move markets change by the hour. Follow any topic and its headlines arrive from every source the app reads, with a short summary each morning of what changed.',
             points: [
                 `A new account starts with ${DEFAULT_TOPIC_NAMES.length} topics, among them ${DEFAULT_TOPIC_NAMES.slice(0, 3).join(', ')}.`,
-                'Scheduled jobs read finance news, feeds and company filings each day and group them into narratives.',
+                'Scheduled jobs read finance news, feeds and company filings each day, and one briefing each morning sums up the main stories, every point linked to its sources.',
                 'A daily email covers the market, your topics and one lesson.',
             ],
         },
@@ -54,8 +61,8 @@ export const LANDING_COPY = {
             body: 'Start from nothing: what a share is, how an order fills, what a portfolio is made of. Every figure on screen carries its own definition, and the app teaches from your own account as you use it.',
             points: [
                 'One short lesson each day, drawn from that day\'s news and trades.',
-                `One glossary of ${GLOSSARY_KEYS.length} terms, each defined in plain words beside the number it explains.`,
-                'A first-week list of where everything is, one step at a time.',
+                `One glossary of ${GLOSSARY_TERMS} terms, each defined in plain words beside the number it explains.`,
+                'A quant puzzle every day, games to practise on, and a poker night for play chips that friends join by link.',
             ],
         },
         {
@@ -64,9 +71,9 @@ export const LANDING_COPY = {
             title: 'Practise with paper money',
             body: `Open paper accounts that start at ${dollars(PAPER_STARTING_BALANCE)}, place orders at the last price, and watch holdings, cash interest and dividends add up the way a brokerage statement shows them.`,
             points: [
-                `${STRATEGIES.length} rule-based strategies trade beside you each morning, and every fill states the rule that caused it.`,
-                'An AI Navigator trades a paper account from the news inside fixed limits, and writes down why.',
-                'Compare accounts with friends, measured against the S&P 500.',
+                'Every paper account is measured against the S&P 500, dividends included, from its own first day.',
+                'Cash earns interest at the Treasury bill rate, and each holding is paid its real dividends.',
+                'Compare accounts with friends on a leaderboard.',
             ],
         },
     ] as const satisfies readonly LandingPillar[],

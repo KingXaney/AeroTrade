@@ -216,6 +216,14 @@ try {
     // A strategy watches SPY, so its page has content of its own with no quote key.
     await ownerPage.goto(`${BASE}/stocks/SPY`, {waitUntil: 'load'});
     check('a stock page lights Markets', await ownerPage.locator('aside.rail nav a[aria-current="page"]').getAttribute('data-rail') === 'markets');
+    // ⌘K's Learn rows follow the reader's own glossary (lib/learn/where.ts searchGlossaryFor): the
+    // owner's reaches the terms homed on the owner's pages. The palette listens from an effect.
+    await ownerPage.goto(`${BASE}/glossary`, {waitUntil: 'networkidle'});
+    await ownerPage.keyboard.press('Meta+k');
+    await ownerPage.waitForSelector('[cmdk-input]', {timeout: 15000});
+    await ownerPage.keyboard.type('thesis');
+    await ownerPage.locator('[data-learn-hit="thesis"]').waitFor({timeout: 15000}).catch(() => {});
+    check("⌘K offers the owner a glossary term homed on the owner's pages", await ownerPage.locator('[data-learn-hit="thesis"]').count() === 1);
     await ownerPage.close();
 
     // --- anyone but the owner: none of the owner's pages, routes, widgets or chips ---
@@ -248,6 +256,17 @@ try {
     await page.keyboard.type('brain');
     await page.waitForTimeout(300);
     check('⌘K finds neither the strategies nor a brain for anyone else', stratHits === 0 && await page.locator('[data-page-hit]').count() === 0);
+    // A Learn row opens /glossary#term, and this reader's glossary leaves the owner's groups out:
+    // a term homed there (the brain's "thesis") is not offered, while their own terms still are.
+    for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('thesis');
+    await page.waitForTimeout(300);
+    const thesisHits = await page.locator('[data-learn-hit]').count();
+    for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type('drawdown');
+    await page.locator('[data-learn-hit="max-drawdown"]').waitFor({timeout: 15000}).catch(() => {});
+    check("…nor a glossary term homed on the owner's pages, while the reader's own terms are still found",
+        thesisHits === 0 && await page.locator('[data-learn-hit="max-drawdown"]').count() === 1, String(thesisHits));
     await page.keyboard.press('Escape');
     await page.getByRole('button', {name: 'Open Aero-AI Assistant'}).click();
     const chips = page.getByRole('button', {name: "What's new in my topics?"});
@@ -283,6 +302,12 @@ try {
     check('…the three pillars and the not-advice line',
         await page.locator('#landing-news, #landing-learn, #landing-practise').count() === 3
         && /never gives financial advice/.test(await page.locator('[data-landing-disclaimer]').innerText()));
+    // The front door describes only what every account can open (lib/learn/copy/landing.ts): the
+    // strategies and both brains are the owner's alone, so no pillar names them.
+    const OWNERS_ALONE = /strateg|navigator|narrative/i;
+    const pillarsText = (await page.locator('#landing-news, #landing-learn, #landing-practise').allInnerTexts()).join(' ');
+    check("…which name the account's measure against the S&P 500 and no page that is the owner's alone",
+        /S&P 500/.test(pillarsText) && /poker night/i.test(pillarsText) && !OWNERS_ALONE.test(pillarsText), pillarsText.slice(0, 160));
     const styleBefore = await page.evaluate(() => document.documentElement.dataset.style);
     await page.locator('[data-theme-demo="gruvbox-brutal"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.style === 'brutalist', null, {timeout: 5000}).catch(() => {});
@@ -298,6 +323,11 @@ try {
     await page.waitForURL(/\/sign-up/, {timeout: 15000}).catch(() => {});
     check('its button opens sign-up, whose logo leads back to it', /\/sign-up/.test(page.url())
         && await page.locator('a.auth-logo[href="/"]').count() === 1);
+    // Beside the form (components/auth/AuthShell, the pillars' first points from md up).
+    await page.setViewportSize({width: 1440, height: 900});
+    const beside = await page.locator('.auth-right-section').innerText();
+    check("…and the column beside the form says the same, with no page that is the owner's alone",
+        /S&P 500/.test(beside) && !OWNERS_ALONE.test(beside), beside.slice(0, 160));
 } catch (err) {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});
