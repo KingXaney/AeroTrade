@@ -13,7 +13,7 @@
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary, hydrated} from './lib.mjs';
 
 const OUT = outDir('steady-prices');
 const STUB = `http://localhost:${process.env.QA_FINNHUB_PORT ?? 8791}`;
@@ -462,7 +462,8 @@ try {
     // --- the trade desk's switcher -----------------------------------------------------------------
     await page.goto(`${BASE}/trade`, {waitUntil: 'domcontentloaded'});
     const deskTrigger = page.locator('[data-account-switcher]');
-    await deskTrigger.waitFor({timeout: 30000});
+    // Hydrated, not just present: a trigger clicked before React has it opens no menu.
+    await hydrated(deskTrigger);
     await deskTrigger.click();
     const deskRequests = watchRequests();
     await page.getByRole('menuitemradio', {name: /Second/}).click();

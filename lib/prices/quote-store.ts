@@ -13,6 +13,7 @@ import {randomUUID} from "node:crypto";
 import {cache} from "react";
 import {after} from "next/server";
 import {connectToDatabase} from "@/database/mongoose";
+import {indexGuard} from "@/database/index-guard";
 import PriceQuote from "@/database/models/price-quote.model";
 import {reportLimit} from "@/lib/limits/report";
 import {bumpCounter, peekRateLimit} from "@/lib/rate-limit";
@@ -62,19 +63,11 @@ const isDuplicateKey = (error: unknown): boolean => {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // One row a symbol is the unique index's doing, and a claim's insert relies on it, so the first
-// write of a process waits for the index (a no-op where it exists). The store builds it itself,
-// once the connection is open, and forgets a failure so the next write tries again: Mongoose's
-// own Model.init() runs when the model is compiled, rejects for good if the connection was still
-// opening then (bufferCommands is off), and would take every later write down with it. Never
-// throws — without the index a symbol may briefly have two rows, which readRows tolerates.
-let indexing: Promise<void> | undefined;
-const indexed = (): Promise<void> => (indexing ??= PriceQuote.createIndexes().then(
-    () => undefined,
-    (error: unknown) => {
-        indexing = undefined;
-        console.error('The quote sheet\'s indexes could not be built:', error);
-    },
-));
+// write of a process waits for the index (a no-op where it exists): database/index-guard.ts,
+// never Model.init(), which stays rejected for good when the model was compiled while the
+// connection was still opening. The guard never throws — without the index a symbol may
+// briefly have two rows, which readRows tolerates.
+const indexed = indexGuard(PriceQuote);
 
 // The session the window is read against. QUOTE_SESSION=open is the browser QA's alone: it
 // treats every instant as in session, so a run at night walks the per-minute path.

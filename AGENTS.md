@@ -1926,8 +1926,11 @@ and friends keep none beyond Shared and the invariants).
   minute first (`QUOTE_ACTING_CEILING`), one quote never — then written into the sheet. A page
   that comes after it takes less; a page that came first has already taken its share.
   `lib/prices/__tests__/quote-guard.test.ts` keeps `fetchQuote` to the store alone. The store
-  builds the model's unique index itself, after connecting (`Model.init()` is rejected for good on
-  a process whose model was compiled while the connection was opening). Without a key the sheet
+  builds the model's unique index itself, after connecting, through `database/index-guard.indexGuard`
+  — the one way a write that relies on an index asks for it (the daily brief's claim does too):
+  never `await Model.init()`, which is rejected for good on a process whose model was compiled
+  while the connection was opening. The guard shares one attempt, forgets a failure and never
+  throws; a caller that cannot go on without the index (the claim) refuses for itself. Without a key the sheet
   answers nothing and reads nothing. `QUOTE_SESSION=open` is the browser QA's: every instant in
   session. The design and its measurements: `docs/specs/2026-11-10-steady-prices.md`.
 
