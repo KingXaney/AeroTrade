@@ -15,6 +15,7 @@ used in every layer:
 | Unit tests | `lib/<feature>/__tests__/` | Vitest, next to the code they test |
 | Browser QA | `scripts/qa/qa-<feature>.mjs` | Playwright against an in-memory Mongo — `npm run qa` |
 | Design docs | `docs/specs/` | Why the larger features are built the way they are |
+| Contracts | `.claude/rules/<feature>.md` | The rules a feature keeps that no map can show; Claude Code loads each beside the files it names, and AGENTS.md lists them |
 
 Shared pieces that belong to no single feature:
 

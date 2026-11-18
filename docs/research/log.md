@@ -115,7 +115,7 @@ and holds at least 21 trading days, so it may be buying after the push and holdi
 
 **Decision rule.**
 - Anomaly's mean IC below zero from 4 weeks on, t ≤ −3: the jump is an exit-side signal for this
-  universe. Build it as a new profile id (AGENTS.md: a picker is never reweighted in place).
+  universe. Build it as a new profile id (the culture contracts: a picker is never reweighted in place).
 - Above zero at 1–2 weeks (t ≥ 3) and gone by 4: the sign is right and the holding rail is the
   mismatch; a shorter-horizon profile is the experiment.
 - Inside ±2 at every horizon: no evidence either way. Spike stays as the control a reader can watch.
