@@ -197,6 +197,13 @@ export const TRADE_CHART_HEIGHT = {wide: 560, narrow: 360} as const;
 // Written out whole: Tailwind reads class names as text.
 export const TRADE_CHART_PLACE_CLASS = 'h-[360px] xl:h-[560px]';
 
+// The ticker tape over the desk. TradingView's adaptive mode draws it at one of two heights by
+// the width of its own frame (measured 2026-11-18: 58 px in a 1440 px window, 84 px from 1280 px
+// down to 320), and its frame arrives a second after the page. The place is held at the taller
+// of the two, the tape centred in it, so nothing under it moves whichever it turns out to be.
+export const TICKER_TAPE_HEIGHTS = {wide: 58, narrow: 84} as const;
+export const TICKER_TAPE_PLACE_CLASS = 'flex min-h-[84px] items-center';
+
 // The chart's height in px for what the browser said of that query. null — the server and the
 // hydrating render cannot know the width — is no height yet: the embed waits for the answer.
 export const tradeChartHeight = (wide: boolean | null): number | null =>

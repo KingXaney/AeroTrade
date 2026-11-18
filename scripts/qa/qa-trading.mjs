@@ -357,6 +357,31 @@ try {
         widened.height === '560' && widened.ticket !== null && widened.chart !== null && widened.chart.x < widened.ticket.x,
         JSON.stringify(widened));
 
+    // Nothing under the embeds moves when their frames arrive, a second after the page: the
+    // tape's place and the chart's are held from the first paint. Read once before any frame is
+    // there and once after; without the network there is nothing to compare, and it says so.
+    await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'commit'});
+    await page.locator('[data-trade-desk]').waitFor({state: 'attached', timeout: 30000});
+    const place = () => page.evaluate(() => {
+        const desk = document.querySelector('[data-trade-desk]');
+        const chart = desk?.querySelector('.tradingview-widget-container');
+        return {
+            deskTop: desk ? Math.round(desk.getBoundingClientRect().top + scrollY) : null,
+            chart: chart ? Math.round(chart.getBoundingClientRect().height) : null,
+            frames: document.querySelectorAll('main .tradingview-widget-container iframe').length,
+        };
+    });
+    const placeEarly = await place();
+    await page.waitForFunction(() => document.querySelectorAll('main .tradingview-widget-container iframe').length >= 3, null, {timeout: 20000}).catch(() => {});
+    await page.waitForTimeout(500);
+    const placeLate = await place();
+    if (placeEarly.frames === 0 && placeLate.frames >= 3) {
+        check('the desk does not move when the tape\'s and the chart\'s frames arrive: their places are held from the first paint',
+            placeEarly.deskTop !== null && placeEarly.deskTop === placeLate.deskTop && placeEarly.chart === 560 && placeLate.chart === 560, `${JSON.stringify(placeEarly)} ${JSON.stringify(placeLate)}`);
+    } else {
+        console.log(`SKIP  the desk's place before and after the embeds  — ${JSON.stringify(placeEarly)} ${JSON.stringify(placeLate)}`);
+    }
+
     // --- the order ticket ---------------------------------------------------------------
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
     const symbolInput = page.locator('#order-symbol');

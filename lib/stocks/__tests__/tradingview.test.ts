@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {MARKET_EMBEDS, TRADE_CHART_HEIGHT, TRADE_CHART_PLACE_CLASS, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from '@/lib/stocks/tradingview';
+import {MARKET_EMBEDS, TICKER_TAPE_HEIGHTS, TICKER_TAPE_PLACE_CLASS, TRADE_CHART_HEIGHT, TRADE_CHART_PLACE_CLASS, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from '@/lib/stocks/tradingview';
 
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
 
@@ -53,6 +53,15 @@ describe('the trade desk chart', () => {
         expect(read('components/trading/desk/TradeDesk.tsx')).toContain('className={TRADE_CHART_PLACE_CLASS}');
         expect(read('components/stocks/TradingViewWidget.tsx')).toMatch(/cn\('tradingview-widget-container', className\)/);
         expect(read('app/globals.css')).toMatch(/\.tradingview-widget-container__widget \{[^}]*height: 100% !important;/);
+    });
+
+    // The ticker tape over the desk draws itself at one of two heights, by a width only
+    // TradingView knows, a second after the page. Its place is held at the taller, so the desk
+    // under it never moves — and a menu open on the page is not pushed out from under a click.
+    it('holds the ticker tape\'s place at the taller of its two heights', () => {
+        expect(TICKER_TAPE_HEIGHTS).toEqual({wide: 58, narrow: 84});
+        expect(TICKER_TAPE_PLACE_CLASS).toBe(`flex min-h-[${Math.max(TICKER_TAPE_HEIGHTS.wide, TICKER_TAPE_HEIGHTS.narrow)}px] items-center`);
+        expect(read('app/(root)/trade/page.tsx')).toContain('className={TICKER_TAPE_PLACE_CLASS}');
     });
 
     // The height is chosen in JS and the columns in CSS: they must turn at the same width.
