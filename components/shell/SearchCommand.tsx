@@ -5,7 +5,8 @@ import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import {CommandDialog, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Button} from "@/components/ui/button";
-import {BookOpen, Loader2, Search, Sparkles, TrendingUp} from "lucide-react";
+import {BookOpen, Loader2, Search, Sparkles} from "lucide-react";
+import StockHit from "@/components/stocks/StockHit";
 import {searchStocks} from "@/lib/actions/stocks.actions";
 import {createTopic} from "@/lib/actions/topics.actions";
 import {NAME_MAX} from "@/lib/topics/config";
@@ -216,16 +217,7 @@ export default function SearchCommand({
                                     className="search-item-link"
                                     data-stock-hit={stock.symbol}
                                 >
-                                    <TrendingUp className="h-4 w-4 text-brand-dim" />
-                                    <div className="flex-1">
-                                        <div className="search-item-name">
-                                            {stock.name}
-                                        </div>
-                                        <div className="text-sm text-fg-muted font-mono"
-                                             style={{ fontSize: '11px', letterSpacing: '0.02em' }}>
-                                            {stock.symbol} | {stock.exchange} | {stock.type}
-                                        </div>
-                                    </div>
+                                    <StockHit stock={stock}/>
                                 </CommandItem>
                             ))}
                         </>

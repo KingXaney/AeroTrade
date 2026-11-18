@@ -11,7 +11,8 @@
 // SIGN_UP_CLIENT_LIMIT the harness sets) gets one fixed sentence and no account; every signup:*
 // row is removed at the end too. Neither the sign-up nor the sign-in action hands the browser the
 // session token its cookie carries, and the tab icon loads logged out.
-// Also, signed in first: the market-status badge on /trade and /watchlist (no "live prices"), the
+// Also, signed in first: the market-status badge on /trade and /watchlist (no "live prices"), an
+// empty /watchlist's own Add a stock button (a pick from its suggestions adds the stock in place),
 // the scan view kept in /trade's URL (and /markets redirecting there), and /history's Trades section.
 // Run: npm run qa -- auth   (the harness: README.md)
 import {chromium} from 'playwright';
@@ -89,6 +90,36 @@ try {
     const wl = await page.locator('main').innerText();
     check('watchlist states the market status instead of "real-time telemetry"', /Open · closes|Closed ·/i.test(wl) && !/real-time/i.test(wl));
     check('watchlist empty state promises no alerts', !/alerts/i.test(wl));
+    // The page's own way to add a stock (components/stocks/AddToWatchlist.tsx): the first-week
+    // step "Add a stock to your watchlist" lands here, where a caption once pointed at the
+    // header's search. A pick from the suggestions needs no search, so no listing in the stand-in.
+    const addEmpty = page.locator('[data-watchlist-add="empty"]');
+    check('an empty watchlist has its own Add a stock button, in the panel and in the title',
+        await addEmpty.count() === 1 && await page.locator('[data-watchlist-add="title"]').count() === 1 && !/use search to add/i.test(wl));
+    const addDialog = page.locator('[data-watchlist-add-dialog]');
+    // A click before the page has hydrated goes nowhere: press until the dialog is there.
+    for (let i = 0; i < 5 && !(await addDialog.isVisible()); i++) {
+        await addEmpty.click({timeout: 3000}).catch(() => {});
+        await addDialog.waitFor({timeout: 3000}).catch(() => {});
+    }
+    const suggestion = addDialog.locator('[data-watchlist-hit="MSFT"]');
+    await suggestion.waitFor({timeout: 15000}).catch(() => {});
+    check('…which opens a stock search with the focus in its box, over suggestions by company name',
+        await addDialog.locator('[cmdk-input]').evaluate((el) => el === document.activeElement).catch(() => false)
+        && /microsoft corp/i.test(await suggestion.innerText().catch(() => '')));
+    await suggestion.click();
+    await page.locator('a[aria-label="Trade MSFT"]').first().waitFor({timeout: 30000}).catch(() => {});
+    const watched = await db.collection('watchlists').findOne({userId, symbol: 'MSFT'});
+    check('a pick adds the stock under its company\'s name, and the reader stays on /watchlist with its row',
+        watched?.company === 'Microsoft Corp' && /\/watchlist$/.test(page.url()) && await page.locator('a[aria-label="Trade MSFT"]').count() >= 1,
+        `${watched?.company} ${page.url()}`);
+    // The empty panel went with its button, so the focus is handed to the title's, not dropped.
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-watchlist-add') === 'title', null, {timeout: 5000}).catch(() => {});
+    check('…the dialog and the empty panel are gone, and the focus is on the title\'s button',
+        await addDialog.count() === 0 && await addEmpty.count() === 0
+        && await page.evaluate(() => document.activeElement?.getAttribute('data-watchlist-add')) === 'title');
+    // The checks below read this account as it was: nothing on its watchlist.
+    await db.collection('watchlists').deleteMany({userId});
 
     // The Markets overview became part of /trade on 2026-10-13; its address redirects with its view.
     await page.goto(`${BASE}/markets?view=heatmap`, {waitUntil: 'domcontentloaded'});

@@ -4,6 +4,7 @@ import {requireUserId} from "@/lib/auth/session";
 import {getWatchlistPageView} from "@/lib/stocks/watchlist-page-store";
 import WatchlistTable from "@/components/stocks/WatchlistTable";
 import WatchlistEmpty from "@/components/stocks/WatchlistEmpty";
+import AddToWatchlist from "@/components/stocks/AddToWatchlist";
 import MarketStatus from "@/components/stocks/MarketStatus";
 import Panel from "@/components/primitives/Panel";
 import PageTitle from "@/components/primitives/PageTitle";
@@ -32,11 +33,34 @@ const WatchlistPage = async () => {
     const view = await getWatchlistPageView(userId);
     const {status} = view;
 
+    // The page's own way to add a stock (components/stocks/AddToWatchlist.tsx) stands in the
+    // title's actions, in the same place with or without rows, so it is one control across the
+    // first add; the empty panel carries the main one, and this one is then the quiet button
+    // beside it. Not when the read failed: the page could not show what was added.
+    const actions = (
+        <div className="flex flex-wrap items-center gap-3">
+            <MarketStatus status={status} />
+            {view.kind === 'rows' && (
+                <div className="text-[10px] text-fg-muted font-mono"
+                     style={{ letterSpacing: '0.02em' }}>
+                    {view.tracked} TRACKED
+                </div>
+            )}
+            {view.kind !== 'unavailable' && (
+                <AddToWatchlist
+                    place="title"
+                    variant={view.kind === 'empty' ? 'secondary' : 'primary'}
+                    tracked={view.kind === 'rows' ? view.rows.map((row) => row.symbol) : []}
+                />
+            )}
+        </div>
+    );
+
     // A failed read is not an empty watchlist: say so instead of "No Assets Tracked".
     if (view.kind !== 'rows') {
         return (
             <div className="space-y-6">
-                {header(<MarketStatus status={status} />)}
+                {header(actions)}
                 {view.kind === 'empty' ? <WatchlistEmpty /> : (
                     <Panel pad={6}>
                         <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
@@ -48,15 +72,7 @@ const WatchlistPage = async () => {
 
     return (
         <div className="space-y-6">
-            {header(
-                <div className="flex items-center gap-3">
-                    <MarketStatus status={status} />
-                    <div className="text-[10px] text-fg-muted font-mono"
-                         style={{ letterSpacing: '0.02em' }}>
-                        {view.tracked} TRACKED
-                    </div>
-                </div>
-            )}
+            {header(actions)}
             <WatchlistTable watchlist={view.rows} />
         </div>
     );

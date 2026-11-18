@@ -4,8 +4,9 @@
 // would earn, chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
 // tables that label themselves below md, the account comparison (a layout saved with the old
 // 'strategy-comparison' id included), and /history's trade feed, which, like every trade read,
-// leaves out a row from before its account's inception. Also the brain's rows, which drill into
-// their evidence with valid markup.
+// leaves out a row from before its account's inception. Also /watchlist's own add dialog (a stock
+// search answered by the Finnhub stand-in) and the brain's rows, which drill into their evidence
+// with valid markup.
 // No Finnhub key, so prices are unknown and the ticket's price-based paths stay open; the ticket's
 // getQuote is answered with a fixed price for the interest line.
 // Run: npm run qa -- trading   (the harness: README.md)
@@ -14,6 +15,8 @@ import {MongoClient} from 'mongodb';
 import {BASE, MONGO, check, outDir, ownerEmail, settledClick, signUp, summary, hydrated} from './lib.mjs';
 
 const OUT = outDir('trading');
+// The Finnhub stand-in (start-finnhub-stub.mjs): the watchlist's add dialog searches through it.
+const FINNHUB_STUB = `http://localhost:${process.env.QA_FINNHUB_PORT ?? 8791}`;
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -220,10 +223,68 @@ try {
     }));
     check('a watchlist row has no pointer cursor of its own', rowStyle.cursor !== 'pointer', rowStyle.cursor);
     check('a watchlist row is a theme surface: no blur under the minimal style', rowStyle.panel && rowStyle.blur === 'none', JSON.stringify(rowStyle));
+    // The page's own add control (components/stocks/AddToWatchlist.tsx), with a list already
+    // there, and from its box on by keyboard alone. A pick is a write and Enter runs the selected
+    // row, so the dialog draws no row while its search is out. The stand-in lists two symbols no
+    // other suite searches for (the search is cached by its address).
+    await fetch(`${FINNHUB_STUB}/__search?QTWA=QA%20Watch%20Alpha&QTWB=QA%20Watch%20Beta`);
+    const addStock = page.locator('[data-watchlist-add="title"]');
+    check('a watchlist with rows has one Add a stock button, in the title',
+        await addStock.count() === 1 && await page.locator('[data-watchlist-add]').count() === 1);
+    const addDialog = page.locator('[data-watchlist-add-dialog]');
+    // A click before the page has hydrated goes nowhere: press until the dialog is there.
+    for (let i = 0; i < 5 && !(await addDialog.isVisible()); i++) {
+        await addStock.click({timeout: 3000}).catch(() => {});
+        await addDialog.waitFor({timeout: 3000}).catch(() => {});
+    }
+    const hits = addDialog.locator('[data-watchlist-hit]');
+    await hits.first().waitFor({timeout: 15000}).catch(() => {});
+    const suggested = await hits.evaluateAll((els) => els.map((el) => el.getAttribute('data-watchlist-hit')));
+    check('its suggestions leave out the stock already on the list',
+        suggested.length === 10 && !suggested.includes('AAPL') && suggested.includes('MSFT'), suggested.join(','));
+    await page.keyboard.type('QTW');
+    // Inside the search's debounce: nothing has answered for "QTW" yet.
+    const early = await hits.count();
+    await page.keyboard.press('Enter');
+    await addDialog.locator('[data-watchlist-hit="QTWA"]').waitFor({timeout: 15000}).catch(() => {});
+    check('while its search is out the dialog draws no row, so Enter adds nothing',
+        early === 0 && await addDialog.isVisible() && await db.collection('watchlists').countDocuments({userId}) === 1, String(early));
+    // Arrows + Enter alone, as in ⌘K.
+    await page.keyboard.press('ArrowDown');
+    const moved = await addDialog.locator('[cmdk-item][aria-selected="true"]').getAttribute('data-watchlist-hit').catch(() => null);
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    await page.locator('a[aria-label="Trade QTWA"]').first().waitFor({timeout: 30000}).catch(() => {});
+    const added = await db.collection('watchlists').findOne({userId, symbol: 'QTWA'});
+    check('the arrows move the selection and Enter adds the first stock, under the name the search gave',
+        moved === 'QTWB' && added?.company === 'QA Watch Alpha', `${moved} ${added?.company}`);
+    check('…and the reader stays on /watchlist, where its row now is',
+        /\/watchlist$/.test(page.url()) && await page.locator('a[aria-label="Trade QTWA"]').count() >= 1, page.url());
+    await addDialog.waitFor({state: 'detached', timeout: 5000}).catch(() => {});
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-watchlist-add') === 'title', null, {timeout: 5000}).catch(() => {});
+    check('…the dialog closes and the focus is back on the button',
+        await addDialog.count() === 0 && await page.evaluate(() => document.activeElement?.getAttribute('data-watchlist-add')) === 'title');
+    // Searched for again, the stock just added is in the answer, marked, and cannot be run.
+    // Enter on the focused button opens the dialog, as a click does.
+    await page.keyboard.press('Enter');
+    await addDialog.locator('[cmdk-input]').waitFor({timeout: 15000}).catch(() => {});
+    await page.keyboard.type('QTW');
+    await addDialog.locator('[data-watchlist-hit="QTWB"]').waitFor({timeout: 15000}).catch(() => {});
+    const marked = addDialog.locator('[data-watchlist-hit="QTWA"]');
+    check('a stock already on the list is marked in a search, cannot be run, and the next one is selected',
+        await marked.getAttribute('aria-disabled').catch(() => null) === 'true' && /on your watchlist/i.test(await marked.innerText().catch(() => ''))
+        && await addDialog.locator('[data-watchlist-hit="QTWB"]').getAttribute('aria-selected').catch(() => null) === 'true');
+    await page.keyboard.press('Escape');
+    await addDialog.waitFor({state: 'detached', timeout: 5000}).catch(() => {});
+    // The checks below read the watchlist this suite seeded: AAPL alone.
+    await db.collection('watchlists').deleteOne({userId, symbol: 'QTWA'});
+    await fetch(`${FINNHUB_STUB}/__search`).catch(() => {});
     await page.setViewportSize({width: 390, height: 844});
     await page.reload({waitUntil: 'load'});
     await page.locator('a[aria-label="Trade AAPL"]').first().waitFor({timeout: 30000});
     check('at 390px watchlist cells name themselves', await page.getByText('Market Cap', {exact: true}).filter({visible: true}).count() >= 1);
+    const addBox = await page.locator('[data-watchlist-add="title"]').boundingBox();
+    check('at 390px the Add a stock button is a 44px target', (addBox?.height ?? 0) >= 44, String(addBox?.height));
     await page.setViewportSize({width: 1440, height: 900});
     // AAPL is on the large-cap strategies' boards, so its stock page renders even without a
     // Finnhub key (a symbol no strategy watches still 404s keyless — qa-styles).
@@ -504,6 +565,7 @@ try {
 } finally {
     if (seededRate) await mongo.db().collection('pricebars').deleteOne(seededRate).catch(() => {});
     await mongo.db().collection('pricebars').deleteMany({symbol: {$in: CLOSE_SYMBOLS}}).catch(() => {});
+    await fetch(`${FINNHUB_STUB}/__search`).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }
