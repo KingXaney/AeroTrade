@@ -104,6 +104,12 @@ page outgrows 30,000, since every session reads all of it.
   `--chrome-*`. The app has one look: its tokens are `:root`'s, and its rules sit unlayered at the
   foot of `app/globals.css`, under no attribute. A palette block (`html[data-palette]`) outranks
   `:root`, so a token of the look is never a palette token.
+- The look has three faces, declared once in `app/layout.tsx` (`next/font/local` over `app/fonts`,
+  each family beside its licence in `app/fonts/licenses`) and all preloaded: Sora is
+  `--type-display` (`font-heading`), Inter `--type-body` (`font-sans`) and JetBrains Mono
+  `--type-mono` (`font-mono`). `lib/theme/__tests__/fonts.test.ts` holds the declarations, the
+  tokens and the files to each other: a face no token reads is still sent to every reader, and a
+  token that reads a variable no face writes falls back to another face without an error.
 - `lib/ai/prompt-utils.injectJson` is every prompt's JSON fill; `lib/brain/prompts` keeps an
   import-free copy. `lib/ai/models` is the one table of which model runs which task (`AI_TIER`:
   free Gemini, or Anthropic with its key) and which Gemini key is in use (`AI_PLAN`:

@@ -609,9 +609,9 @@ export const shownHandWidth = (fit: Fit, count = 2): number => {
 };
 
 // A line's width at `px` (semibold when `bold`), from each character's advance in em — an upper bound
-// for the app's text faces (Hanken Grotesk, Inter): the narrow marks and letters, the slim ones, the
-// wide, capitals, figures and the rest; a character past Latin's scripts (a name in another script,
-// an emoji) a whole em; the marks that isolate a name or join an emoji none.
+// for the app's body face (Inter): the narrow marks and letters, the slim ones, the wide, capitals,
+// figures and the rest; a character past Latin's scripts (a name in another script, an emoji) a whole
+// em; the marks that isolate a name or join an emoji none.
 const NARROW = new Set([...' .,:;\'!|ijlI·']);
 const SLIM = new Set([...'frt()-1']);
 const WIDE = new Set([...'mwMW@%']);
@@ -907,7 +907,7 @@ const placeHands = (
 // An open seat's ring (.pn-open-seat): max(44 px, 95 % of the plate's height) across.
 export const openSeatPx = (stage: Pick<Stage, 'plateSize'>): number => Math.max(44, stage.plateSize.h * 0.95);
 
-// Text in the mono face (JetBrains Mono, IBM Plex Mono): 0.6 em a character, whatever the weight.
+// Text in the mono face (JetBrains Mono): 0.6 em a character, whatever the weight.
 export const MONO_EM = 0.6;
 
 // A winner's "+N" (.pn-win-pop-text): BANK_COPY.net's words in the mono face at 13 px on the page's

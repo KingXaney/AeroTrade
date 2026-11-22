@@ -950,10 +950,10 @@ describe("the winner's banner", () => {
         expect(wrappedLines([250, 60], 4, 100)).toBe(4);
     });
 
-    it("estimates a line no narrower than the app's faces draw it, the marks that isolate a name taking no room", () => {
-        // As Hanken Grotesk draws them on the table: 156 px and 71 px.
-        expect(textWidth('Full house, threes full of fives', 12)).toBeGreaterThanOrEqual(156);
-        expect(textWidth(TABLE_COPY.bannerYou(70), 14, true)).toBeGreaterThanOrEqual(71);
+    it("estimates a line no narrower than the app's body face draws it, the marks that isolate a name taking no room", () => {
+        // As Chrome draws them in Inter at the banner's two weights (400 and 600): 166.5 px and 73.8 px.
+        expect(textWidth('Full house, threes full of fives', 12)).toBeGreaterThanOrEqual(166.5);
+        expect(textWidth(TABLE_COPY.bannerYou(70), 14, true)).toBeGreaterThanOrEqual(73.8);
         expect(textWidth(TABLE_COPY.banner('Ana', 5), 12)).toBe(textWidth('Ana wins 5', 12));
         expect(textWidth('WWW', 12)).toBeGreaterThan(textWidth('iii', 12));
     });

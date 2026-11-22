@@ -8,11 +8,19 @@ import {LANDING_COPY} from "@/lib/learn/copy/landing";
 import {PALETTE_CSS} from "@/lib/theme/palettes";
 import {decodeThemeCookie, modeOfTheme, THEME_COOKIE} from "@/lib/theme/resolve";
 
-// The six faces ship with the app (app/fonts, SIL Open Font License — app/fonts/licenses) instead
+// The three faces ship with the app (app/fonts, SIL Open Font License — app/fonts/licenses) instead
 // of being fetched from Google Fonts during the build: when that fetch failed, the whole Vercel
 // build failed with it. Latin subset. Each face is declared at exactly the weights Google served
 // it at — a variable face's one file listed once per weight, as Google's CSS does — so a weight
 // in between (font-medium on a 400/600 face) still renders as it did, not as a true 500.
+//
+// They are the look's three type tokens in app/globals.css: Sora draws the headings
+// (--type-display), Inter the body (--type-body) and JetBrains Mono the figures (--type-mono). All
+// three are preloaded, which is next/font's default. A face left out of the preload is fetched only
+// once the stylesheet has been read and some text asks for it, so that text is drawn in the
+// fallback first and again when the file lands — as the body's was while Inter was not preloaded.
+// lib/theme/__tests__/fonts.test.ts holds these declarations, the tokens and the files in
+// app/fonts to each other.
 const sora = localFont({
   src: [
     {path: "./fonts/sora-latin.woff2", weight: "400", style: "normal"},
@@ -22,12 +30,12 @@ const sora = localFont({
   variable: "--font-sora",
 });
 
-const hankenGrotesk = localFont({
+const inter = localFont({
   src: [
-    {path: "./fonts/hanken-grotesk-latin.woff2", weight: "400", style: "normal"},
-    {path: "./fonts/hanken-grotesk-latin.woff2", weight: "600", style: "normal"},
+    {path: "./fonts/inter-latin.woff2", weight: "400", style: "normal"},
+    {path: "./fonts/inter-latin.woff2", weight: "600", style: "normal"},
   ],
-  variable: "--font-hanken",
+  variable: "--font-inter",
 });
 
 const jetbrainsMono = localFont({
@@ -36,34 +44,6 @@ const jetbrainsMono = localFont({
     {path: "./fonts/jetbrains-mono-latin.woff2", weight: "700", style: "normal"},
   ],
   variable: "--font-jetbrains",
-});
-
-// Style-specific faces. Not preloaded: only the default stack above is on the critical path.
-const spaceGrotesk = localFont({
-  src: [
-    {path: "./fonts/space-grotesk-latin.woff2", weight: "500", style: "normal"},
-    {path: "./fonts/space-grotesk-latin.woff2", weight: "700", style: "normal"},
-  ],
-  variable: "--font-space-grotesk",
-  preload: false,
-});
-
-const inter = localFont({
-  src: [
-    {path: "./fonts/inter-latin.woff2", weight: "400", style: "normal"},
-    {path: "./fonts/inter-latin.woff2", weight: "600", style: "normal"},
-  ],
-  variable: "--font-inter",
-  preload: false,
-});
-
-const plexMono = localFont({
-  src: [
-    {path: "./fonts/ibm-plex-mono-latin-500.woff2", weight: "500", style: "normal"},
-    {path: "./fonts/ibm-plex-mono-latin-700.woff2", weight: "700", style: "normal"},
-  ],
-  variable: "--font-plex-mono",
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -89,7 +69,7 @@ export default async function RootLayout({
   const theme = decodeThemeCookie((await cookies()).get(THEME_COOKIE)?.value);
   const mode = modeOfTheme(theme);
   // Font variables live on <html> so the :root type tokens can reference them.
-  const fontClasses = [sora, hankenGrotesk, jetbrainsMono, spaceGrotesk, inter, plexMono].map((f) => f.variable).join(' ');
+  const fontClasses = [sora, inter, jetbrainsMono].map((f) => f.variable).join(' ');
 
   return (
     <html
