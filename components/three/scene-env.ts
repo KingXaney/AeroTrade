@@ -6,7 +6,9 @@ import {parseCssColor, type Rgb} from "@/lib/theme/css-color";
 // share it. Everything here is an external store read through useSyncExternalStore, with a server
 // snapshot, so the first client paint matches the server's and no decision sets state in an effect.
 
-const THEME_ATTRIBUTES = ['data-palette', 'data-style', 'data-mode', 'data-motion'];
+// What a theme writes on <html> (components/theme/ThemeProvider): its palette, the palette's
+// mode and the motion choice.
+const THEME_ATTRIBUTES = ['data-palette', 'data-mode', 'data-motion'];
 
 // The document's theme attributes as one string: a change means the tokens must be read again.
 const subscribeHtml = (notify: () => void) => {
@@ -16,7 +18,7 @@ const subscribeHtml = (notify: () => void) => {
 };
 const themeStamp = () => {
     const data = document.documentElement.dataset;
-    return `${data.palette}|${data.style}|${data.mode}|${data.motion}`;
+    return `${data.palette}|${data.mode}|${data.motion}`;
 };
 export const useThemeStamp = (): string => useSyncExternalStore(subscribeHtml, themeStamp, () => '');
 

@@ -88,9 +88,8 @@ the map is `docs/MAP.md`.
   company under Paperclip's default policy, so the setup script allows unpriced usage. Under automatic
   approval the desk has no run of its own, so its comments land only once it has had one.
 - The office (`/agent-world/office`, `docs/specs/2026-10-27-agent-office.md`) is the same session as a
-  3D floor on a page of its own: the route group `app/(office)/agent-world/office` has none of the app's shell
-  (`components/theme/ThemeBackdrop` draws nothing there either), and the floor's title links to it in
-  a new tab. `lib/agent-world/office.officeState` (pure) reads the live view into fourteen workers
+  3D floor on a page of its own: the route group `app/(office)/agent-world/office` has none of the app's shell,
+  and the floor's title links to it in a new tab. `lib/agent-world/office.officeState` (pure) reads the live view into fourteen workers
   (`WORKER_IDS`: the Head trader, the twelve roles in the run's order, the Execution desk), each with
   a status (`WORKER_STATUSES`; "Busy" for working, the legend's mechanism-only rule), a task line, a
   bubble and this session's figures, plus the flows in flight, the shelves, the tickets, the issue,

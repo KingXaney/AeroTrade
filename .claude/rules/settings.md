@@ -7,6 +7,7 @@ paths:
   - "components/theme/**"
   - "lib/actions/appearance.actions.ts"
   - "lib/actions/preferences.actions.ts"
+  - "lib/learn/copy/settings.ts"
 ---
 
 # settings
@@ -21,3 +22,24 @@ the map is `docs/MAP.md`.
   `components/settings/SettingsHashRedirect`, as `/learn#term` is by `components/learn/LearnRedirect`.
 
 - `lib/theme/store` is the saved theme's read and its cookie mirror.
+- The app has one look, so a theme is two choices: a palette (`lib/theme/palettes`) and Reduce
+  motion (`lib/theme/resolve`, `Theme`). `lib/theme/resolve.resolveTheme` reads those two keys
+  and no other, and `lib/theme/resolve.isThemeInput` — what
+  `lib/actions/appearance.actions.setAppearance` accepts — checks the same two: the `style` that
+  a document saved before the one look still holds, or a tab opened before it still posts, is
+  ignored, never an error. No migration removes the stored field (a reader's next save replaces
+  the sub-document without it).
+- The theme cookie is written `v2:<palette>:<0|1>`. `lib/theme/resolve.decodeThemeCookie` is
+  whole-value and reads two shapes: that one, and `v1:<palette>:<style>:<0|1>` where the style is
+  one of the five ids v1 ever wrote (a private list there, dated: a cookie lives a year from its
+  last write, so the v1 branch goes a year after this shipped) — the style dropped, the palette
+  and the motion choice kept. Anything else is the default theme. `app/layout.tsx` is the
+  cookie's only parser, so the route groups where `components/theme/ThemeSync` is not mounted
+  (the landing and auth pages, `/play`, the office) read an old cookie exactly as the app does.
+- `app/layout.tsx` stamps `data-palette`, `data-mode` and `data-motion` from the theme, and a
+  literal `data-style="soft"`, which the stylesheet's rules for the one look are still written
+  under. `components/theme/ThemeProvider.applyToDocument` writes the first three and never the
+  fourth. A preview (`useTheme().preview`) paints the whole theme and saves nothing: a hover or
+  a focus on a palette chip in Settings, a click in the landing page's
+  `components/landing/ThemeDemo`. Appearance's sentences are `lib/learn/copy/settings`
+  (`APPEARANCE_COPY`).

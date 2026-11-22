@@ -3,22 +3,18 @@
 import {connectToDatabase} from "@/database/mongoose";
 import {getCurrentUserId} from "@/lib/auth/session";
 import {upsertPreferences} from "@/lib/settings/preferences-store";
-import {isPaletteId, resolveTheme, type Theme} from "@/lib/theme/resolve";
-import {isStyleId} from "@/lib/theme/styles";
+import {isThemeInput, resolveTheme, type Theme} from "@/lib/theme/resolve";
 import {getAppearanceForUser, setThemeCookie} from "@/lib/theme/store";
 import type {ActionResult} from '@/lib/actions/types';
 
 type AppearanceResult = ActionResult & {theme?: Theme};
 
-const isThemeInput = (input: unknown): input is Theme =>
-    typeof input === 'object' && input !== null
-    && isPaletteId((input as Theme).palette)
-    && isStyleId((input as Theme).style)
-    && typeof (input as Theme).reduceMotion === 'boolean';
-
 export const setAppearance = async (input: unknown): Promise<AppearanceResult> => {
     const userId = await getCurrentUserId();
     if (!userId) return {success: false, message: 'Not authenticated'};
+    // A palette and a boolean, whatever else is posted (lib/theme/resolve.ts isThemeInput, held
+    // by its test): a tab opened before the app kept one look still posts the style it had, and
+    // resolveTheme below drops it, so that save lands without it instead of failing here.
     if (!isThemeInput(input)) return {success: false, message: 'Invalid theme'};
 
     const theme = resolveTheme(input);

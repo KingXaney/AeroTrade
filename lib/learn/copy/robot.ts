@@ -53,7 +53,7 @@ export const ROBOT_TIPS: readonly RobotTip[] = [
     },
     {
         id: 'themes',
-        text: 'Settings → Appearance has twelve palettes and five visual styles; hovering a card previews it before you choose. Its Reduce motion switch keeps me still.',
+        text: 'Settings → Appearance has twelve palettes; hovering one previews it before you choose. Its Reduce motion switch keeps me still.',
     },
     {
         id: 'learn-glossary',

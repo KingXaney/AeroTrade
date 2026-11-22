@@ -152,7 +152,7 @@ const Welcome = () => (
                     <h2 id="landing-themes" className="font-heading text-2xl font-semibold text-fg">{LANDING_COPY.themesHeading}</h2>
                     <p className="mt-2 text-sm leading-relaxed text-fg-soft">{LANDING_COPY.themesBody}</p>
                 </div>
-                <ThemeDemo/>
+                <ThemeDemo label={LANDING_COPY.themesGroup}/>
             </Panel>
 
             {/* Closing */}

@@ -7,9 +7,9 @@ import {PALETTES, type PaletteMode} from "@/lib/theme/palettes";
 import {modeOfTheme, themeEquals, type Theme} from "@/lib/theme/resolve";
 import {setAppearance} from "@/lib/actions/appearance.actions";
 
-// Hover intent: a card the pointer merely sweeps over never repaints the document.
+// Hover intent: a chip the pointer merely sweeps over never repaints the document.
 const PREVIEW_DELAY_MS = 60;
-// Crossing the gutter between two cards must never flash the committed theme in between.
+// Crossing the gutter between two chips must never flash the committed theme in between.
 const CANCEL_DELAY_MS = 150;
 
 type ThemeTokens = {
@@ -22,32 +22,28 @@ type ThemeTokens = {
     reduceMotion: boolean;
 };
 
-type PreviewOptions = {
-    // The whole theme, layout included — for a click that previews because there is no account to
-    // save to (the landing page's switcher). A hover previews the palette only: a style moves the
-    // page, and a page that moves under the pointer leaves the card, cancels the preview, moves
-    // back, enters the card again, and loops.
-    full?: boolean;
-};
-
 type ThemeContextValue = {
     theme: Theme;              // the committed theme (what the server rendered)
     mode: PaletteMode;
     tokens: ThemeTokens;
     pending: boolean;
-    preview: (theme: Theme, options?: PreviewOptions) => void;
+    // Paints the whole theme without saving it: a hover or a focus in Settings, a click on the
+    // landing page, where there is no account to save to. A theme is a palette and the motion
+    // choice, neither of which moves the page, so nothing leaves the pointer it is previewed under.
+    preview: (theme: Theme) => void;
     commit: (theme: Theme) => void;
     cancel: (delayMs?: number) => void;   // 0 = restore right now
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-// Attributes live on <html> so portals (dialogs, dropdowns, chat, toasts) inherit them.
+// Attributes live on <html> so portals (dialogs, dropdowns, chat, toasts) inherit them. Only the
+// three a theme decides are written: data-style is the root layout's literal (app/layout.tsx) and
+// is left exactly as the server rendered it.
 const applyToDocument = (theme: Theme) => {
     const el = document.documentElement;
     const mode = modeOfTheme(theme);
     el.dataset.palette = theme.palette;
-    el.dataset.style = theme.style;
     el.dataset.mode = mode;
     el.dataset.motion = theme.reduceMotion ? 'reduced' : 'auto';
     el.classList.toggle('dark', mode === 'dark');
@@ -117,14 +113,12 @@ const ThemeProvider = ({initial, children}: {initial: Theme; children: ReactNode
         }, delayMs);
     }, [clearTimer]);
 
-    const preview = useCallback((theme: Theme, options?: PreviewOptions) => {
+    const preview = useCallback((theme: Theme) => {
         if (pendingTheme.current) {   // a commit is in flight; never paint a third theme
             clearTimer();
             return;
         }
-        const base = committedRef.current;
-        const painted: Theme = options?.full ? theme : {...base, palette: theme.palette};
-        schedule(() => paint(painted), PREVIEW_DELAY_MS);
+        schedule(() => paint(theme), PREVIEW_DELAY_MS);
     }, [clearTimer, schedule, paint]);
 
     const cancel = useCallback((delayMs: number = CANCEL_DELAY_MS) => schedule(restore, delayMs), [schedule, restore]);

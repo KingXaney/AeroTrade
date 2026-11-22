@@ -49,7 +49,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (18 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily brief by email opens with the day in 30 seconds, then the stories about the reader's own stocks, the markets, their news feed, filings and what people are posting — each written from the articles it cites, with links to those articles and to the stock's page in the app — followed by the AI Navigator's week, their topics and the day's lesson.
 
-**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 37-widget dashboard you can drag, resize and extend.
+**Make it yours.** 12 colour palettes, saved per account and rendered without a flash. A 37-widget dashboard you can drag, resize and extend.
 
 <div align="center">
 <img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry" width="440">
@@ -198,7 +198,7 @@ lib/            one folder per feature, named as in components/:
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read
   prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, signals, NYSE hours, Finnhub
   stocks/       the watchlist, the stock page's key numbers and "what the rules see", TradingView embeds
-  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav sections + the rail cards · palettes + styles
+  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav sections + the rail cards · palettes + the saved theme
   actions/      'use server' entry points (session-derived, userId-scoped), one file per feature
   ai/           model matrix by task and tier, inference, prompt helpers
   *.ts          shared: format, dates, text, rate-limit, day-memo, action-toast

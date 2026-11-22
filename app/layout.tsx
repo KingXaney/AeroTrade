@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import "./globals.css";
 import {Toaster} from "@/components/ui/sonner"
 import ThemeProvider from "@/components/theme/ThemeProvider";
-import ThemeBackdrop from "@/components/theme/ThemeBackdrop";
+import {LANDING_COPY} from "@/lib/learn/copy/landing";
 import {PALETTE_CSS} from "@/lib/theme/palettes";
 import {decodeThemeCookie, modeOfTheme, THEME_COOKIE} from "@/lib/theme/resolve";
 
@@ -70,7 +70,10 @@ export const metadata: Metadata = {
   // A page names itself ("Portfolio") and this appends the app; a page with no title of its own
   // is the app.
   title: {default: "AeroTrade", template: "%s · AeroTrade"},
-  description: "Paper-trading terminal with an AI news brain: follow the topics you care about, paper-trade with virtual money beside eight rule-based quant strategies, and let scheduled AI jobs read the news for you.",
+  // Every page that sets no description of its own carries this one, and the sign-in and sign-up
+  // pages are open to anyone: it is the landing page's sentence, which names only what every
+  // account can open (lib/learn/copy/landing.ts, held by its test), never the owner's pages.
+  description: LANDING_COPY.metaDescription,
 };
 
 export default async function RootLayout({
@@ -79,18 +82,25 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // The theme cookie mirrors the account's saved appearance, so the very first
-  // HTML already carries the right palette/style — no flash, no client JS.
+  // HTML already carries the right palette and motion choice — no flash, no client JS. This is
+  // the cookie's only parser, so the route groups that never sync it with the account (the
+  // landing and auth pages, a poker night table, the office) read an older v1 cookie exactly as
+  // the app's own pages do.
   const theme = decodeThemeCookie((await cookies()).get(THEME_COOKIE)?.value);
   const mode = modeOfTheme(theme);
   // Font variables live on <html> so the :root type tokens can reference them.
   const fontClasses = [sora, hankenGrotesk, jetbrainsMono, spaceGrotesk, inter, plexMono].map((f) => f.variable).join(' ');
 
+  // data-style is a literal: the app has one look, and a theme no longer names a style. The
+  // stylesheet still writes that look's rules under [data-style="soft"] (app/globals.css), so the
+  // attribute stays on <html> — set here only, never by the client (components/theme/ThemeProvider)
+  // — until those rules lose the prefix.
   return (
     <html
       lang="en"
       className={mode === 'dark' ? `${fontClasses} dark` : fontClasses}
       data-palette={theme.palette}
-      data-style={theme.style}
+      data-style="soft"
       data-mode={mode}
       data-motion={theme.reduceMotion ? 'reduced' : 'auto'}
       style={{ colorScheme: mode }}
@@ -113,7 +123,6 @@ export default async function RootLayout({
           suppressHydrationWarning
       >
         <ThemeProvider initial={theme}>
-          <ThemeBackdrop />
           {children}
           <Toaster position="top-center"/>
         </ThemeProvider>

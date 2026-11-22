@@ -26,7 +26,7 @@ the map is `docs/MAP.md`.
   `lib/learn/copy/landing`: numbers only from the app's own constants, no return figure, user
   count or testimonial, and the no-advice list applies as everywhere. The example screen is
   the app's own primitives, labelled as an example. `components/landing/ThemeDemo` previews a
-  theme and saves nothing.
+  palette — six of them, `data-theme-demo` carrying the palette's id — and saves nothing.
 - The hero is the momentum terrain, `components/landing/MomentumTerrain`: a 3D surface of SPY's
   normalised momentum — the last 250 sessions along x, lookbacks 5 to 250 days along y, height
   z = ln(P_t/P_{t−n}) / (σ_t√n) on the total-return index — that fetches `app/api/landing/surface`

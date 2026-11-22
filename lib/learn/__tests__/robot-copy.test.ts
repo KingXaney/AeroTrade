@@ -8,12 +8,12 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {findBanned} from '@/lib/learn/banned';
 import {ROBOT_COPY, ROBOT_TIPS} from '@/lib/learn/copy/robot';
+import {APPEARANCE_COPY} from '@/lib/learn/copy/settings';
 import {ASK_MAX_CHARS} from '@/lib/chat/ask';
 import {JOBS} from '@/lib/jobs/registry';
 import {STRATEGIES} from '@/lib/strategies/catalog';
 import {capitalize, numberWord} from '@/lib/text';
 import {PALETTE_IDS} from '@/lib/theme/palettes';
-import {STYLE_IDS} from '@/lib/theme/styles';
 
 // The chips' denylist (lib/chat/__tests__/advice-voice.test.ts): a robot that names a stock tips it.
 const TICKERS = /\b(NVDA|AAPL|TSLA|MSFT|SPY|AMZN|GOOGL|GOOG|META|AMD|NFLX)\b/;
@@ -63,8 +63,14 @@ describe('ROBOT_TIPS', () => {
     it("quotes the app's own numbers", () => {
         expect(text('strategies')).toContain(`${capitalize(numberWord(STRATEGIES.length))} rule-based`);
         expect(text('themes')).toContain(`${numberWord(PALETTE_IDS.length)} palettes`);
-        expect(text('themes')).toContain(`${numberWord(STYLE_IDS.length)} visual styles`);
         expect(text('morning-briefing')).toContain(JOBS.marketBriefing.health.schedule.replace('daily ', ''));
+    });
+
+    // The app has one look: Settings › Appearance offers palettes and the Reduce motion switch
+    // (lib/learn/copy/settings.ts), so the tip counts no visual styles and names no preset card.
+    it('describes the Appearance section as it is: palettes and the motion switch, no style to choose', () => {
+        expect(text('themes')).not.toMatch(/\bstyles?\b|\bpresets?\b|\bcards?\b/i);
+        expect(text('themes')).toContain(APPEARANCE_COPY.motion.title);
     });
 
     it('imports nothing, so the launcher on every page carries no catalog', () => {

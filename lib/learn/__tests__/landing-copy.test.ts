@@ -2,10 +2,13 @@
 // lib/learn/banned.ts — a front door is where "the best way to invest" is most tempting.
 
 import {describe, expect, it} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {findBanned} from '@/lib/learn/banned';
 import {LANDING_BALANCE, LANDING_COPY} from '@/lib/learn/copy/landing';
 import {GLOSSARY_KEYS} from '@/lib/learn/glossary';
 import {glossaryKeysFor} from '@/lib/learn/where';
+import {PALETTE_IDS} from '@/lib/theme/palettes';
 import {DEFAULT_TOPIC_NAMES} from '@/lib/topics/starters';
 
 const strings = (value: unknown): string[] => {
@@ -48,6 +51,25 @@ describe('LANDING_COPY', () => {
         expect(terms).toBeLessThan(GLOSSARY_KEYS.length);
         expect(learn?.points[1]).toContain(`${terms} terms`);
         expect(learn?.points[1]).not.toContain(`${GLOSSARY_KEYS.length} terms`);
+        expect(LANDING_COPY.themesBody).toContain(`${PALETTE_IDS.length} colour palettes`);
+    });
+
+    // The app has one look: a theme is a palette and the Reduce motion choice (lib/theme/resolve.ts),
+    // so the front door offers palettes and counts no visual styles.
+    it('offers palettes to try, and no visual style', () => {
+        for (const text of all) {
+            expect(text, text).not.toMatch(/\bvisual styles?\b|\bpresets?\b/i);
+        }
+        expect(LANDING_COPY.themesGroup).toMatch(/palette/);
+    });
+
+    // app/layout.tsx gives every page without a description of its own this one — the sign-in
+    // and sign-up pages among them, which anyone can open. It once wrote its own, which named the
+    // owner's pages; quoting this file holds it to the tests here.
+    it("is every other page's description too: the root layout quotes it and writes none of its own", () => {
+        const layout = readFileSync(fileURLToPath(new URL('../../../app/layout.tsx', import.meta.url)), 'utf8');
+        expect(layout).toMatch(/description:\s*LANDING_COPY\.metaDescription\b/);
+        expect(layout).not.toMatch(/description:\s*["'`]/);
     });
 
     // The strategies, both brains (the AI Navigator and its narratives among them), the trading
