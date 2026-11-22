@@ -21,7 +21,7 @@ import type {SidebarNews} from "@/lib/shell/sidebar";
 const NewsSidebarCard = ({news, seenAt}: {news: SidebarNews; seenAt: number | null}) => (
     <Link
         href="/news"
-        className="relative block rounded-xl p-4 shimmer overflow-hidden transition-all hover:brightness-110 bg-brand-strong/6 border border-brand/15"
+        className="relative block rounded-xl p-4 overflow-hidden transition-all hover:brightness-110 bg-brand-strong/6 border border-brand/15"
     >
         <div className="relative z-10">
             <div className="flex items-center gap-3 mb-2">

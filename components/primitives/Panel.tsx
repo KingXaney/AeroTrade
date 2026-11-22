@@ -2,9 +2,9 @@ import type {CSSProperties, ReactNode, SubmitEventHandler} from "react";
 import {cn} from "@/lib/utils";
 
 // The one framed surface in the app. `.glass-panel` (app/globals.css) carries the
-// background, border, blur, shadow and radius of the *active visual style*, so a panel
-// assembled by hand out of bg-surface-2/40 + border-line-strong/20 silently stops
-// responding to the style axis — it looks right in `minimal` and wrong in the other four.
+// background, border, blur, shadow and radius of the app's one look (the --panel-* tokens), so
+// a panel assembled by hand out of bg-surface-2/40 + border-line-strong/20 is silently another
+// surface: no tint, no layered shadow, a radius of its own.
 //
 // `className` is LAYOUT ONLY: grid, flex, space-y, scroll-mt, max-w, text-center.
 // Never background, border, shadow or radius. `.glass-panel` is declared outside any

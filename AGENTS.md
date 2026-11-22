@@ -94,15 +94,16 @@ page outgrows 30,000, since every session reads all of it.
   over `components/ui/switch`, `TextField`/`TextArea` the compact form field, `iconButton` the
   square icon affordance's class string.
 - A caption, a panel heading and a labelled control take their face, case, tracking and colour
-  from the active visual style, through `.label-type`, `.heading-type` and `.control-type`
-  (`app/globals.css`, the components layer — a utility at the call site still wins): `MicroLabel`,
-  `SectionHeading`, `ActionButton` and `Badge` carry them, and a hand-written label uses the
-  class, never `font-mono uppercase tracking-[…]`. A label's text is written as it should read in
-  sentence case; a style that wants capitals applies them. `RowCard` and `.news-item` read the
-  style's `--card-*` tokens; the header and everything that floats (menus, dialogs, the drawer,
-  the chat window: `.chrome-surface` and the shadcn `data-slot` contents) read `--chrome-*`. A
-  style block sets only style tokens — a palette block outranks it, so it never writes a
-  palette token.
+  from the look's type tokens (`--label-*`, `--heading-*`, `--control-*`), through `.label-type`,
+  `.heading-type` and `.control-type` (`app/globals.css`, the components layer — a utility at the
+  call site still wins): `MicroLabel`, `SectionHeading`, `ActionButton` and `Badge` carry them, and
+  a hand-written label uses the class, never `font-mono uppercase tracking-[…]`. A label's text is
+  written as it should read in sentence case; the tokens apply any capitals. `RowCard` and
+  `.news-item` read the `--card-*` tokens; the header and everything that floats (menus, dialogs,
+  the drawer, the chat window: `.chrome-surface` and the shadcn `data-slot` contents) read
+  `--chrome-*`. The app has one look: its tokens are `:root`'s, and its rules sit unlayered at the
+  foot of `app/globals.css`, under no attribute. A palette block (`html[data-palette]`) outranks
+  `:root`, so a token of the look is never a palette token.
 - `lib/ai/prompt-utils.injectJson` is every prompt's JSON fill; `lib/brain/prompts` keeps an
   import-free copy. `lib/ai/models` is the one table of which model runs which task (`AI_TIER`:
   free Gemini, or Anthropic with its key) and which Gemini key is in use (`AI_PLAN`:
@@ -166,9 +167,10 @@ page outgrows 30,000, since every session reads all of it.
    (`LEGACY_WIDGET_IDS`) run only where saved layouts are read (`readSavedLayout`). A stored widget
    id never changes meaning: a clearer id is a new entry there, never a rename in place.
 7. Framed surfaces are `<Panel>`, never a hand-rolled `bg-surface-2/40 + border` — only `.glass-panel`
-   reads `--panel-bg/-border/-blur/-shadow/-radius`, so anything else silently ignores four of the
-   five visual styles. `.glass-panel` is declared **outside any cascade layer**, so `rounded-*`,
-   `ring-*` and `shadow-*` written next to it lose and do nothing; use `outline-*` for a ring.
+   reads `--panel-bg/-border/-blur/-shadow/-radius`, so anything else silently ignores the look
+   (its tint, its layered shadow, its radius). `.glass-panel` is declared **outside any cascade
+   layer**, so `rounded-*`, `ring-*` and `shadow-*` written next to it lose and do nothing; use
+   `outline-*` for a ring.
 8. A column, tile or caveat that is empty or identical on every row is not information — hide it
    (`visibleSignalColumns`) or state it once per panel (`describeUnpriced`, `unpricedNote`), never
    per row. Reference prose belongs in a `<details>`, above-the-fold space belongs to numbers.

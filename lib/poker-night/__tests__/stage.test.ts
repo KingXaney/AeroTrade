@@ -685,8 +685,8 @@ describe('the sizes shared with the stylesheet', () => {
             expect(AMOUNT_PX[fit]).toBe(11);
         }
         expect(px(room('comfortable'), '--pn-amount')).toBe(AMOUNT_PX.comfortable);
-        // Every visual style's mono face is JetBrains Mono or IBM Plex Mono: 0.6 em a character.
-        expect(new Set([...css.matchAll(/--type-mono: var\((--font-[a-z-]+)\)/g)].map((m) => m[1]))).toEqual(new Set(['--font-jetbrains', '--font-plex-mono']));
+        // The mono face is JetBrains Mono, the one face the stylesheet names for it: 0.6 em a character.
+        expect(new Set([...css.matchAll(/--type-mono: var\((--font-[a-z-]+)\)/g)].map((m) => m[1]))).toEqual(new Set(['--font-jetbrains']));
         expect(MONO_EM).toBe(0.6);
         // An all-in's line: 4 px a side inside a 2 px outline breathing out to 5 px.
         expect(css).toContain(`.pn-bet.pn-pulse { outline: ${PULSE.outline}px solid var(--warning); border-radius: 9999px; padding-inline: ${PULSE.pad}px; }`);
@@ -986,7 +986,7 @@ describe("the banner's sizes in the stylesheet", () => {
         // The line's pill: px-3 py-0.5 text-xs, 12 px on 16.
         expect(screen).toMatch(/const PILL = '[^']*\bpx-3 py-0\.5 text-xs\b/);
         expect([BANNER.note.pad.x, BANNER.note.pad.y, BANNER.note.px, BANNER.note.line]).toEqual([12, 2, 12, 16]);
-        // No visual style draws a chrome border wider than the plan allows for.
+        // The chrome border is no wider than the plan allows for.
         const borders = [...css.matchAll(/--chrome-border: (\d+)px/g)].map((m) => Number(m[1]));
         expect(borders.length).toBeGreaterThan(0);
         expect(Math.max(...borders)).toBeLessThanOrEqual(BANNER.border);

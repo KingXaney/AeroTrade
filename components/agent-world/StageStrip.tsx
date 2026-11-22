@@ -9,7 +9,7 @@ import {cn} from "@/lib/utils";
 // The desk at a glance: the five teams in run order (numbered, side by side from md, stacked on a
 // phone), each role a tile with its state, its clock, its calls, tokens and cost, and the providers
 // its fetches were answered by. A working role's dot breathes (.aw-working, CSS keyframes only,
-// stopped under both reduced-motion guards and in brutalist). No sign colour anywhere: the dot
+// stopped by name under both reduced-motion guards). No sign colour anywhere: the dot
 // reads waiting, working, done or stopped, nothing better or worse.
 const DOT: Readonly<Record<StageStatus, string>> = {
     waiting: 'bg-line-strong',

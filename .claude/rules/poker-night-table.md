@@ -79,7 +79,7 @@ Part 2 of 3: the rest is `.claude/rules/poker-night.md` and `.claude/rules/poker
   length, so each fires once) on `lib/poker-night/choreography`'s timeline, drawn by CSS keyframes
   from custom properties (`--pn-at`, `--pn-dur` in `--motion-base` units; a flight's `--pn-dx` /
   `--pn-dy` from `lib/poker-night/stage`) and exposed as `data-anim`: no SMIL, no Web Animations,
-  every class in both reduced-motion guards and brutalist's loops stopped by name
+  every class in both reduced-motion guards
   (`lib/theme/__tests__/motion-guards.test.ts`). Opacity never sits on a turning card (a fold turns
   the inner `.pn-fold-turn`). The one thing a timer moves is a winner's stack counting up, formatted
   text on the same token (`components/poker-night/CountUp`).

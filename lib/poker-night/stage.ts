@@ -567,9 +567,10 @@ const layoutStage = (box: Box, seatCount: number, mySeat: number | null, n: numb
 // stage.test holds them to it): the full banner's padding, its rows' gap and its avatar, by fit — a
 // row is the avatar beside the name's line (14 px on 20) over the hand's (12 on 16); the compact
 // banner's padding and gap, a 12-on-16 line a winner, no avatar; the line's pill; the gap under the
-// banner; the widest chrome border any visual style draws (brutalist's, 2 px a side); and the room
-// kept between the banner and anything it must not cover. It comes in where it lands, growing from
-// 90 % of its size (.pn-banner-drop), so on its way in it covers nothing its place does not.
+// banner; the chrome border it allows for (2 px a side, an upper bound: the look draws 1 px); and
+// the room kept between the banner and anything it must not cover. It comes in where it lands,
+// growing from 90 % of its size (.pn-banner-drop), so on its way in it covers nothing its place
+// does not.
 export const BANNER = {
     full: {
         pad: {tight: {x: 8, y: 3}, compact: {x: 12, y: 6}, comfortable: {x: 12, y: 6}} as Record<Fit, {x: number; y: number}>,

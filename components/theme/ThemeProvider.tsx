@@ -37,9 +37,9 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-// Attributes live on <html> so portals (dialogs, dropdowns, chat, toasts) inherit them. Only the
-// three a theme decides are written: data-style is the root layout's literal (app/layout.tsx) and
-// is left exactly as the server rendered it.
+// Attributes live on <html> so portals (dialogs, dropdowns, chat, toasts) inherit them: the three
+// a theme decides, the same three the root layout stamps (app/layout.tsx). The app has one look,
+// so no attribute names a style.
 const applyToDocument = (theme: Theme) => {
     const el = document.documentElement;
     const mode = modeOfTheme(theme);

@@ -61,7 +61,7 @@ the map is `docs/MAP.md`.
   is hidden), naming the session, version and seq it holds, so an answer is `unchanged` from one
   head read or carries only the runs that moved. A finished session plays back from its stored times
   (`lib/agent-world/replay`; none with motion reduced). The stage strip's working dot is
-  `.aw-working`, in both motion guards and stopped by name in brutalist. The ratings' words are data
+  `.aw-working`, stopped by name in both motion guards. The ratings' words are data
   labels (`RATING_LABELS`, `ORDER_SIDE_LABELS` in `lib/agent-world/config`), drawn in neutral badges
   and table cells, never opening a sentence; every model text goes through `SafeMarkdown` under the
   caveat. Components reach no store, no Paperclip client, no env reader
@@ -110,7 +110,7 @@ the map is `docs/MAP.md`.
   (`components/agent-world/office/OfficeDossier`, a sheet that leaves the floor live) is the
   Execution desk's `DecisionPanel` too, so an owner decides from the office; `?engine=2d` or no WebGL
   draws `components/agent-world/office/OfficeMap2D`. Colours are the `--office-*` tokens in
-  `app/globals.css`; the `.ao-*` motion classes are in both guards and stopped by name in brutalist.
+  `app/globals.css`; the `.ao-*` motion classes are in both motion guards.
   Keys: `lib/agent-world/office-keys`; sound, off until turned on and kept in this browser, is the
   pure recipes of `lib/agent-world/office-sounds` (cued by the ticker's new event keys) played by
   `components/agent-world/office/office-sound`. Its sentences are `lib/learn/copy/agent-world-office`,

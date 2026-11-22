@@ -98,7 +98,7 @@ const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) =
             />
 
             {/* The chart, straight under the price */}
-            <Panel pad={4} className="shimmer">
+            <Panel pad={4}>
                 <TradingViewWidget
                     title="Advanced Chart"
                     scriptUrl={tvScript('advanced-chart')}

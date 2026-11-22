@@ -58,10 +58,10 @@ the map is `docs/MAP.md`.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
   also finds pages, `searchPages`), the account menu. From md the trigger sits in the bar's true
   middle (`.header-bar` in `app/globals.css`: two equal side columns, the middle narrowing so each
-  side keeps 12rem); below md, and in Minimal at every width, it is an icon beside the account
-  menu. The landing page's header keeps the plain `.header-wrapper`. The bar's row fills the bar
+  side keeps 12rem); below md it is an icon beside the account menu. The landing page's header
+  keeps the plain `.header-wrapper`. The bar's row fills the bar
   (`.header-wrapper` height 100%, the grid's row centred), so the logo, the search and the avatar
-  sit on its middle line however tall each style draws it, and the account button's `-mr-2` puts
+  sit on its middle line however tall the bar is drawn, and the account button's `-mr-2` puts
   its edge as far from the right as the logo is from the left. The assistant's launcher is not in the bar:
   `components/chat/ChatWidget` floats the robot (`components/chat/RobotMascot`) fixed bottom-right
   at every width, over the page, and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`)

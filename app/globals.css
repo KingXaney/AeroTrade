@@ -5,9 +5,9 @@
 
 /* ═══════════════════════════════════════════════════════════════════
    THEME TOKENS — palettes override the colour tokens on html[data-palette]
-   (generated from lib/theme/palettes.ts), styles override the style tokens
-   on [data-style]. Defaults below are Quiet Cyber + minimal so a fresh
-   render is identical to the pre-theme app.
+   (generated from lib/theme/palettes.ts); the colour defaults below are
+   Quiet Cyber, the default palette. The app has one look, and its tokens
+   are here too, after the colours: its rules are at the foot of this file.
    ═══════════════════════════════════════════════════════════════════ */
 :root {
   --bg: #050608;
@@ -91,27 +91,30 @@
   color-scheme: dark;
   --shade-1: rgb(0 0 0 / 0.25);
   --shade-2: rgb(0 0 0 / 0.5);
-  --backdrop-opacity: 0.35;
 
-  /* style tokens — the neutral baseline every style starts from. What "Minimal" is lives in its
-     own [data-style="minimal"] block below, like the other four styles. */
-  --panel-bg: var(--surface-1);
-  --panel-border: 1px solid var(--line);
+  /* The look's tokens: generous radius, quiet borders, layered shadows. The app has one look
+     (the one that was called Soft while a theme could choose among five), so these are simply
+     :root's. A breath of the palette's accent in the fill and the shadow: on a dark palette a
+     black shadow over a near-black page is invisible, and a panel read as a flat box with
+     rounder corners. */
+  --panel-bg: color-mix(in srgb, var(--brand) 4%, var(--surface-1));
+  --panel-border: 1px solid color-mix(in srgb, var(--fg) 5%, transparent);
   --panel-blur: none;
-  --panel-shadow: none;
-  --panel-radius: 0.875rem;   /* = the old rounded-xl (--radius 0.625rem + 4px) */
-  --control-radius: 0.625rem; /* = the old --radius */
-  --glow: none;
+  --panel-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent), 0 1px 2px var(--shade-1), 0 10px 28px color-mix(in srgb, var(--brand) 7%, var(--shade-1)), 0 24px 48px var(--shade-2);
+  --panel-radius: 1.25rem;
+  --control-radius: 0.875rem;
+  --glow: 0 6px 20px color-mix(in srgb, var(--brand) 22%, transparent);
   --type-display: var(--font-sora);
-  --type-body: var(--font-hanken);
+  --type-body: var(--font-inter);
   --type-mono: var(--font-jetbrains);
 
   /* Type roles. A caption (MicroLabel, a Badge tag), a panel's heading (SectionHeading) and a
-     labelled control (ActionButton) each read their own tokens, so a style decides whether they
-     are terminal captions or plain words. Style blocks set these and only these: a palette block
-     (html[data-palette]) outranks [data-style], so a style must never write a palette token. */
+     labelled control (ActionButton) each read their own tokens, so one place decides whether
+     they are terminal captions or plain words: here, plain words. A token of the look may read
+     a palette token (var(--brand)) and is never one itself: a palette block (html[data-palette])
+     outranks :root, and would silently win. */
   --label-font: var(--type-body);
-  --label-size: 11px;
+  --label-size: 12px;
   --label-transform: none;
   --label-tracking: 0.01em;
   --heading-font: var(--type-display);
@@ -125,19 +128,19 @@
   --control-tracking: 0;
 
   /* The row inside a panel (RowCard). */
-  --card-bg: color-mix(in oklab, var(--surface-2) 40%, transparent);
+  --card-bg: color-mix(in srgb, var(--fg) 4%, transparent);
   --card-border-width: 1px;
-  --card-border-color: color-mix(in oklab, var(--line-strong) 20%, transparent);
-  --card-radius: var(--control-radius);
+  --card-border-color: transparent;
+  --card-radius: 1rem;
 
   /* The app frame (the header, the navigation) and what floats over the page (menus, popovers,
      dialogs, the drawer, the chat window). */
   --chrome-bg: var(--chrome);
-  --chrome-border: 1px solid var(--line);
+  --chrome-border: 1px solid transparent;
   --chrome-blur: none;
-  --chrome-shadow: none;
+  --chrome-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent), 0 4px 16px var(--shade-1);
   --chrome-float-bg: var(--surface-2);
-  --chrome-float-shadow: 0 12px 32px var(--shade-2);
+  --chrome-float-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2);
 
   /* Motion. Both reduced-motion guards at the foot of this file zero them. */
   --motion-fast: 120ms;
@@ -154,7 +157,6 @@ html[data-mode="light"] {
   color-scheme: light;
   --shade-1: rgb(15 23 42 / 0.06);
   --shade-2: rgb(15 23 42 / 0.14);
-  --backdrop-opacity: 0.25;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -442,18 +444,18 @@ html[data-mode="light"] {
 .glass-panel[data-interactive]:hover {
   border-color: color-mix(in srgb, var(--brand) 25%, transparent);
 }
-/* A panel arrives rather than appears. One short rise, in the style's own tempo. */
+/* A panel arrives rather than appears. One short rise, on the motion token. */
 .glass-panel { animation: panel-in var(--motion-base) var(--motion-ease) both; }
 /* The active account's panels while another account is being opened
    (components/trading/accounts/AccountRegion): each panel's content fades, never the panel —
-   an ancestor at less than full opacity would become the backdrop root and cut the blur the
-   glass styles draw behind a panel. Timed on the fast token, so both reduced-motion guards and
-   brutalist, which zero it, make the fade a cut. */
+   its frame stays whole, and an ancestor at less than full opacity would become the backdrop
+   root and cut a blur drawn behind a panel (--panel-blur). Timed on the fast token, so both
+   reduced-motion guards, which zero it, make the fade a cut. */
 .account-region .glass-panel > * { transition: opacity var(--motion-fast) var(--motion-ease); }
 .account-region[data-pending] .glass-panel > * { opacity: 0.45; }
 /* Lab › Today being arranged (components/lab/LabHud): each card's own Panel sits inside the
    shell's editing frame, so it draws no frame of its own there — one box per card, not two.
-   Unlayered like .glass-panel, and more specific than any style's rule for it. */
+   Unlayered like .glass-panel, and more specific than the rules that frame it. */
 [data-lab-hud="editing"] .glass-panel .glass-panel {
   background: transparent;
   border-color: transparent;
@@ -493,12 +495,6 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   from { opacity: 0; transform: translateY(-4px); }
 }
 
-/* Quiet Cyber redesign: shimmer and glow pulse are disabled. Kept as no-ops so the
-   .shimmer / .animate-glow usages render flat and calm; the futuristic style turns
-   them back on. */
-.shimmer::after { content: none; }
-.animate-glow { animation: none; }
-
 /* Typing Indicator Animation */
 .typing-dot {
   width: 4px;
@@ -517,9 +513,9 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 
 /* The assistant's robot (components/chat/RobotMascot, the launcher in components/chat/ChatWidget):
    CSS keyframes only, so both motion guards at the foot stop them — no SMIL, no Web Animations.
-   The hover tilt and the disc's scale ride the motion tokens; the loops are timed in seconds, so
-   brutalist stops them by name below (a zeroed token does not stop a keyframe: the .theme-blob
-   lesson). lib/theme/__tests__/motion-guards.test.ts pins every class to both guard lists. */
+   The hover tilt and the disc's scale ride the motion tokens; the loops are timed in seconds,
+   which a zeroed token does not reach, so the guards stop them by name.
+   lib/theme/__tests__/motion-guards.test.ts pins every class to both guard lists. */
 .robot-launcher { transition: scale var(--motion-base) var(--motion-ease); }
 .robot-mascot { transition: transform var(--motion-base) var(--motion-ease); }
 .robot-launcher:hover .robot-mascot,
@@ -534,21 +530,20 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 }
 
 /* The trading agent world's floor (components/agent-world/StageStrip): a working role's dot
-   breathes. A loop in literal seconds, so both motion guards at the foot of this file stop it by
-   name, and brutalist, whose zeroed tokens stop nothing timed in seconds, stops it by name too
-   (lib/theme/__tests__/motion-guards.test.ts pins all three). */
+   breathes. A loop in literal seconds, which the guards' zeroed tokens do not reach, so both
+   motion guards at the foot of this file stop it by name (lib/theme/__tests__/motion-guards.test.ts
+   finds every animation timed that way and holds it to both). */
 .aw-working { animation: aw-working 1.6s ease-in-out infinite; }
 @keyframes aw-working {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(1.35); }
 }
-[data-style="brutalist"] .aw-working { animation: none; }
 
 /* The office (/agent-world/office): a bubble pops in over a seat that just spoke, a status lamp
    breathes while its seat is at it, the confetti after the owner's Approve falls once, the stamp's
-   label lands, a new ticker line slides in. The one-shots run on --motion-base; the two in literal
-   seconds (.ao-lamp, .ao-confetti) are stopped by name in brutalist; all five are in both motion
-   guards (lib/theme/__tests__/motion-guards.test.ts). A confetti piece rests invisible, so a stopped
+   label lands, a new ticker line slides in. The one-shots run on --motion-base, the lamp and the
+   confetti in literal seconds; all five are in both motion guards
+   (lib/theme/__tests__/motion-guards.test.ts). A confetti piece rests invisible, so a stopped
    one is simply not seen; a bubble and a label rest whole. */
 .ao-bubble-in { animation: ao-bubble-in calc(var(--motion-base) * 1.4) cubic-bezier(.2, .9, .3, 1.2) both; }
 @keyframes ao-bubble-in {
@@ -559,14 +554,12 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: .5; transform: scale(1.3); }
 }
-[data-style="brutalist"] .ao-lamp { animation: none; }
 .ao-confetti { opacity: 0; animation: ao-confetti 1.8s cubic-bezier(.15, .7, .35, 1) both; animation-delay: var(--ao-delay, 0ms); }
 @keyframes ao-confetti {
   0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
   80% { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--ao-dx, 0px), var(--ao-dy, 120px)) rotate(var(--ao-rot, 360deg)); }
 }
-[data-style="brutalist"] .ao-confetti { animation: none; }
 .ao-stamp-in { transform: rotate(-6deg); animation: ao-stamp-in calc(var(--motion-base) * 1.6) cubic-bezier(.2, 1.5, .4, 1) both; }
 @keyframes ao-stamp-in {
   from { opacity: 0; transform: scale(1.9) rotate(-14deg); }
@@ -612,12 +605,12 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
    `transform` free for the animations.
    Motion is CSS keyframes only — no SMIL, no Web Animations — on the timeline
    lib/poker-night/choreography lays out: --pn-at (when) and --pn-dur (how long) are in units of
-   --motion-base, so brutalist and both motion guards (they zero the token) play every step at once.
+   --motion-base, so both motion guards (they zero the token) play every step at once.
    Each keyframe leaves its end to the element's static style, which is the final state, so a guard's
    `animation: none` shows the table as it now is: flights that end invisible (opacity 0) are not
    seen at all, a stack shows its new count, a dimmed card stays dimmed. Element lifetimes are JS
-   timers, never animationend. Loops (.pn-pulse, .pn-win-glow) run in literal seconds and brutalist
-   stops them by name; every class is in both guard lists at the foot of this file, pinned by
+   timers, never animationend. Loops (.pn-pulse, .pn-win-glow) run in literal seconds, which a
+   zeroed token does not reach; every class is in both guard lists at the foot of this file, pinned by
    lib/theme/__tests__/motion-guards.test.ts. The one thing that moves without a keyframe is a
    winner's stack counting up: formatted text a timer steps (components/poker-night/CountUp), on the
    same --motion-base, so a zeroed token shows the new count at once.
@@ -670,8 +663,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     .pn-stage > .pn-dock { grid-column: 2; grid-row: 2; align-self: end; }
   }
 
-  /* The felt: a stadium (rounded-full, which brutalist's square-corner rule leaves alone) in the
-     felt's two tones inside its rail, the betting line printed on it. */
+  /* The felt: a stadium (rounded-full, at the call site) in the felt's two tones inside its
+     rail, the betting line printed on it. */
   .pn-felt {
     position: absolute;
     background: radial-gradient(ellipse at 50% 42%, var(--pn-felt-light), var(--pn-felt) 70%);
@@ -1061,7 +1054,7 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .pn-dock-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 10px; max-width: 64rem; margin-inline: auto; }
   /* The viewer's turn (or a card of theirs to throw away), for a phone that cannot buzz: the dock's top
      edge in the warning colour, its ring breathing on .pn-pulse's loop, and the "Your turn" pill ringed
-     the same way — still, and still there, under either motion guard and in brutalist. */
+     the same way — still, and still there, under either motion guard. */
   .pn-turn-edge {
     position: absolute;
     left: max(10px, env(safe-area-inset-left));
@@ -1096,7 +1089,7 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   /* Triple T's throw-away (components/poker-night/DiscardPicker): three cards side by side, never
      overlapping, each a radio of 44 px or more; the one picked rises 10 px, dims by filter (never
      opacity: the scene must not show through the paper) and carries an ✕ in a chrome circle. The rise
-     is a transition on the motion token, so a zeroed token (brutalist, both motion guards) shows it at
+     is a transition on the motion token, so a zeroed token (both motion guards) shows it at
      once. */
   .pn-pick { --pn-card-w: max(44px, var(--pn-hole-w)); --pn-card-h: calc(var(--pn-card-w) * 1.4); }
   .pn-pick-card {
@@ -1331,7 +1324,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   100% { transform: translate(var(--pn-x, 0px), var(--pn-y, 0px)) rotate(var(--pn-rot, 0deg)); opacity: 0; }
 }
 /* Loops in literal time: the plate on the clock breathes, an all-in bet line too; the cards that
-   play glow. Brutalist stops both by name — its zeroed tokens do not reach a loop timed in seconds. */
+   play glow. A zeroed token does not reach a loop timed in seconds: both guards stop them by name,
+   and the turn ring's second-long sweep with them. */
 .pn-pulse { animation: pn-pulse 1.6s ease-in-out infinite; }
 @keyframes pn-pulse {
   0%, 100% { outline-offset: 1px; }
@@ -1344,8 +1338,6 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   50% { filter: drop-shadow(0 0 9px var(--rank-1)); }
 }
 .pn-turn-ring { transition: stroke-dashoffset 1s linear, color var(--motion-base) var(--motion-ease); }
-[data-style="brutalist"] :is(.pn-pulse, .pn-win-glow, .pn-ambient) { animation: none; }
-[data-style="brutalist"] .pn-turn-ring { transition: none; }
 
 /* ── poker night looks (P5: components/poker-night SceneBackdrop, SceneArt, LookPicker,
    PersonalLookControls, AvatarBuilder; lib/poker-night/looks, personal) ──
@@ -1355,8 +1347,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
    the full-screen table and a small preview draw the same art. A picker's swatch reads its colours
    from its own data attribute (a drawer is portaled out of the room). The art's ambient loop
    (.pn-ambient plus .pn-ambient-twinkle, -drift, -flicker or -waves) runs in literal seconds:
-   brutalist stops .pn-ambient by name and both guards stop every class; a scene change fades in on
-   the motion token (.pn-scene-fade). */
+   both guards stop every class by name; a scene change fades in on the motion token
+   (.pn-scene-fade). */
 @layer components {
   .pn-room { --pn-art-top: var(--pn-top); }
   .pn-scene-stack { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
@@ -1591,7 +1583,7 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 /* ── poker night summary (P7: components/poker-night NightSummary, lib/poker-night/awards) ──
    The end of the night celebrates once as it opens: the big win's confetti (.pn-confetti, in a fixed
    layer that clips it, so no piece widens the page) and the award cards stepping in one after another
-   on the motion token (.pn-award-in, --pn-at in its units), so brutalist and both guards show them in
+   on the motion token (.pn-award-in, --pn-at in its units), so both guards show them in
    place at once — and a guarded confetti piece rests unseen. */
 @layer components {
   .pn-celebration { position: fixed; inset: 0; z-index: 30; overflow: hidden; pointer-events: none; }
@@ -1600,28 +1592,6 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 .pn-award-in { animation: pn-award-in calc(var(--motion-base) * 2.2) cubic-bezier(0.2, 1.25, 0.4, 1) calc(var(--motion-base) * var(--pn-at, 0)) both; }
 @keyframes pn-award-in {
   from { transform: translateY(12px) scale(0.92); opacity: 0; }
-}
-
-/* Particle Background Canvas */
-#bg-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.4;
-}
-
-/* Reduced Motion */
-@media (prefers-reduced-motion: reduce) {
-  .shimmer::after,
-  .typing-dot,
-  .animate-glow {
-    animation: none !important;
-    transition: none !important;
-  }
 }
 
 /* ═══════════════════════════════════════
@@ -1657,8 +1627,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     box-shadow: var(--chrome-shadow);
   }
   /* The bar's row fills the bar, so its items centre on the bar's middle line: the account button
-     (a 36px avatar in its padding) is taller than a bar's height less its padding in every style,
-     and a row that only started at the top hung 2-5px low. */
+     (a 36px avatar in its padding) is taller than the bar's height less its padding, and a row
+     that only started at the top hung 2-5px low. */
   .header-wrapper {
     @apply flex justify-between items-center px-6 py-3;
     height: 100%;
@@ -1668,8 +1638,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
      the search sits in the bar's true middle: two equal side columns, so neither the logo nor a
      name beside the avatar pushes it off centre, and the middle never takes more than leaves
      each side 12rem (the drawer button and the logo below lg). Below md the search is an icon,
-     set beside the account menu, since a centred icon would meet the logo. Minimal keeps its own
-     row (its block below). The landing page's header has no search and keeps the plain wrapper. */
+     set beside the account menu, since a centred icon would meet the logo. The landing page's
+     header has no search and keeps the plain wrapper. */
   .header-bar > .search-text { margin-left: auto; }
   @media (min-width: 48rem) {
     .header-bar {
@@ -1872,8 +1842,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   }
 
   /* ─── NEWS ─── */
-  /* A headline card sits inside a panel, so it takes the style's card tokens (a step larger than
-     a row), not a frame of its own — and no second blur over the panel's. */
+  /* A headline card sits inside a panel, so it takes the card tokens (a step larger than a
+     row), not a frame of its own — and no second blur over the panel's. */
   .news-item {
     @apply w-full p-4 duration-200 cursor-pointer;
     background-color: var(--card-bg);
@@ -2040,575 +2010,17 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   overflow: hidden !important;
 }
 /* ═══════════════════════════════════════════════════════════════════
-   STYLES — orthogonal to palettes. Each block only sets style tokens and
-   its own extra rules; the :root values above are the neutral baseline
-   a block falls back to for the tokens it does not set.
+   THE LOOK — the app has one: generous radius, quiet borders, layered shadows. Its tokens are
+   :root's, at the head of this file; these are its rules beyond them. They are unlayered, so
+   each beats a utility written at a call site, and they keep the order they were written in
+   while the look was one of five styles: among rules of equal weight the later one wins.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ─── minimal: no boxes. Open sections under hairline rules, one typeface, ink buttons, flat
-   chrome. The page's own background is the only surface; a rule, a weight and a little air do
-   the work a frame did. ─── */
-[data-style="minimal"] {
-  --panel-bg: transparent;
-  --panel-border: 0;
-  --panel-blur: none;
-  --panel-shadow: none;
-  --panel-radius: 0;
-  --control-radius: 0.25rem;
-  --glow: none;
-  --type-display: var(--font-inter);
-  --type-body: var(--font-inter);
-  --type-mono: var(--font-jetbrains);
-  --label-font: var(--type-body);
-  --label-size: 11px;
-  --label-transform: none;
-  --label-tracking: 0.02em;
-  --heading-font: var(--type-body);
-  --heading-weight: 500;
-  --heading-transform: none;
-  --heading-tracking: 0;
-  --heading-color: var(--fg-soft);
-  --control-font: var(--type-body);
-  --control-weight: 500;
-  --control-transform: none;
-  --control-tracking: 0;
-  --card-bg: transparent;
-  --card-border-width: 1px;
-  --card-border-color: transparent;
-  --card-radius: 0;
-  --chrome-bg: var(--bg);
-  --chrome-border: 1px solid var(--line);
-  --chrome-blur: none;
-  --chrome-shadow: none;
-  --chrome-float-bg: var(--surface-1);
-  --chrome-float-shadow: 0 0 0 1px var(--line-strong);
-}
-/* A panel is a section: a hairline above it, its content flush with the page's left edge, the
-   vertical padding it asked for. The horizontal padding utility loses to this unlayered rule,
-   as .glass-panel documents. */
-[data-style="minimal"] .glass-panel {
-  border-top: 1px solid var(--line-strong);
-  padding-inline: 0;
-}
-/* Panels side by side are columns of one ruled page, so they stand further apart than boxes did. */
-[data-style="minimal"] .grid:has(> .glass-panel) { column-gap: 2.5rem; }
-/* The lab's HUD grid holds its cards in shell divs, so the rule above never matches it. */
-[data-style="minimal"] [data-lab-grid] { column-gap: 2.5rem; }
-/* A panel that is a link: its rule takes the accent, and the section lifts a shade. */
-[data-style="minimal"] .glass-panel[data-interactive]:hover {
-  border-top-color: var(--brand);
-  background: color-mix(in srgb, var(--fg) 3%, transparent);
-}
-/* Rows and headlines are a ruled list, not tiles: a hairline under each, flush left. */
-[data-style="minimal"] :is(.row-card, .news-item) {
-  border-width: 0 0 1px 0;
-  border-color: var(--line);
-  border-radius: 0;
-  padding-inline: 0;
-}
-[data-style="minimal"] :is(a, button).row-card:hover,
-[data-style="minimal"] .news-item:hover { border-bottom-color: color-mix(in srgb, var(--brand) 60%, transparent); }
-/* Buttons are ink — the page's foreground on its background — so the accent is kept for links
-   and the active state, and one colour carries one meaning. */
-[data-style="minimal"] .control-type:is(.bg-brand, .bg-brand-strong),
-[data-style="minimal"] :is(.yellow-btn, .search-btn) {
-  background-color: var(--fg);
-  color: var(--bg);
-}
-[data-style="minimal"] .control-type:is(.bg-brand, .bg-brand-strong):hover,
-[data-style="minimal"] :is(.yellow-btn, .search-btn):hover {
-  background-color: var(--fg-soft);
-  filter: none;
-}
-/* Titles carry weight by size, not boldness. */
-[data-style="minimal"] :is(h1, h2) { font-weight: 500; }
-/* Fields are outlines on the page, not filled boxes. */
-[data-style="minimal"] :is(.form-input, .select-trigger, .country-select-trigger) {
-  background-color: transparent;
-  border: 1px solid var(--line-strong);
-}
-[data-style="minimal"] :is(.form-input, .select-trigger):focus { border-color: var(--fg) !important; }
-/* The chrome nearly disappears: a 3rem bar on the page background with no rule, the logo small,
-   search an icon, the account an avatar; the rail a narrow strip of plain icons with the current
-   one in the foreground colour, no tile. The content wrapper moves up and in to match. */
-[data-style="minimal"] .header { height: 3rem; border-bottom: 0; }
-[data-style="minimal"] .header-wrapper { padding-block: 0.5rem; justify-content: flex-start; }
-/* Minimal's search is an icon beside the account menu at every width, so its bar stays a row. */
-[data-style="minimal"] .header-bar { display: flex; }
-[data-style="minimal"] .header .font-heading { font-size: 1rem; letter-spacing: -0.01em; }
-[data-style="minimal"] .header .material-symbols-outlined { font-size: 20px; }
-[data-style="minimal"] .search-text {
-  margin-left: auto;
-  width: 2.25rem;
-  max-width: none;
-  padding: 0;
-  justify-content: center;
-  border-color: transparent;
-  background: transparent;
-  color: var(--fg-muted);
-}
-[data-style="minimal"] .search-text:hover { color: var(--fg); }
-[data-style="minimal"] .search-text > :not(svg) { display: none; }
-[data-style="minimal"] [data-user-name] { display: none; }
-[data-style="minimal"] .header [data-slot="avatar"] { width: 1.75rem; height: 1.75rem; box-shadow: none; }
-[data-style="minimal"] .rail { width: 3rem; top: 3rem; border-right: 0; }
-[data-style="minimal"] .rail nav { gap: 0.25rem; padding-block: 0.75rem; }
-[data-style="minimal"] .rail nav a { width: 2.25rem; height: 2.25rem; background: transparent; color: var(--fg-muted); }
-[data-style="minimal"] .rail nav a:hover { background: transparent; color: var(--fg); }
-[data-style="minimal"] .rail nav a[aria-current="page"] { color: var(--fg); }
-[data-style="minimal"] .rail .material-symbols-outlined { font-size: 20px; }
-[data-style="minimal"] [data-app-content] { padding-top: 3.5rem; }
-@media (min-width: 64rem) {
-  [data-style="minimal"] [data-app-content] { margin-left: 3rem; }
-}
-/* A section's pages are words, the current one underlined, not chips. */
-[data-style="minimal"] [data-section-tabs] { gap: 1.25rem; }
-[data-style="minimal"] [data-section-tabs] a {
-  padding-inline: 0;
-  border-radius: 0;
-  background: transparent;
-  border-bottom: 1px solid transparent;
-  color: var(--fg-muted);
-}
-[data-style="minimal"] [data-section-tabs] a:hover { color: var(--fg); background: transparent; }
-[data-style="minimal"] [data-section-tabs] a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--fg); }
-/* Less on the page: a smaller title with its subtitle as a caption, chips as words, the chat
-   launcher in ink without a halo, the terrain without its axis caption (the legend and the
-   definitions stay). */
-[data-style="minimal"] [data-app-content] h1 { font-size: 1.375rem; margin-bottom: 0.125rem; }
-[data-style="minimal"] [data-page-subtitle] { font-size: 0.75rem; }
-[data-style="minimal"] [data-streak-chip] { border-color: transparent; background: transparent; padding-inline: 0; }
-[data-style="minimal"] .robot-launcher {
-  width: 2.75rem;
-  height: 2.75rem;
-  background: var(--fg);
-  color: var(--bg);
-  box-shadow: none;
-}
-[data-style="minimal"] .robot-launcher > svg { width: 1.75rem; height: 1.75rem; }
-[data-style="minimal"] [data-terrain-caption] { display: none; }
-/* The landing page's header has no search to push its buttons right; its nav does that itself. */
-[data-style="minimal"] .header-wrapper > nav { margin-left: auto; }
-/* Settings' section list, the news tags and every badge are words, not chips. */
-[data-style="minimal"] [data-settings-tab] { background: transparent; border-radius: 0; padding-inline: 0; color: var(--fg-muted); }
-[data-style="minimal"] [data-settings-tab]:hover { background: transparent; color: var(--fg); }
-[data-style="minimal"] [data-settings-tab][aria-current="page"] { color: var(--fg); }
-[data-style="minimal"] .news-tag { background: transparent; padding-inline: 0; }
-[data-style="minimal"] [data-badge] { background: transparent; padding-inline: 0; color: var(--fg-soft); }
-[data-style="minimal"] [data-count-pill] { background: transparent; padding-inline: 0; color: var(--brand); }
-[data-style="minimal"] [data-topic-chip] { background: transparent; border-color: transparent; padding-inline: 0; }
-
-/* ─── futuristic: the original Cyber-Fin look (shimmer, glow, particles, grid) ─── */
-[data-style="futuristic"] {
-  --panel-bg: color-mix(in srgb, var(--surface-0) 70%, transparent);
-  --panel-border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
-  --panel-blur: blur(12px);
-  --panel-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-strong) 6%, transparent), 0 8px 32px var(--shade-2);
-  --panel-radius: 0.75rem;
-  --control-radius: 0.375rem;
-  --glow: 0 0 15px color-mix(in srgb, var(--brand-strong) 25%, transparent);
-  --type-display: var(--font-space-grotesk);
-  --type-body: var(--font-hanken);
-  --type-mono: var(--font-jetbrains);
-  --label-font: var(--type-mono);
-  --label-size: 10px;
-  --label-transform: uppercase;
-  --label-tracking: 0.1em;
-  --heading-font: var(--type-mono);
-  --heading-weight: 700;
-  --heading-transform: uppercase;
-  --heading-tracking: 0.1em;
-  --heading-color: var(--brand);
-  --control-font: var(--type-mono);
-  --control-weight: 700;
-  --control-transform: uppercase;
-  --control-tracking: 0.1em;
-  --card-bg: color-mix(in srgb, var(--surface-0) 55%, transparent);
-  --card-border-color: color-mix(in srgb, var(--brand) 14%, transparent);
-  --chrome-bg: color-mix(in srgb, var(--chrome) 82%, transparent);
-  --chrome-border: 1px solid color-mix(in srgb, var(--brand) 16%, transparent);
-  --chrome-blur: blur(14px);
-  --chrome-shadow: 0 0 24px color-mix(in srgb, var(--brand-strong) 6%, transparent);
-  --chrome-float-bg: color-mix(in srgb, var(--surface-0) 88%, transparent);
-  --chrome-float-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-strong) 8%, transparent), 0 16px 40px var(--shade-2);
-}
-/* An accent line along each panel's top edge, and a rule beside its heading. ::before — the
-   shimmer sweep owns ::after. */
-[data-style="futuristic"] .glass-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand) 55%, transparent) 30%, color-mix(in srgb, var(--brand) 55%, transparent) 70%, transparent);
-}
-[data-style="futuristic"] [data-panel-title] { border-left: 2px solid var(--brand); padding-left: 0.5rem; }
-/* grid + vignette layer, below the particle canvas (#bg-canvas is z-index -1) */
-[data-style="futuristic"] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in srgb, var(--brand-strong) 8%, transparent), transparent 70%),
-    linear-gradient(color-mix(in srgb, var(--brand) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--brand) 5%, transparent) 1px, transparent 1px);
-  background-size: 100% 100%, 48px 48px, 48px 48px;
-  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 100%);
-}
-[data-style="futuristic"] .shimmer { position: relative; overflow: hidden; }
-[data-style="futuristic"] .shimmer::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--brand) 12%, transparent) 50%, transparent 60%);
-  background-size: 250% 250%;
-  animation: shimmer-sweep 8s linear infinite;
-}
-[data-style="futuristic"] .animate-glow { animation: subtle-glow 3s ease-in-out infinite; }
-[data-style="futuristic"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
-[data-style="futuristic"] :is(.form-input, .select-trigger):focus {
-  border-color: var(--brand-strong) !important;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-strong) 20%, transparent), 0 0 12px color-mix(in srgb, var(--brand-strong) 20%, transparent);
-}
-[data-style="futuristic"] :is(h1, h2) { text-shadow: 0 0 24px color-mix(in srgb, var(--brand-strong) 20%, transparent); }
-@keyframes shimmer-sweep { 0% { background-position: 200% 0; } 100% { background-position: -100% 0; } }
-@keyframes subtle-glow {
-  0%, 100% { box-shadow: 0 0 15px color-mix(in srgb, var(--brand-strong) 25%, transparent); }
-  50% { box-shadow: 0 0 25px color-mix(in srgb, var(--brand-strong) 45%, transparent); }
-}
-
-/* Layout: a console. Denser type; the sections as a dock along the bottom edge, so the page runs
-   full width; panels bracketed at two corners; a prompt before the page title; tabs in brackets;
-   rows with an accent edge; tags as mono capitals in a thin frame. */
-[data-style="futuristic"] { font-size: 15px; }
-[data-style="futuristic"] .header { height: 3.5rem; }
-[data-style="futuristic"] .header-wrapper { padding-block: 0.5rem; }
-[data-style="futuristic"] .rail {
-  top: auto; bottom: 0; left: 0; right: 0;
-  width: auto; height: 3.5rem;
-  flex-direction: row;
-  border-right: 0;
-  border-top: var(--chrome-border);
-}
-[data-style="futuristic"] .rail nav { flex-direction: row; justify-content: center; gap: 0.75rem; padding: 0.375rem 1rem; width: auto; }
-[data-style="futuristic"] .rail nav a { width: 2.75rem; height: 2.75rem; border-radius: var(--control-radius); border: 1px solid transparent; }
-[data-style="futuristic"] .rail nav a[aria-current="page"] { border-color: color-mix(in srgb, var(--brand) 45%, transparent); box-shadow: var(--glow); }
-[data-style="futuristic"] [data-app-content] { padding-top: 4.5rem; padding-bottom: 6rem; }
-@media (min-width: 64rem) {
-  [data-style="futuristic"] [data-app-content] { margin-left: 0; }
-}
-[data-style="futuristic"] .robot-launcher { bottom: 4.75rem; }
-[data-style="futuristic"] [data-chat-window] { bottom: 4.75rem; max-height: calc(100dvh - 6.75rem); }
-[data-style="futuristic"] [data-robot-tip] { bottom: 9rem; }
-[data-style="futuristic"] .glass-panel {
-  background-image:
-    linear-gradient(var(--brand), var(--brand)), linear-gradient(var(--brand), var(--brand)),
-    linear-gradient(var(--brand), var(--brand)), linear-gradient(var(--brand), var(--brand));
-  background-repeat: no-repeat;
-  background-size: 14px 1px, 1px 14px, 14px 1px, 1px 14px;
-  background-position: left top, left top, right bottom, right bottom;
-}
-[data-style="futuristic"] [data-app-content] h1 {
-  font-family: var(--type-mono);
-  font-size: 1.25rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--brand);
-}
-[data-style="futuristic"] [data-app-content] h1::before { content: "> "; color: var(--brand-dim); }
-[data-style="futuristic"] [data-page-subtitle] { font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.04em; }
-[data-style="futuristic"] [data-section-tabs] a {
-  background: transparent;
-  border-radius: 0;
-  padding-inline: 0.25rem;
-  font-family: var(--type-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-[data-style="futuristic"] [data-section-tabs] a::before { content: "["; color: var(--fg-muted); }
-[data-style="futuristic"] [data-section-tabs] a::after { content: "]"; color: var(--fg-muted); }
-[data-style="futuristic"] [data-section-tabs] a[aria-current="page"] { color: var(--brand); text-shadow: 0 0 12px color-mix(in srgb, var(--brand-strong) 40%, transparent); }
-[data-style="futuristic"] [data-section-tabs] a[aria-current="page"]::before,
-[data-style="futuristic"] [data-section-tabs] a[aria-current="page"]::after { color: var(--brand); }
-[data-style="futuristic"] .row-card { border-left: 2px solid color-mix(in srgb, var(--brand) 45%, transparent); }
-[data-style="futuristic"] :is([data-badge], [data-count-pill]) {
-  font-family: var(--type-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-  color: var(--brand);
-  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
-}
-[data-style="futuristic"] [data-settings-tab] { border-radius: 0; border-left: 2px solid transparent; }
-[data-style="futuristic"] [data-settings-tab][aria-current="page"] { border-left-color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, transparent); }
-
-/* ─── liquid-glass: translucent blurred panels with a specular top edge over drifting blobs ─── */
-[data-style="liquid-glass"] {
-  --panel-bg: color-mix(in srgb, var(--surface-1) 55%, transparent);
-  --panel-border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
-  --panel-blur: blur(24px) saturate(160%);
-  --panel-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent), 0 12px 40px var(--shade-2);
-  --panel-radius: 1.25rem;
-  --control-radius: 0.75rem;
-  --glow: 0 4px 24px color-mix(in srgb, var(--brand) 30%, transparent);
-  --type-display: var(--font-sora);
-  --type-body: var(--font-inter);
-  --type-mono: var(--font-jetbrains);
-  --card-bg: color-mix(in srgb, var(--fg) 5%, transparent);
-  --card-border-color: color-mix(in srgb, var(--fg) 10%, transparent);
-  --card-radius: 0.875rem;
-  --chrome-bg: color-mix(in srgb, var(--chrome) 60%, transparent);
-  --chrome-border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
-  --chrome-blur: blur(24px) saturate(160%);
-  --chrome-float-bg: color-mix(in srgb, var(--surface-1) 70%, transparent);
-  --chrome-float-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent), 0 12px 40px var(--shade-2);
-}
-[data-style="liquid-glass"] :is(.glass-panel, .news-item) { position: relative; overflow: hidden; isolation: isolate; }
-/* z-index -1 inside the panel's own stacking context: above its background, below its children. */
-[data-style="liquid-glass"] :is(.glass-panel, .news-item)::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  z-index: -1;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--fg) 12%, transparent) 0%, color-mix(in srgb, var(--fg) 3%, transparent) 30%, transparent 55%);
-  mask-image: linear-gradient(180deg, #000, transparent 60%);
-}
-[data-style="liquid-glass"] :is(.form-input, .select-trigger, .country-select-trigger) {
-  background-color: color-mix(in srgb, var(--surface-0) 60%, transparent);
-  backdrop-filter: blur(12px);
-  border-color: color-mix(in srgb, var(--fg) 12%, transparent);
-}
-[data-style="liquid-glass"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
-@keyframes blob-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  33% { transform: translate3d(6vw, -4vh, 0) scale(1.08); }
-  66% { transform: translate3d(-4vw, 5vh, 0) scale(0.94); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
-}
-.theme-blobs { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; contain: strict; }
-.theme-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  will-change: transform;
-  opacity: var(--backdrop-opacity);
-  animation: blob-drift 28s ease-in-out infinite;
-}
-.theme-blob--1 { width: 55vmax; height: 55vmax; top: -20vmax; left: -15vmax; background: radial-gradient(circle, color-mix(in srgb, var(--brand) 55%, transparent), transparent 70%); }
-.theme-blob--2 { width: 45vmax; height: 45vmax; bottom: -15vmax; right: -10vmax; animation-duration: 34s; animation-delay: -9s; background: radial-gradient(circle, color-mix(in srgb, var(--secondary-tint) 50%, transparent), transparent 70%); }
-.theme-blob--3 { width: 40vmax; height: 40vmax; top: 40%; left: 50%; animation-duration: 40s; animation-delay: -18s; background: radial-gradient(circle, color-mix(in srgb, var(--positive) 40%, transparent), transparent 70%); }
-
-/* Layout: islands. The bar floats inset from the top edge; the sections float as a capsule at the
-   left, centred on the page; the page sits under them with more air; controls are pills. */
-[data-style="liquid-glass"] .header {
-  top: 0.75rem; left: 0.75rem; right: 0.75rem;
-  width: auto; height: 3.5rem;
-  border: var(--chrome-border);
-  border-radius: 1.25rem;
-  box-shadow: var(--chrome-float-shadow);
-}
-[data-style="liquid-glass"] .header-wrapper { padding-block: 0.5rem; }
-[data-style="liquid-glass"] .search-text { border-radius: 9999px; }
-[data-style="liquid-glass"] .rail {
-  top: 50%; bottom: auto; left: 0.75rem;
-  height: auto; width: 3.75rem;
-  transform: translateY(-50%);
-  border: var(--chrome-border);
-  border-radius: 9999px;
-  box-shadow: var(--chrome-float-shadow);
-  background: var(--chrome-float-bg);
-}
-[data-style="liquid-glass"] .rail nav { padding-block: 0.75rem; gap: 0.5rem; }
-[data-style="liquid-glass"] .rail nav a { width: 2.75rem; height: 2.75rem; border-radius: 9999px; }
-[data-style="liquid-glass"] .rail nav a[aria-current="page"] {
-  background: color-mix(in srgb, var(--fg) 14%, transparent);
-  color: var(--fg);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 20%, transparent);
-}
-[data-style="liquid-glass"] [data-app-content] { padding-top: 6rem; padding-inline: 2rem; }
-@media (min-width: 64rem) {
-  [data-style="liquid-glass"] [data-app-content] { margin-left: 5.5rem; }
-}
-[data-style="liquid-glass"] [data-app-content] h1 { font-size: 1.75rem; letter-spacing: -0.02em; }
-[data-style="liquid-glass"] .control-type { border-radius: 9999px; }
-[data-style="liquid-glass"] [data-section-tabs] { gap: 0.375rem; }
-[data-style="liquid-glass"] [data-section-tabs] a {
-  border-radius: 9999px;
-  padding: 0.375rem 0.875rem;
-  background: color-mix(in srgb, var(--fg) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
-}
-[data-style="liquid-glass"] [data-section-tabs] a[aria-current="page"] {
-  background: color-mix(in srgb, var(--brand) 22%, transparent);
-  color: var(--fg);
-  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
-}
-[data-style="liquid-glass"] :is([data-badge], [data-count-pill], [data-settings-tab], [data-topic-chip]) { border-radius: 9999px; }
-[data-style="liquid-glass"] [data-settings-tab][aria-current="page"] { background: color-mix(in srgb, var(--brand) 18%, transparent); }
-[data-style="liquid-glass"] .robot-launcher {
-  background: color-mix(in srgb, var(--brand) 32%, transparent);
-  color: var(--fg);
-  border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-/* ─── brutalist: zero radius, heavy borders, hard offset shadows, mono display ─── */
-[data-style="brutalist"] {
-  --panel-bg: var(--surface-1);
-  --panel-border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent);
-  --panel-blur: none;
-  --panel-shadow: 4px 4px 0 color-mix(in srgb, var(--fg) 60%, transparent);
-  --panel-radius: 0;
-  --control-radius: 0;
-  --glow: 4px 4px 0 var(--fg);
-  --type-display: var(--font-plex-mono);
-  --type-body: var(--font-inter);
-  --type-mono: var(--font-plex-mono);
-  --label-font: var(--type-mono);
-  --label-size: 10px;
-  --label-transform: uppercase;
-  --label-tracking: 0.08em;
-  --heading-font: var(--type-mono);
-  --heading-weight: 700;
-  --heading-transform: uppercase;
-  --heading-tracking: 0.04em;
-  --control-font: var(--type-mono);
-  --control-weight: 700;
-  --control-transform: uppercase;
-  --control-tracking: 0.06em;
-  --card-bg: var(--surface-2);
-  --card-border-width: 2px;
-  --card-border-color: color-mix(in srgb, var(--fg) 35%, transparent);
-  --chrome-border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent);
-  --chrome-float-bg: var(--surface-1);
-  --chrome-float-shadow: 4px 4px 0 color-mix(in srgb, var(--fg) 60%, transparent);
-  --motion-fast: 0ms;
-  --motion-base: 0ms;
-}
-/* A panel's heading is a label stuck on it. */
-[data-style="brutalist"] [data-panel-title] {
-  width: fit-content;
-  background: var(--fg);
-  color: var(--bg);
-  padding: 0.125rem 0.5rem;
-}
-/* A panel that is a link moves when touched; a fainter border would say "disabled". */
-[data-style="brutalist"] .glass-panel[data-interactive]:hover {
-  border-color: var(--brand);
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 color-mix(in srgb, var(--fg) 60%, transparent);
-}
-[data-style="brutalist"] :not(.rounded-full):not(.typing-dot):not(.theme-blob) { border-radius: 0; }
-/* The robot stands still, squared off; the blink stays — a hard cut suits the style. Stopped by
-   name: the loops are timed in seconds, which the zeroed motion tokens do not reach. */
-[data-style="brutalist"] :is(.robot-bob, .robot-antenna) { animation: none; }
-[data-style="brutalist"] .robot-mascot rect { rx: 0; ry: 0; }
-[data-style="brutalist"] :is(h1, h2, h3) { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
-[data-style="brutalist"] :is(.yellow-btn, .search-btn) {
-  border: 2px solid var(--fg);
-  box-shadow: var(--glow);
-  font-family: var(--type-mono);
-  font-weight: 700;
-  text-transform: uppercase;
-  transition: transform 0.08s linear, box-shadow 0.08s linear;
-}
-[data-style="brutalist"] :is(.yellow-btn, .search-btn):active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--fg); }
-[data-style="brutalist"] :is(.form-input, .select-trigger, .country-select-trigger) { border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent); }
-[data-style="brutalist"] :is(.form-input, .select-trigger):focus { border-color: var(--fg) !important; box-shadow: 4px 4px 0 var(--brand); }
-
-/* Layout: a ledger. The rail widens into a sidebar of sections with their names (data-rail), every
-   row a 2px rule, the current one inverted; the content moves right to make room; the title is a
-   stamp; tabs are one segmented block; tags are inverted blocks; a faint hatch behind the page. */
-[data-style="brutalist"] .rail { width: 11rem; align-items: stretch; }
-[data-style="brutalist"] .rail nav { align-items: stretch; gap: 0; padding: 0; }
-[data-style="brutalist"] .rail nav a {
-  width: 100%; height: 3rem;
-  justify-content: flex-start; gap: 0.75rem;
-  padding-inline: 1rem;
-  border-radius: 0;
-  border-bottom: 2px solid color-mix(in srgb, var(--fg) 20%, transparent);
-  color: var(--fg-soft);
-}
-[data-style="brutalist"] .rail nav a::after {
-  content: attr(data-rail);
-  font-family: var(--type-mono);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-[data-style="brutalist"] .rail nav a:hover { background: var(--surface-2); color: var(--fg); }
-[data-style="brutalist"] .rail nav a[aria-current="page"] { background: var(--fg); color: var(--bg); }
-[data-style="brutalist"] .rail .material-symbols-outlined { font-size: 20px; }
-@media (min-width: 64rem) {
-  [data-style="brutalist"] [data-app-content] { margin-left: 11rem; padding-left: 2rem; }
-}
-[data-style="brutalist"] [data-app-content] h1 {
-  display: inline-block;
-  font-size: 1.75rem;
-  background: var(--fg);
-  color: var(--bg);
-  padding: 0.125rem 0.625rem;
-}
-[data-style="brutalist"] [data-section-tabs] { gap: 0; }
-[data-style="brutalist"] [data-section-tabs] a {
-  border: 2px solid color-mix(in srgb, var(--fg) 60%, transparent);
-  margin-right: -2px;
-  border-radius: 0;
-  padding: 0.5rem 1rem;
-  background: var(--surface-1);
-  color: var(--fg-soft);
-}
-[data-style="brutalist"] [data-section-tabs] a[aria-current="page"] { position: relative; z-index: 1; background: var(--fg); color: var(--bg); border-color: var(--fg); }
-[data-style="brutalist"] :is([data-badge], [data-count-pill]) { border-radius: 0; background: var(--fg); color: var(--bg); font-family: var(--type-mono); }
-[data-style="brutalist"] [data-settings-tab] { border: 2px solid transparent; border-radius: 0; }
-[data-style="brutalist"] [data-settings-tab][aria-current="page"] { background: var(--fg); color: var(--bg); }
-[data-style="brutalist"] .robot-launcher { border-radius: 0; border: 2px solid var(--fg); box-shadow: 4px 4px 0 var(--fg); }
-[data-style="brutalist"] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--fg) 3%, transparent) 0 1px, transparent 1px 14px);
-}
-
-/* ─── soft: generous radius, quiet borders, layered shadows ─── */
-[data-style="soft"] {
-  /* A breath of the palette's accent in the fill and the shadow: on a dark palette a black shadow
-     over a near-black page is invisible, and the style read as minimal with rounder corners. */
-  --panel-bg: color-mix(in srgb, var(--brand) 4%, var(--surface-1));
-  --panel-border: 1px solid color-mix(in srgb, var(--fg) 5%, transparent);
-  --panel-blur: none;
-  --panel-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent), 0 1px 2px var(--shade-1), 0 10px 28px color-mix(in srgb, var(--brand) 7%, var(--shade-1)), 0 24px 48px var(--shade-2);
-  --panel-radius: 1.25rem;
-  --control-radius: 0.875rem;
-  --glow: 0 6px 20px color-mix(in srgb, var(--brand) 22%, transparent);
-  --type-display: var(--font-sora);
-  --type-body: var(--font-inter);
-  --type-mono: var(--font-jetbrains);
-  --label-size: 12px;
-  --card-bg: color-mix(in srgb, var(--fg) 4%, transparent);
-  --card-border-color: transparent;
-  --card-radius: 1rem;
-  --chrome-border: 1px solid transparent;
-  --chrome-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent), 0 4px 16px var(--shade-1);
-  --chrome-float-bg: var(--surface-2);
-  --chrome-float-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2);
-}
 /* Only what can be clicked lifts: a settings section that rose under the pointer promised a
    link that was not there. */
-[data-style="soft"] :is(.glass-panel[data-interactive], .news-item) { transition: transform var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease); }
-[data-style="soft"] :is(.glass-panel[data-interactive], .news-item):hover { transform: translateY(-2px); box-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2); }
-[data-style="soft"] [data-panel-title]::before {
+:is(.glass-panel[data-interactive], .news-item) { transition: transform var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease); }
+:is(.glass-panel[data-interactive], .news-item):hover { transform: translateY(-2px); box-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2); }
+[data-panel-title]::before {
   content: "";
   display: inline-block;
   width: 0.375rem;
@@ -2619,44 +2031,44 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   background: var(--brand);
 }
 /* A disclosure's summary already leads with its chevron. */
-[data-style="soft"] summary [data-panel-title]::before { content: none; }
-[data-style="soft"] :is(.form-input, .select-trigger):focus { border-color: var(--brand) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
-[data-style="soft"] .news-tag { border-radius: 999px; }
-[data-style="soft"] :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
+summary [data-panel-title]::before { content: none; }
+:is(.form-input, .select-trigger):focus { border-color: var(--brand) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
+.news-tag { border-radius: 999px; }
+:is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 
 /* Layout: a reading column. Larger type; the page centred at a comfortable width; a tall bar with
    the search as a wide pill; the rail a column of rounded tiles, the current one lifted; wider
    gaps; tabs in a pill track; a soft wash of the accent behind the page. */
-[data-style="soft"] { font-size: 17px; }
-[data-style="soft"] .header { height: 4.5rem; }
-[data-style="soft"] .header-wrapper { padding-block: 0.875rem; }
-[data-style="soft"] .search-text { border-radius: 9999px; height: 2.75rem; background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: transparent; }
-[data-style="soft"] .rail { width: 5rem; top: 4.5rem; border-right: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-[data-style="soft"] .rail nav { gap: 0.625rem; padding-block: 1.25rem; }
-[data-style="soft"] .rail nav a { width: 3.25rem; height: 3.25rem; border-radius: 1rem; }
-[data-style="soft"] .rail nav a[aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); color: var(--brand); }
-[data-style="soft"] [data-app-content] { padding-top: 6rem; }
+html { font-size: 17px; }
+.header { height: 4.5rem; }
+.header-wrapper { padding-block: 0.875rem; }
+.search-text { border-radius: 9999px; height: 2.75rem; background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: transparent; }
+.rail { width: 5rem; top: 4.5rem; border-right: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.rail nav { gap: 0.625rem; padding-block: 1.25rem; }
+.rail nav a { width: 3.25rem; height: 3.25rem; border-radius: 1rem; }
+.rail nav a[aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); color: var(--brand); }
+[data-app-content] { padding-top: 6rem; }
 @media (min-width: 64rem) {
-  [data-style="soft"] [data-app-content] { margin-left: 5rem; }
+  [data-app-content] { margin-left: 5rem; }
 }
-[data-style="soft"] [data-app-content] > * { max-width: 68rem; margin-inline: auto; }
-[data-style="soft"] .grid:has(> .glass-panel) { gap: 1.5rem; }
-[data-style="soft"] [data-lab-grid] { gap: 1.5rem; }
-[data-style="soft"] [data-app-content] h1 { font-size: 1.875rem; font-weight: 600; }
-[data-style="soft"] .row-card { padding: 0.875rem 1.125rem; }
-[data-style="soft"] [data-section-tabs] {
+[data-app-content] > * { max-width: 68rem; margin-inline: auto; }
+.grid:has(> .glass-panel) { gap: 1.5rem; }
+[data-lab-grid] { gap: 1.5rem; }
+[data-app-content] h1 { font-size: 1.875rem; font-weight: 600; }
+.row-card { padding: 0.875rem 1.125rem; }
+[data-section-tabs] {
   gap: 0.25rem;
   padding: 0.25rem;
   width: fit-content;
   border-radius: 9999px;
   background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
-[data-style="soft"] [data-section-tabs] a { border-radius: 9999px; padding: 0.375rem 0.875rem; }
-[data-style="soft"] [data-section-tabs] a[aria-current="page"] { background: var(--panel-bg); color: var(--fg); box-shadow: 0 1px 2px var(--shade-1), 0 4px 12px var(--shade-1); }
-[data-style="soft"] [data-settings-tab] { border-radius: 0.875rem; }
-[data-style="soft"] [data-settings-tab][aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); }
-[data-style="soft"] .robot-launcher { width: 4rem; height: 4rem; }
-[data-style="soft"] body::before {
+[data-section-tabs] a { border-radius: 9999px; padding: 0.375rem 0.875rem; }
+[data-section-tabs] a[aria-current="page"] { background: var(--panel-bg); color: var(--fg); box-shadow: 0 1px 2px var(--shade-1), 0 4px 12px var(--shade-1); }
+[data-settings-tab] { border-radius: 0.875rem; }
+[data-settings-tab][aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); }
+.robot-launcher { width: 4rem; height: 4rem; }
+body::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -2665,26 +2077,26 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   background: radial-gradient(ellipse 70% 50% at 50% -10%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%);
 }
 
-/* ─── motion guards: OS setting or the in-app toggle (html[data-motion="reduced"]) ─── */
+/* ─── motion guards: OS setting or the in-app toggle (html[data-motion="reduced"]) ───
+   Both zero the motion tokens, which makes everything timed on them a cut. An animation timed in
+   literal seconds is out of a token's reach, so each one is stopped here by name, in both lists
+   (lib/theme/__tests__/motion-guards.test.ts reads this file and finds any that is not). */
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-fast: 0ms; --motion-base: 0ms; }
   .glass-panel, details[open] > :not(summary) { animation: none !important; }
-  .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in,
+  .typing-dot, .animate-pulse, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in,
   .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient,
   .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade,
   .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce,
   .pn-award-in,
   .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in,
-  [data-style] :is(.glass-panel, .news-item, .yellow-btn, .search-btn) {
+  .glass-panel, .news-item, .yellow-btn, .search-btn {
     animation: none !important;
     transition: none !important;
   }
-  [data-style="futuristic"] .shimmer::after { content: none; }
 }
-html[data-motion="reduced"] :is(.animate-glow, .typing-dot, .theme-blob, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
+html[data-motion="reduced"] :is(.typing-dot, .animate-pulse, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
   animation: none !important;
   transition: none !important;
 }
-html[data-motion="reduced"] .shimmer::after { content: none; }
 html[data-motion="reduced"] { --motion-fast: 0ms; --motion-base: 0ms; }
-html[data-mode="light"] #bg-canvas { opacity: 0.2; }

@@ -36,10 +36,11 @@ the map is `docs/MAP.md`.
   and the motion choice kept. Anything else is the default theme. `app/layout.tsx` is the
   cookie's only parser, so the route groups where `components/theme/ThemeSync` is not mounted
   (the landing and auth pages, `/play`, the office) read an old cookie exactly as the app does.
-- `app/layout.tsx` stamps `data-palette`, `data-mode` and `data-motion` from the theme, and a
-  literal `data-style="soft"`, which the stylesheet's rules for the one look are still written
-  under. `components/theme/ThemeProvider.applyToDocument` writes the first three and never the
-  fourth. A preview (`useTheme().preview`) paints the whole theme and saves nothing: a hover or
-  a focus on a palette chip in Settings, a click in the landing page's
+- `app/layout.tsx` stamps `data-palette`, `data-mode` and `data-motion` from the theme, and
+  `components/theme/ThemeProvider.applyToDocument` writes the same three. No attribute names a
+  style: the one look's tokens are `:root`'s and its rules the stylesheet's own (the foot of
+  `app/globals.css`), and `lib/theme/__tests__/motion-guards.test.ts` fails if `data-style` is
+  written there again. A preview (`useTheme().preview`) paints the whole theme and saves nothing:
+  a hover or a focus on a palette chip in Settings, a click in the landing page's
   `components/landing/ThemeDemo`. Appearance's sentences are `lib/learn/copy/settings`
   (`APPEARANCE_COPY`).

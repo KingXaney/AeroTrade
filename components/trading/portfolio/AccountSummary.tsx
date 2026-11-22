@@ -22,7 +22,7 @@ const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: Po
     const returnClass = getChangeColorClass(portfolio.totalReturnPct);
 
     return (
-        <Panel as="div" className="shimmer">
+        <Panel as="div">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatTile label={<Term k="net-worth">Net Worth</Term>} value={formatPrice(portfolio.totalValue)} valueClass="text-brand" />
                 <StatTile

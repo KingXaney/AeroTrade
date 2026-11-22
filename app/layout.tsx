@@ -91,16 +91,11 @@ export default async function RootLayout({
   // Font variables live on <html> so the :root type tokens can reference them.
   const fontClasses = [sora, hankenGrotesk, jetbrainsMono, spaceGrotesk, inter, plexMono].map((f) => f.variable).join(' ');
 
-  // data-style is a literal: the app has one look, and a theme no longer names a style. The
-  // stylesheet still writes that look's rules under [data-style="soft"] (app/globals.css), so the
-  // attribute stays on <html> — set here only, never by the client (components/theme/ThemeProvider)
-  // — until those rules lose the prefix.
   return (
     <html
       lang="en"
       className={mode === 'dark' ? `${fontClasses} dark` : fontClasses}
       data-palette={theme.palette}
-      data-style="soft"
       data-mode={mode}
       data-motion={theme.reduceMotion ? 'reduced' : 'auto'}
       style={{ colorScheme: mode }}
