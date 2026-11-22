@@ -166,9 +166,11 @@ export default function SearchCommand({
             {renderAs === 'text' ? (
                 // Was a bare <span onClick> — Tab skipped it and screen readers announced
                 // it as inert text. The ⌘K hint is the only place the shortcut is advertised.
+                // A pill --search-h tall from md, and a circle of that size below it. The border
+                // is transparent, kept for forced-colours mode, which draws it.
                 <button type="button" onClick={() => setOpen(true)} aria-label={label}
                         onPointerEnter={preloadGlossary} onFocus={preloadGlossary} onTouchStart={preloadGlossary}
-                        className="search-text inline-flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-line-strong/30 bg-surface-0/60 text-sm transition-colors md:w-full md:max-w-md md:shrink md:justify-start md:px-3">
+                        className="search-text inline-flex size-(--search-h) shrink-0 items-center justify-center gap-2 rounded-full border border-transparent bg-fg/6 text-sm transition-colors md:w-full md:max-w-md md:shrink md:justify-start md:px-3">
                     <Search className="size-4 opacity-70 shrink-0" aria-hidden="true"/>
                     <span className="hidden md:inline flex-1 truncate text-left text-fg-muted">{label}</span>
                     <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted font-mono">⌘K</kbd>

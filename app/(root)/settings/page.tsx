@@ -100,7 +100,7 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
                               data-settings-tab={s.id}
                               className={cn(
                                   'control-type flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs transition-colors',
-                                  s.id === active ? 'bg-brand/10 text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
+                                  s.id === active ? 'lifted text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
                               )}>
                             <span className="material-symbols-outlined text-base" aria-hidden="true">{s.icon}</span>
                             {s.label}

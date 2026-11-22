@@ -41,7 +41,8 @@ const Logo = () => (
 const Welcome = () => (
     <div className="min-h-screen text-fg-soft" data-landing>
         <header className="header">
-            <div className="header-wrapper mx-auto max-w-6xl">
+            {/* px-6, the page's own sides below: the logo lines up with the hero, not the app's rail. */}
+            <div className="header-wrapper mx-auto max-w-6xl px-6">
                 <Logo/>
                 <nav aria-label="Account" className="flex items-center gap-2">
                     <Link href="/sign-in" className={actionButton({variant: 'secondary', size: 'md'})}>{LANDING_COPY.signIn}</Link>
@@ -50,7 +51,7 @@ const Welcome = () => (
             </div>
         </header>
 
-        <main className="mx-auto max-w-6xl space-y-16 px-6 pb-20 pt-28">
+        <main className="mx-auto max-w-6xl space-y-16 px-6 pb-20 pt-(--content-pt)">
             {/* Hero */}
             <section className="grid items-start gap-10 lg:grid-cols-5" aria-labelledby="landing-title">
                 <div className="lg:col-span-2 lg:pt-8">

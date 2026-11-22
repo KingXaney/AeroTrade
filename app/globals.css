@@ -142,6 +142,27 @@
   --chrome-float-bg: var(--surface-2);
   --chrome-float-shadow: 0 2px 4px var(--shade-1), 0 16px 40px var(--shade-2);
 
+  /* Density: how much room the frame takes and where the content sits, each said once and read
+     by the frame (the components layer below) and by the classes of the shell's own components
+     (app/(root)/layout.tsx, components/shell). The root font size is the reader's browser's
+     (lib/theme/__tests__/density.test.ts holds all of this). The logo sits over the rail's icons:
+     the bar's side padding plus half the logo's icon is half the rail. */
+  --header-h: 3.5rem;
+  --chrome-px: 1rem;
+  --chrome-py: 0;
+  --search-h: 2.25rem;
+  --rail-w: 3.5rem;
+  --rail-tile: 2.5rem;
+  --content-pt: calc(var(--header-h) + 1rem);
+  /* Where a sticky panel stops and an anchor lands: where the content starts. */
+  --sticky-top: var(--content-pt);
+  --content-px: 1rem;
+  --content-px-lg: 1.5rem;
+  /* The launcher's room (components/chat/ChatWidget floats it over the content's foot): its size
+     and its offset from the corner, so it never covers a page's last panel. */
+  --content-pb: 5rem;
+  --content-max: 72rem;
+
   /* Motion. Both reduced-motion guards at the foot of this file zero them. */
   --motion-fast: 120ms;
   --motion-base: 200ms;
@@ -420,6 +441,64 @@ html[data-mode="light"] {
   .lab-prose .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; margin: 0.9rem 0; }
   .lab-prose .katex { font-size: 1.02em; }
   .lab-prose > :last-child { margin-bottom: 0; }
+}
+
+/* ═══════════════════════════════════════
+   THE FRAME — the bar (components/shell/Header.tsx; the landing page's header keeps the plain
+   wrapper) and the rail (components/shell/Rail.tsx), sized by the density tokens. In the
+   components layer, so a class written at a call site still wins: in the utilities layer these
+   came after Tailwind's own utilities and beat it.
+   ═══════════════════════════════════════ */
+@layer components {
+  .header {
+    @apply fixed top-0 z-50 w-full;
+    height: var(--header-h);
+    background: var(--chrome-bg);
+    border-bottom: var(--chrome-border);
+    backdrop-filter: var(--chrome-blur);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    box-shadow: var(--chrome-shadow);
+  }
+  /* The section rail: no chrome of its own, a column of tiles down the left edge under the bar,
+     the current one lifted (.lifted below). */
+  .rail {
+    @apply fixed bottom-0 left-0 z-40 flex-col;
+    top: var(--header-h);
+    width: var(--rail-w);
+  }
+  /* The bar's row fills the bar, so its items centre on the bar's middle line whatever their
+     heights (a row that only started at the top once hung the account button 2-5px low). */
+  .header-wrapper {
+    @apply flex items-center justify-between;
+    height: 100%;
+    padding: var(--chrome-py) var(--chrome-px);
+    color: var(--fg-soft);
+  }
+  /* The app's bar: the logo, the search, the account menu. From md the search sits in the bar's
+     true middle: two equal side columns, so neither the logo nor a name beside the avatar pushes
+     it off centre, and the middle never takes more than leaves each side 12rem (the drawer button
+     and the logo below lg). Below md the search is an icon, set beside the account menu, since a
+     centred icon would meet the logo. */
+  .header-bar > .search-text { margin-left: auto; }
+  @media (min-width: 48rem) {
+    .header-bar {
+      display: grid;
+      grid-template-columns: 1fr minmax(0, min(28rem, calc(100% - 24rem))) 1fr;
+      /* The row sits on the bar's middle line, as the flex row does below md, whatever its
+         tallest item: centred, never grown down from the top. */
+      align-content: center;
+    }
+    .header-bar > .search-text { margin-left: 0; justify-self: center; }
+    .header-bar > :last-child { justify-self: end; }
+  }
+
+  /* The current one of a set — the rail's tile, a section's tab, a settings section — is a small
+     piece of panel lifted off its track: the panel's own fill and layered shadow. Each component
+     keeps its own text colour beside it. */
+  .lifted {
+    background: var(--panel-bg);
+    box-shadow: var(--panel-shadow);
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -1608,51 +1687,6 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     filter: brightness(1.08);
   }
 
-  /* ─── HEADER ─── */
-  .header {
-    @apply z-50 w-full h-16 fixed top-0;
-    background: var(--chrome-bg);
-    border-bottom: var(--chrome-border);
-    backdrop-filter: var(--chrome-blur);
-    -webkit-backdrop-filter: var(--chrome-blur);
-    box-shadow: var(--chrome-shadow);
-  }
-  /* The section rail (components/shell/Rail.tsx): the header's chrome, down the left edge. */
-  .rail {
-    @apply z-40 w-16 fixed left-0 top-16 bottom-0 flex-col;
-    background: var(--chrome-bg);
-    border-right: var(--chrome-border);
-    backdrop-filter: var(--chrome-blur);
-    -webkit-backdrop-filter: var(--chrome-blur);
-    box-shadow: var(--chrome-shadow);
-  }
-  /* The bar's row fills the bar, so its items centre on the bar's middle line: the account button
-     (a 36px avatar in its padding) is taller than the bar's height less its padding, and a row
-     that only started at the top hung 2-5px low. */
-  .header-wrapper {
-    @apply flex justify-between items-center px-6 py-3;
-    height: 100%;
-    color: var(--fg-soft);
-  }
-  /* The app's bar (components/shell/Header.tsx): the logo, the search, the account menu. From md
-     the search sits in the bar's true middle: two equal side columns, so neither the logo nor a
-     name beside the avatar pushes it off centre, and the middle never takes more than leaves
-     each side 12rem (the drawer button and the logo below lg). Below md the search is an icon,
-     set beside the account menu, since a centred icon would meet the logo. The landing page's
-     header has no search and keeps the plain wrapper. */
-  .header-bar > .search-text { margin-left: auto; }
-  @media (min-width: 48rem) {
-    .header-bar {
-      display: grid;
-      grid-template-columns: 1fr minmax(0, min(28rem, calc(100% - 24rem))) 1fr;
-      /* The row is taller than the bar less its padding; centred, it overhangs both paddings
-         evenly instead of growing down from the top. */
-      align-content: center;
-    }
-    .header-bar > .search-text { margin-left: 0; justify-self: center; }
-    .header-bar > :last-child { justify-self: end; }
-  }
-
   /* ─── AUTH ─── */
   .auth-layout {
     @apply flex flex-col justify-between lg:flex-row h-screen relative overflow-hidden;
@@ -2013,9 +2047,11 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 }
 /* ═══════════════════════════════════════════════════════════════════
    THE LOOK — the app has one: generous radius, quiet borders, layered shadows. Its tokens are
-   :root's, at the head of this file; these are its rules beyond them. They are unlayered, so
-   each beats a utility written at a call site, and they keep the order they were written in
-   while the look was one of five styles: among rules of equal weight the later one wins.
+   :root's, at the head of this file, and its frame is in the components layer; these are its
+   decorations beyond them. They are unlayered, so each beats a utility written at a call site,
+   and they keep the order they were written in while the look was one of five styles: among
+   rules of equal weight the later one wins. Nothing here sizes the frame, a page's spacing or a
+   component that says its own size (lib/theme/__tests__/density.test.ts).
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Only what can be clicked lifts: a settings section that rose under the pointer promised a
@@ -2038,38 +2074,9 @@ summary [data-panel-title]::before { content: none; }
 .news-tag { border-radius: 999px; }
 :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 
-/* Layout: a reading column. Larger type; the page centred at a comfortable width; a tall bar with
-   the search as a wide pill; the rail a column of rounded tiles, the current one lifted; wider
-   gaps; tabs in a pill track; a soft wash of the accent behind the page. */
-html { font-size: 17px; }
-.header { height: 4.5rem; }
-.header-wrapper { padding-block: 0.875rem; }
-.search-text { border-radius: 9999px; height: 2.75rem; background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: transparent; }
-.rail { width: 5rem; top: 4.5rem; border-right: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-.rail nav { gap: 0.625rem; padding-block: 1.25rem; }
-.rail nav a { width: 3.25rem; height: 3.25rem; border-radius: 1rem; }
-.rail nav a[aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); color: var(--brand); }
-[data-app-content] { padding-top: 6rem; }
-@media (min-width: 64rem) {
-  [data-app-content] { margin-left: 5rem; }
-}
-[data-app-content] > * { max-width: 68rem; margin-inline: auto; }
-.grid:has(> .glass-panel) { gap: 1.5rem; }
-[data-lab-grid] { gap: 1.5rem; }
-[data-app-content] h1 { font-size: 1.875rem; font-weight: 600; }
+/* A row inside a panel, a step roomier than its call site asks for. */
 .row-card { padding: 0.875rem 1.125rem; }
-[data-section-tabs] {
-  gap: 0.25rem;
-  padding: 0.25rem;
-  width: fit-content;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
-}
-[data-section-tabs] a { border-radius: 9999px; padding: 0.375rem 0.875rem; }
-[data-section-tabs] a[aria-current="page"] { background: var(--panel-bg); color: var(--fg); box-shadow: 0 1px 2px var(--shade-1), 0 4px 12px var(--shade-1); }
-[data-settings-tab] { border-radius: 0.875rem; }
-[data-settings-tab][aria-current="page"] { background: var(--panel-bg); box-shadow: var(--panel-shadow); }
-.robot-launcher { width: 4rem; height: 4rem; }
+/* A soft wash of the accent behind the page. */
 body::before {
   content: "";
   position: fixed;
