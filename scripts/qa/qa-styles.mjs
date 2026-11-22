@@ -1,9 +1,11 @@
 // Styles and the page frame (app/globals.css, lib/theme, the route boundaries): the warning
 // token and its utility resolve, six pages carry no phantom scroll below their content, the order
 // ticket's hand-rolled input shows a focus ring, and TradingView embeds keep the light scheme their
-// documents use under a dark palette. Also the not-found pages: an unmatched URL gets the global
-// 404, a notFound() inside the app keeps the header, and a symbol no strategy watches renders
-// keyless with no stock panels.
+// documents use under a dark palette, and a theme cookie written before the app kept one look
+// (v1, with a style in it) still gives a page that never syncs the cookie its palette and its
+// motion choice. Also the not-found pages: an unmatched URL gets the global 404, a notFound()
+// inside the app keeps the header, and a symbol no strategy watches renders keyless with no
+// stock panels.
 // Run: npm run qa -- styles   (the harness: README.md)
 import {chromium} from 'playwright';
 import {BASE, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
@@ -92,7 +94,8 @@ try {
     // element's color-scheme differs from the embedded document's (TradingView never
     // declares one). Under a dark palette <html> is color-scheme: dark, so every
     // isTransparent widget went white and read as a broken light theme.
-    await page.context().addCookies([{name: 'aero-theme', value: 'v1:nord:minimal:0', domain: new URL(BASE).hostname, path: '/'}]);
+    // The cookie as the app writes it today (lib/theme/resolve.ts): v2:<palette>:<0|1>.
+    await page.context().addCookies([{name: 'aero-theme', value: 'v2:nord:0', domain: new URL(BASE).hostname, path: '/'}]);
     await page.goto(`${BASE}/trade`, {waitUntil: 'domcontentloaded'});
     await page.waitForSelector('.tradingview-widget-container iframe', {timeout: 30000});
     const schemes = await page.evaluate(() => ({
@@ -114,6 +117,36 @@ try {
         console.log(`NOTE  ${href} visible links at 390px on /portfolio: ${n}  (inside the closed drawer)`);
     }
     await shot('04-mobile-portfolio');
+
+    // --- a theme cookie from before the one look, on a page that never syncs it -------
+    // Until the app kept one look the cookie was v1:<palette>:<style>:<0|1>, and a browser can
+    // hold one for a year. The root layout is the cookie's only parser (decodeThemeCookie), and
+    // it still reads one: the style dropped, the palette and the motion choice kept. Inside the
+    // app a reader with a saved theme has the cookie rewritten from it (ThemeSync); the auth
+    // pages have no account to ask, so this is where a v1 cookie read as junk would show — a
+    // visitor who kept Nord with motion reduced, in whichever style, would sign in from the
+    // default theme. A context of its own: the signed-in page above is sent Home from /sign-in.
+    const visitor = await browser.newContext({viewport: {width: 1440, height: 900}});
+    await visitor.addCookies([{name: 'aero-theme', value: 'v1:nord:brutalist:1', domain: new URL(BASE).hostname, path: '/'}]);
+    const signIn = await visitor.newPage();
+    await signIn.goto(`${BASE}/sign-in`, {waitUntil: 'load'});
+    const kept = await signIn.evaluate(() => {
+        const html = document.documentElement;
+        return {
+            path: location.pathname,
+            palette: html.getAttribute('data-palette'),
+            motion: html.getAttribute('data-motion'),
+            style: html.getAttribute('data-style'),
+            // What the attribute is for: the stylesheet zeroes the motion tokens under it. The
+            // compiled sheet writes the zero as 0s (the source says 0ms), so either spelling counts.
+            motionBase: getComputedStyle(html).getPropertyValue('--motion-base').trim(),
+        };
+    });
+    check('a visitor holding a v1 theme cookie opens /sign-in in its palette with motion reduced, and no style named',
+        kept.path === '/sign-in' && kept.palette === 'nord' && kept.motion === 'reduced' && kept.style === null && ['0s', '0ms'].includes(kept.motionBase),
+        JSON.stringify(kept));
+    await signIn.screenshot({path: `${OUT}05-sign-in-v1-cookie.png`});
+    await visitor.close();
 } catch (err) {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});

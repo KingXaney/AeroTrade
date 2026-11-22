@@ -208,7 +208,7 @@ try {
     // The rail's News card carries the same headline as a text node under the dated caveat. The
     // card is portaled and mounted only while open, with no `data-briefing-*` or `#news-briefing`
     // of its own, so the page-scoped checks above never see it. `/i`: the caveat is a MicroLabel,
-    // which a style may uppercase.
+    // whose case the look's type tokens decide.
     await page.locator('aside.rail a[data-rail="news"]').hover();
     const railCard = page.locator('[data-rail-flyout="news"]');
     await railCard.waitFor({timeout: 5000}).catch(() => {});

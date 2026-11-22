@@ -234,14 +234,14 @@ try {
     check('the watchlist header says Asset, with no crypto "Protocol" left in it',
         await page.getByText('Asset', {exact: true}).count() === 1 && await page.getByText(/Protocol/).count() === 0);
     // Only the symbol, company and action links navigate, so the row itself must not look
-    // clickable; and it is the theme's own surface, so the default (minimal) style's
+    // clickable; and it is the look's own surface (.glass-panel), so the look's
     // --panel-blur: none reaches it instead of a blur written inline.
     const watchRow = page.locator('a[aria-label="Trade AAPL"]').first().locator('xpath=ancestor::div[contains(@class, "md:grid-cols-")][1]');
     const rowStyle = await watchRow.evaluate((el) => ({
         cursor: getComputedStyle(el).cursor, blur: getComputedStyle(el).backdropFilter, panel: el.classList.contains('glass-panel'),
     }));
     check('a watchlist row has no pointer cursor of its own', rowStyle.cursor !== 'pointer', rowStyle.cursor);
-    check('a watchlist row is a theme surface: no blur under the minimal style', rowStyle.panel && rowStyle.blur === 'none', JSON.stringify(rowStyle));
+    check('a watchlist row is the look\'s own surface: a panel, with no blur written on it', rowStyle.panel && rowStyle.blur === 'none', JSON.stringify(rowStyle));
     // The page's own add control (components/stocks/AddToWatchlist.tsx), with a list already
     // there, and from its box on by keyboard alone. A pick is a write and Enter runs the selected
     // row, so the dialog draws no row while its search is out. The stand-in lists two symbols no

@@ -44,9 +44,10 @@ try {
         !(await page.locator('button[aria-label="Open navigation"]').isVisible()));
 
     // --- the bar's search sits in its middle (.header-bar) ---
-    // Every style that draws the search as a box centres it in the bar, wide and narrow, whatever
-    // the logo's and the account button's widths; on a phone, and in Minimal at every width, it is
-    // an icon beside the account menu. The theme cookie is taken away again after.
+    // From md the search is a box with its words, centred in the bar, wide and narrow, whatever
+    // the logo's and the account button's widths; below md it is an icon beside the account
+    // menu, since a centred icon would meet the logo. The app has one look, so this is one pass
+    // under the theme a new account has, with no theme cookie to set.
     // The account button's avatar sits on the bar's middle line (the bar's own box, above its
     // border), and where the logo leads the bar (lg and up, the drawer button hidden) the button's
     // visible edge (the chevron) is as far from the right as the logo's icon is from the left.
@@ -54,7 +55,8 @@ try {
         const header = document.querySelector('header.header');
         const bar = header.getBoundingClientRect();
         const border = parseFloat(getComputedStyle(header).borderBottomWidth) || 0;
-        const search = document.querySelector('header .search-text').getBoundingClientRect();
+        const trigger = document.querySelector('header .search-text');
+        const search = trigger.getBoundingClientRect();
         const account = document.querySelector('header .header-bar > :last-child').getBoundingClientRect();
         const avatar = document.querySelector('header [data-slot="avatar"]').getBoundingClientRect();
         const chevron = document.querySelector('header [data-slot="avatar"]').closest('button').querySelector('svg').getBoundingClientRect();
@@ -64,39 +66,38 @@ try {
         return {
             off: Math.round(search.left + search.width / 2 - (bar.left + bar.width / 2)),
             gap: Math.round(account.left - search.right),
+            // Its label and the ⌘K hint are drawn from md only: with neither, it is the icon alone.
+            icon: trigger.innerText.trim() === '',
             dy: +(avatar.top + avatar.height / 2 - (bar.top + (bar.height - border) / 2)).toFixed(1),
             edges: logoLeads ? Math.round((bar.right - Math.max(avatar.right, chevron.right)) - (logo.left - bar.left)) : null,
         };
     });
+    const barAt = async (width, height, path = '/trade') => {
+        await page.setViewportSize({width, height});
+        await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
+        await page.locator('header .search-text').waitFor({timeout: 30000});
+        return barPlaces();
+    };
     const offCentre = [];
     const offProfile = [];
     const profileOf = (where, {dy, edges}) => {
         if (Math.abs(dy) > 1 || (edges !== null && Math.abs(edges) > 1)) offProfile.push(`${where}: ${dy}px low, edges ${edges}px apart`);
     };
-    for (const style of ['futuristic', 'liquid-glass', 'brutalist', 'soft']) {
-        await page.context().addCookies([{name: 'aero-theme', value: `v1:quiet-cyber:${style}:0`, domain: new URL(BASE).hostname, path: '/'}]);
-        for (const width of [1440, 1024, 768]) {
-            await page.setViewportSize({width, height: 900});
-            await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
-            await page.locator('header .search-text').waitFor({timeout: 30000});
-            const places = await barPlaces();
-            if (Math.abs(places.off) > 1) offCentre.push(`${style} at ${width}px: ${places.off}px`);
-            profileOf(`${style} at ${width}px`, places);
-        }
+    for (const width of [1440, 1024, 768]) {
+        const places = await barAt(width, 900);
+        if (places.icon || Math.abs(places.off) > 1) offCentre.push(`at ${width}px: ${places.icon ? 'an icon' : 'a box'}, ${places.off}px off`);
+        profileOf(`at ${width}px`, places);
     }
-    check('the bar\'s search sits in its middle in every boxed style, wide and narrow', offCentre.length === 0, offCentre.join(', '));
-    await page.setViewportSize({width: 390, height: 844});
-    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
-    const phoneBar = await barPlaces();
-    check('…and on a phone it is an icon beside the account menu', phoneBar.gap >= 0 && phoneBar.gap <= 16, JSON.stringify(phoneBar));
-    profileOf('soft on a phone', phoneBar);
-    await page.context().clearCookies({name: 'aero-theme'});
-    await page.setViewportSize({width: 1440, height: 900});
-    await page.goto(`${BASE}/`, {waitUntil: 'load'});
-    const minimalBar = await barPlaces();
-    check('…while Minimal keeps it an icon beside the account menu at every width',
-        await page.evaluate(() => document.documentElement.dataset.style) === 'minimal' && minimalBar.gap >= 0 && minimalBar.gap <= 16, JSON.stringify(minimalBar));
-    profileOf('minimal at 1440px', minimalBar);
+    check('the bar\'s search is a box in its middle, wide and narrow', offCentre.length === 0, offCentre.join(', '));
+    const iconByTheMenu = (places) => places.icon && places.gap >= 0 && places.gap <= 16;
+    const phoneBar = await barAt(390, 844);
+    check('…and on a phone it is an icon beside the account menu', iconByTheMenu(phoneBar), JSON.stringify(phoneBar));
+    profileOf('on a phone', phoneBar);
+    // md is 48rem, 768 px: one pixel under it the box has already given way to the icon.
+    const underMd = await barAt(767, 900);
+    check('…as it is at every width below md, one pixel under it too', iconByTheMenu(underMd), JSON.stringify(underMd));
+    profileOf('at 767px', underMd);
+    profileOf('on Home at 1440px', await barAt(1440, 900, '/'));
     check('the account button sits on the bar\'s middle line, its edge as far from the right as the logo from the left',
         offProfile.length === 0, offProfile.join(', '));
     await page.locator('aside.rail a[data-rail="markets"]').hover();
@@ -111,7 +112,7 @@ try {
     const newsFly = page.locator('[data-rail-flyout="news"]');
     await newsFly.waitFor({timeout: 5000}).catch(() => {});
     const newsText = (await newsFly.innerText().catch(() => '')).replace(/\n/g, ' ');
-    // `/i`: the card's eyebrow and footer are label-type, which a style may uppercase.
+    // `/i`: the card's eyebrow and footer are label-type, whose case the look's type tokens decide.
     check('…and News opens its card, which leads to the news',
         /News/i.test(newsText) && /Open the news/i.test(newsText) && await newsFly.locator('a[href="/news"]').count() === 1, newsText);
     await page.mouse.move(700, 500);
@@ -447,12 +448,20 @@ try {
     const pillarsText = (await page.locator('#landing-news, #landing-learn, #landing-practise').allInnerTexts()).join(' ');
     check("…which name the account's measure against the S&P 500 and no page that is the owner's alone",
         /S&P 500/.test(pillarsText) && /poker night/i.test(pillarsText) && !OWNERS_ALONE.test(pillarsText), pillarsText.slice(0, 160));
-    const styleBefore = await page.evaluate(() => document.documentElement.dataset.style);
-    await page.locator('[data-theme-demo="gruvbox-brutal"]').click();
-    await page.waitForFunction(() => document.documentElement.dataset.style === 'brutalist', null, {timeout: 5000}).catch(() => {});
-    check('a theme button repaints the page, saving nothing',
-        styleBefore === 'minimal' && await page.evaluate(() => document.documentElement.dataset.style) === 'brutalist'
-        && !(await page.context().cookies()).some((c) => c.name === 'aero-theme'));
+    // The page's theme buttons (components/landing/ThemeDemo) each repaint it in one palette and
+    // save nothing: a visitor has no account to save a theme to, so no cookie is written. A theme
+    // is a palette and the motion choice — the app has one look — so <html> names no style.
+    const themeOf = () => page.evaluate(() => ({
+        palette: document.documentElement.getAttribute('data-palette'),
+        styled: document.documentElement.hasAttribute('data-style'),
+    }));
+    const themeBefore = await themeOf();
+    await page.locator('[data-theme-demo="gruvbox-dark"]').click();
+    await page.waitForFunction(() => document.documentElement.dataset.palette === 'gruvbox-dark', null, {timeout: 5000}).catch(() => {});
+    const themeAfter = await themeOf();
+    check('a theme button repaints the page in its palette, saving nothing and naming no style',
+        themeBefore.palette === 'quiet-cyber' && themeAfter.palette === 'gruvbox-dark' && !themeBefore.styled && !themeAfter.styled
+        && !(await page.context().cookies()).some((c) => c.name === 'aero-theme'), JSON.stringify({before: themeBefore, after: themeAfter}));
     await shot('05-landing');
     await page.setViewportSize({width: 390, height: 844});
     await page.goto(`${BASE}/`, {waitUntil: 'load'});

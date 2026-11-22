@@ -4,8 +4,9 @@
 // new tab with no shell, watches a session run seat by seat (the fetches and their refusals on the
 // shelves, the turns as bubbles, the ratings, the desks), opens a seat's file by keyboard, moves the
 // camera, approves from the Execution desk's file (the confetti, the stamp, the ticket returned for
-// want of a live price), replays the session, and the office holds with motion reduced, as a floor
-// plan, in brutalist, on a phone, in its words, and a reader who is not the owner sent Home.
+// want of a live price), replays the session, and the office holds with motion reduced (by the
+// browser, and by the theme cookie), as a floor plan, on a phone, in its words, and a reader who
+// is not the owner sent Home.
 // Run: npm run qa -- agent-office   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -104,7 +105,7 @@ const stopReplay = async (target = tab) => {
     await sleep(200);
 };
 // The office's own animations still moving: a loop not stopped, or a one-shot whose duration the
-// style or the motion setting did not zero.
+// motion setting did not zero.
 const animated = (target = tab) => target.evaluate(() => [...document.querySelectorAll('[class*="ao-"]')]
     .filter((el) => [...el.classList].some((c) => c.startsWith('ao-')))
     .filter((el) => {
@@ -411,14 +412,20 @@ try {
     check('… its fourteen seats saying what the roster says', Object.keys(mapped).length === 14 && WORKERS.every((id) => mapped[id] === flat.workers[id]?.status), JSON.stringify(mapped));
     await shot('05-plan');
 
-    // --- brutalist ---
-    await context.addCookies([{name: 'aero-theme', value: 'v1:nord:brutalist:0', domain: new URL(BASE).hostname, path: '/'}]);
+    // --- motion reduced by the theme cookie ---
+    // The in-app choice, as the cookie carries it (v2:<palette>:<0|1>, lib/theme/resolve.ts). The
+    // office's route group never syncs the cookie with the account, so the root layout's read of
+    // it is all there is: <html data-motion="reduced">, which stops the loops by name
+    // (app/globals.css) and which the scene reads too (components/three/scene-env).
+    await context.addCookies([{name: 'aero-theme', value: 'v2:nord:1', domain: new URL(BASE).hostname, path: '/'}]);
     await tab.goto(`${BASE}/agent-world/office`, {waitUntil: 'load'});
     await ready();
     await stopReplay();
     await sleep(800);
-    check('in brutalist the office renders and its loops are stopped', (await office()).state === 'ready' && (await animated()).length === 0, (await animated()).join(','));
-    await shot('06-brutalist');
+    const byCookie = await office();
+    check('with motion reduced by the theme cookie the office renders and its loops are stopped',
+        byCookie.state === 'ready' && byCookie.motion === 'reduced' && (await animated()).length === 0, `${byCookie.state} ${byCookie.motion} ${(await animated()).join(',')}`);
+    await shot('06-reduced-by-cookie');
     await context.clearCookies({name: 'aero-theme'});
 
     // --- the words ---

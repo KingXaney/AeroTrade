@@ -7,8 +7,8 @@
 // starters followed at once, Add your own staying on the page, the 16-topic cap. Also the
 // surfaces topics lead: the topics-first dashboard and the widget library's Topics group, the
 // settings page's Topics section and email toggle, the chat launcher's topic suggestion, the
-// header nav order, and the theme picker's hover sweep (the committed palette never flashes; a
-// style card's hover changes nothing, since a style moves the page).
+// header nav order, and the theme picker: twelve palettes and nothing else to pick, and a hover
+// sweep across two of them in which the committed palette never flashes.
 // Run: npm run qa -- topics   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -137,7 +137,7 @@ const until = async (page, fn, ms) => {
     await shot('02-topic-ai-chips');
 
     // --- the rail's News card + the section's tabs ---
-    // `/i` throughout: MicroLabel lines may be uppercased by the style, which innerText reflects.
+    // `/i` throughout: the look's type tokens decide a MicroLabel line's case, which innerText reflects.
     await page.locator(newsRail).hover();
     const newsCard = page.locator('[data-rail-flyout="news"]');
     await newsCard.waitFor({timeout: 5000}).catch(() => {});
@@ -250,15 +250,25 @@ const until = async (page, fn, ms) => {
     await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
 
-    // --- theme hover: sweep across the gutter between two palette cards; the committed palette must never flash ---
+    // --- the theme picker: palettes, and nothing else ---
+    // A theme is a palette and the Reduce motion choice (lib/theme/resolve.ts): the section's one
+    // radio group is the twelve palettes of lib/theme/palettes.ts, each a chip named by its label
+    // and its mode ("Nord dark"). The app has one look, so no radio offers a style or a preset.
+    const paletteGroup = page.getByRole('radiogroup', {name: 'Colour palette'});
+    const paletteNames = await paletteGroup.getByRole('radio').evaluateAll((radios) => radios.map((r) => r.innerText.replace(/\s+/g, ' ').trim()));
+    check('Appearance offers the twelve palettes as its one radio group, beside the Reduce motion switch',
+        paletteNames.length === 12 && await page.getByRole('radio').count() === 12 && await page.locator('#reduce-motion-toggle').count() === 1,
+        paletteNames.join(', '));
+
+    // --- theme hover: sweep across the gutter between two palette chips; the committed palette must never flash ---
     await page.evaluate(() => {
         window.__paletteLog = [document.documentElement.dataset.palette];
         new MutationObserver(() => window.__paletteLog.push(document.documentElement.dataset.palette))
             .observe(document.documentElement, {attributes: true, attributeFilter: ['data-palette']});
     });
-    const dra = page.getByRole('radio', {name: /^Dracula/}).first();
-    const nord = page.getByRole('radio', {name: /^Nord/}).first();
-    if (await dra.count() && await nord.count()) {
+    const dra = paletteGroup.getByRole('radio', {name: /^Dracula/});
+    const nord = paletteGroup.getByRole('radio', {name: /^Nord/});
+    if (await dra.count() === 1 && await nord.count() === 1) {
         await dra.scrollIntoViewIfNeeded();
         await page.waitForTimeout(400);
         const a = await dra.boundingBox();
@@ -278,31 +288,9 @@ const until = async (page, fn, ms) => {
         await page.waitForTimeout(400);
         const log = await page.evaluate(() => window.__paletteLog);
         const committed = log[0];
-        check('hover sweep: no flash of the committed palette between cards', log.length >= 3 && !log.slice(1, -1).includes(committed) && log[log.length - 1] === committed, log.join(' → '));
+        check('hover sweep: no flash of the committed palette between chips', log.length >= 3 && !log.slice(1, -1).includes(committed) && log[log.length - 1] === committed, log.join(' → '));
     } else {
-        note('theme hover', 'palette radios not found');
-    }
-
-    // --- a style moves the page, so hovering its card previews nothing: the page's style must not
-    // change under the pointer (it did once, and the page flickered between two layouts) ---
-    const fut = page.getByRole('radio', {name: /^Futuristic/}).first();
-    if (await fut.count()) {
-        await page.evaluate(() => {
-            window.__styleLog = [document.documentElement.dataset.style];
-            new MutationObserver(() => window.__styleLog.push(document.documentElement.dataset.style))
-                .observe(document.documentElement, {attributes: true, attributeFilter: ['data-style']});
-        });
-        await fut.scrollIntoViewIfNeeded();
-        await page.waitForTimeout(300);
-        const f = await fut.boundingBox();
-        await page.mouse.move(f.x + f.width / 2, f.y + f.height / 2);
-        await page.waitForTimeout(700);
-        await page.mouse.move(5, 5);
-        await page.waitForTimeout(300);
-        const styleLog = await page.evaluate(() => window.__styleLog);
-        check('hovering a style card leaves the page\'s style alone; a click applies it', styleLog.length === 1, styleLog.join(' → '));
-    } else {
-        note('style hover', 'style radio not found');
+        check('hover sweep: no flash of the committed palette between chips', false, 'the Dracula and Nord palette chips were not found');
     }
 
     // --- ⌘K: follow a topic from the palette, open an existing one ---

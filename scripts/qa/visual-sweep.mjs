@@ -12,36 +12,45 @@
 // it on the change, then compare with `node visual-diff.mjs <before> <after>`.
 // Run it inside the harness: `npm run qa -- visual-sweep` (README.md).
 //
-// QA_THEME=<palette>:<style>[,<palette>:<style>…] (say nord:brutalist) sweeps under each theme
-// named instead of the default one, into ./output/sweep-<palette>-<style>/ — a change to the
-// visual styles is checked style by style in one harness run. QA_SWEEP_PAGES=home,owner-brain,…
-// limits the sweep to those pictures (the names below, the owner's with their owner- prefix), for
-// a quick look at a few screens.
+// QA_THEME=<palette>[,<palette>…] (say nord,paper) sweeps under each palette named instead of the
+// default one, into ./output/sweep-<palette>/ — a change to the look is checked palette by palette
+// in one harness run. The app has one look, so a palette is all there is to name.
+// QA_SWEEP_PAGES=home,owner-brain,… limits the sweep to those pictures (the names below, the
+// owner's with their owner- prefix), for a quick look at a few screens.
 //
 // It records and asserts nothing. What would make a picture a poor record — another page than the
-// one asked for, the 404, a route's error boundary, a skeleton still showing, the wrong theme,
+// one asked for, the 404, a route's error boundary, a skeleton still showing, the wrong palette,
 // icons drawn as their names — is said in a NOTE line naming the picture, and the run exits 1
 // only when a picture could not be taken at all.
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
+import {createJiti} from 'jiti';
 import {mkdirSync} from 'node:fs';
-import {BASE, HOME_URL, MONGO, PASSWORD, hydrated, note, outDir, ownerEmail, signUp} from './lib.mjs';
+import {BASE, HOME_URL, MONGO, PASSWORD, REPO_ROOT, hydrated, note, outDir, ownerEmail, signUp} from './lib.mjs';
 import {STUB_PORT as TIINGO_PORT} from './tiingo-series.mjs';
 
-// The theme cookie the root layout reads (lib/theme/resolve.ts); neither of the sweep's accounts
-// ever saves a theme, so nothing overrides it. An empty theme is the default look.
+// A sweep's theme is a palette, set through the cookie the root layout reads — written here by
+// the app's own encoder (lib/theme/resolve.ts), so the sweep follows the cookie's shape. Neither
+// of the sweep's accounts ever saves a theme, so nothing overrides it; with no palette named,
+// no cookie is set and the pictures are the default theme's. The names are held to the app's
+// registry (lib/theme/palettes.ts) before anything starts: a cookie the app cannot read is the
+// default theme, so a mistyped palette — or the <palette>:<style> pair a theme was while the app
+// had five styles — would otherwise fill its folder with the default's pictures.
+const jiti = createJiti(import.meta.url, {alias: {'@': REPO_ROOT.replace(/\/$/, '')}, fsCache: false});
+const {PALETTE_IDS} = await jiti.import(`${REPO_ROOT}lib/theme/palettes.ts`);
+const {THEME_COOKIE, encodeThemeCookie} = await jiti.import(`${REPO_ROOT}lib/theme/resolve.ts`);
 const THEMES = (process.env.QA_THEME || '').split(',').map((t) => t.trim()).filter(Boolean);
-for (const theme of THEMES) {
-    if (!/^[a-z-]+:[a-z-]+$/.test(theme)) {
-        console.error(`QA_THEME must be <palette>:<style>[,…], got "${theme}"`);
-        process.exit(2);
-    }
+const notPalettes = THEMES.filter((theme) => !PALETTE_IDS.includes(theme));
+if (notPalettes.length > 0) {
+    console.error(`QA_THEME is a list of palettes, <palette>[,<palette>…], and names no palette called ${notPalettes.map((t) => `"${t}"`).join(', ')}. The palettes: ${PALETTE_IDS.join(', ')}`);
+    process.exit(2);
 }
 
-const setTheme = async (context, theme) => {
-    if (theme) await context.addCookies([{name: 'aero-theme', value: `v1:${theme}:0`, domain: new URL(BASE).hostname, path: '/'}]);
+const setTheme = async (context, palette) => {
+    if (!palette) return;
+    await context.addCookies([{name: THEME_COOKIE, value: encodeThemeCookie({palette, reduceMotion: false}), domain: new URL(BASE).hostname, path: '/'}]);
 };
-const folderOf = (theme) => (theme ? `sweep-${theme.replace(':', '-')}` : 'sweep');
+const folderOf = (palette) => (palette ? `sweep-${palette}` : 'sweep');
 
 const WIDTHS = [{name: 'desktop', width: 1440, height: 900}, {name: 'phone', width: 390, height: 844}];
 
@@ -225,7 +234,6 @@ const doubts = async (page, response, path, theme) => {
     if (status >= 400 && path !== NOT_FOUND) found.push(`the page answered ${status}`);
     const seen = await page.evaluate((selector) => ({
         palette: document.documentElement.dataset.palette,
-        style: document.documentElement.dataset.style,
         // components/shell/RouteError, which every route's error.tsx renders.
         failed: [...document.querySelectorAll('h3')].some((h) => h.textContent === "This page couldn't load"),
         // Both 404s (app/not-found.tsx, app/(root)/not-found.tsx); a streamed one still answers 200.
@@ -234,10 +242,7 @@ const doubts = async (page, response, path, theme) => {
         // The icon font comes from Google Fonts; without it every icon is drawn as its name.
         icons: document.querySelector('.material-symbols-outlined') === null || document.fonts.check('24px "Material Symbols Outlined"'),
     }), SKELETON);
-    if (theme) {
-        const [palette, style] = theme.split(':');
-        if (seen.palette !== palette || (seen.style !== undefined && seen.style !== style)) found.push(`it is drawn in ${seen.palette}:${seen.style}`);
-    }
+    if (theme && seen.palette !== theme) found.push(`it is drawn in ${seen.palette}`);
     if (seen.failed) found.push("it shows the route's error boundary");
     if (seen.missing && path !== NOT_FOUND) found.push('it shows the not-found page');
     if (seen.skeleton) found.push('a skeleton is still showing');
