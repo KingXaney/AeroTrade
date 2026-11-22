@@ -53,8 +53,9 @@ import {paintHeatmap} from "@/components/landing/terrain-heatmap";
 
 export type TerrainPalette = {scale: TerrainScale; fg: Rgb; zero: Rgb};
 // The cell under the pointer and where, in CSS pixels from the canvas's top-left, with the
-// canvas's width so the tooltip can pick its side without reading the DOM.
-export type TerrainHit = {cell: SurfaceCell; x: number; y: number; width: number};
+// canvas's width and height so the tooltip can pick its side (and, in Home's strip, whether it
+// drops below the pointer) without reading the DOM.
+export type TerrainHit = {cell: SurfaceCell; x: number; y: number; width: number; height: number};
 
 export type SceneOptions = {
     canvas: HTMLCanvasElement;
@@ -468,7 +469,7 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
         rowLine.visible = true;
         columnLine.visible = true;
         syncHighlight();
-        options.onHover({cell: hovered, x: point.x, y: point.y, width});
+        options.onHover({cell: hovered, x: point.x, y: point.y, width, height});
         dirty = true;
     };
 

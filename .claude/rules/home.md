@@ -20,13 +20,24 @@ the map is `docs/MAP.md`.
   the session (the trade desk while the market is open, the news while it is closed); a box with
   nothing to say is not drawn. The widget grid is `/dashboard`; every action that revalidates
   `/` revalidates it too (`lib/__tests__/home-revalidate.test.ts`).
-- Home opens on the landing page's momentum terrain (`components/landing/MomentumTerrain`,
-  `size="panel"`, no eyebrow under the section's own heading), frameless like the landing hero so
-  the transparent canvas sits on the page background, not in a panel's box: the page reads
-  `lib/landing/surface-store.getMomentumSurface` on the server beside `getHomeView` and hands the
-  surface in as `initial`, so the section exists only when there is one (never a loading box) and
-  the client draws it at once. Its one `WhatTheseMean` keeps its Ask links, since the chat is
-  mounted here; the landing page's has none.
+- The order is the reader's own figures first: the title and its chips; the paper accounts
+  (`#home-accounts`, the total `[data-home-total]`) beside the next step; the momentum terrain; the
+  topics (`#home-topics`) beside the briefing or the lesson; the first week or the lesson; poker
+  night. Each section keeps its rule: a box with nothing to say is not drawn.
+- The terrain is the landing page's (`components/landing/MomentumTerrain`) at `size="strip"`, under
+  the section's own heading (handed in as `heading`, no eyebrow), frameless like the landing hero so
+  the transparent canvas sits on the page background, not in a panel's box. From lg the strip is
+  one row — the canvas 220px tall with its controls on the left, the slice, legend, caption and
+  source on the right — stacked under lg (the canvas 2:1, at most 220px), its one `WhatTheseMean`
+  under both. Its Expand button (`data-terrain-expand`, `aria-expanded`, on the heading's line so
+  it never moves) swaps the strip for the `panel` size in place and back: state alone — no
+  navigation, no fetch, the same canvas and scene, nothing animated — and `data-terrain-size`
+  names the size drawn. In the strip the tooltip drops below a pointer in the canvas's top half and
+  is held inside the band, and the slice gives the hovered session a line of its own (`stacked`), so
+  a hover moves nothing. The page reads `lib/landing/surface-store.getMomentumSurface` on the server
+  beside `getHomeView` and hands the surface in as `initial`, so the section exists only when there
+  is one (never a loading box) and the client draws it at once. Its one `WhatTheseMean` keeps its
+  Ask links, since the chat is mounted here; the landing page's has none.
 - Poker night on Home: `components/home/PokerNightChip`, a link chip to `/poker-night` beside the
   streak, is the way in that is always there while `pokerNightEnabled()` — and, while the reader
   holds a seat, the way straight back to it ("Rejoin your table", `lobby.homeChipOf`, streamed in

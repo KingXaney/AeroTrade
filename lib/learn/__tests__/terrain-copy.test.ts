@@ -49,6 +49,21 @@ describe('TERRAIN_COPY', () => {
         expect(TERRAIN_COPY.caption(250)).toContain('the last 250 sessions');
     });
 
+    it('words the strip\'s Expand button both ways, its name led by the word on the button', () => {
+        const pairs = [
+            [TERRAIN_COPY.expand, TERRAIN_COPY.expandName],
+            [TERRAIN_COPY.collapse, TERRAIN_COPY.collapseName],
+        ] as const;
+        for (const [word, name] of pairs) {
+            expect(findBanned(word, 'copy'), word).toEqual([]);
+            expect(findBanned(name, 'copy'), name).toEqual([]);
+            // WCAG's label in name: a voice user says the word they see.
+            expect(name.startsWith(word), name).toBe(true);
+        }
+        expect(TERRAIN_COPY.expand).not.toBe(TERRAIN_COPY.collapse);
+        expect(TERRAIN_COPY.expandName).not.toBe(TERRAIN_COPY.collapseName);
+    });
+
     it('names a camera preset for each the view defines, and lists only glossary terms', () => {
         expect(Object.keys(TERRAIN_COPY.presets)).toEqual([...CAMERA_PRESET_IDS]);
         for (const key of TERRAIN_TERMS) expect(isGlossaryKey(key), key).toBe(true);
