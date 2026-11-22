@@ -14,16 +14,22 @@ export type PanelPad = 0 | 2 | 3 | 4 | 5 | 6 | 8 | 12;
 
 // Numeric on purpose: the app has no spacing scale yet, so sm/md/lg would invent one.
 // When a scale lands, only this map changes — every call site is already behind the seam.
+// The look is compact: from 3 up each key draws a step under its name (the default, 5, is 16px;
+// 12, the roomiest, is 32px), so a page that asked for a roomy panel still gets a roomier one.
 const PAD: Record<PanelPad, string> = {
     0: '',
     2: 'p-2',
     3: 'p-3',
-    4: 'p-4',
-    5: 'p-5',
-    6: 'p-6',
-    8: 'p-8',
-    12: 'p-12',
+    4: 'p-3.5',
+    5: 'p-4',
+    6: 'p-5',
+    8: 'p-6',
+    12: 'p-8',
 };
+
+// The padding class a key draws, for a surface that frames its body itself (the dashboard's
+// widget shell while it is being arranged).
+export const panelPad = (pad: PanelPad): string => PAD[pad];
 
 type Props = {
     as?: 'section' | 'div' | 'article' | 'aside' | 'nav' | 'li' | 'form';

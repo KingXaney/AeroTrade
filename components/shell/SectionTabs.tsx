@@ -11,15 +11,15 @@ import {NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges, type NavSection} 
 // its own with its own URL (the tablist role belongs to a view switched inside one page, as the
 // market scan on /trade).
 //
-// The tabs are pills in a pill track, the current one lifted (.lifted in app/globals.css).
+// The tabs are pills in the tab track a page's own views share (components/primitives/Tabs),
+// at the column's left, the current one lifted (.tab-track and .lifted in app/globals.css).
 const SectionTabs = ({badges = {}, sections = NAV_SECTIONS}: {badges?: NavBadges; sections?: readonly NavSection[]}) => {
     const pathname = usePathname();
     const section = sectionFor(pathname, sections);
     if (!section || section.pages.length < 2) return null;
 
     return (
-        <nav aria-label={`${section.label} pages`} data-section-tabs={section.id}
-             className="mb-4 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-full bg-fg/5 p-1">
+        <nav aria-label={`${section.label} pages`} data-section-tabs={section.id} className="tab-track mb-3">
             {section.pages.map((page) => {
                 const active = isActiveNav(pathname, page.href);
                 const count = page.badge ? (badges[page.badge] ?? 0) : 0;
@@ -29,13 +29,15 @@ const SectionTabs = ({badges = {}, sections = NAV_SECTIONS}: {badges?: NavBadges
                         href={page.href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                            'control-type inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs transition-colors',
+                            'control-type inline-flex items-center gap-2 rounded-full px-3.5 py-(--tab-pad-y) text-xs transition-colors',
                             active ? 'lifted text-fg' : 'text-fg-soft hover:bg-surface-3 hover:text-fg',
                         )}
                     >
                         {page.label}
+                        {/* leading-none: the count sits inside the tab's line, so a tab with one is
+                            no taller than the others. */}
                         {count > 0 && (
-                            <span className="rounded-full bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-fg-muted"
+                            <span className="rounded-full bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] leading-none text-fg-muted"
                                   aria-label={`${count} ${count === 1 ? 'symbol' : 'symbols'} on watchlist`}>{count}</span>
                         )}
                     </Link>

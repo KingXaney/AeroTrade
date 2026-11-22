@@ -6,9 +6,13 @@ import {cn} from "@/lib/utils";
 // ever read or mounted. A tablist of links — not buttons with state — for that reason.
 //
 // Pages of their own under one section are not tabs but links (components/shell/SectionTabs).
+// Both are drawn in the one tab track (.tab-track in app/globals.css, never a rule on the
+// tablist role), the current one lifted; a view's label keeps the brand colour, so a page's own
+// views read apart from its section's pages above the title.
 //
-// `size`: 'sm', the default, is the compact strip most pages use; 'md' makes each tab a 44 px
-// touch target, for a page read mostly on a phone (the poker night lobby).
+// `size`: 'sm', the default, is the compact strip most pages use, each tab --tab-pad-y above and
+// below its text; 'md' makes each tab a 44 px touch target, for a page read mostly on a phone
+// (the poker night lobby).
 
 export type TabItem = {id: string; label: string; href: string};
 
@@ -22,12 +26,12 @@ type Props = {
 };
 
 const SIZE = {
-    sm: 'px-3.5 py-1.5 text-xs',
+    sm: 'px-3.5 py-(--tab-pad-y) text-xs',
     md: 'inline-flex min-h-11 items-center px-4 text-sm',
 } as const;
 
 const Tabs = ({tabs, active, label, size = 'sm', className}: Props) => (
-    <div role="tablist" aria-label={label} className={cn('flex flex-wrap gap-1', className)}>
+    <div role="tablist" aria-label={label} className={cn('tab-track', className)}>
         {tabs.map((tab) => {
             const on = tab.id === active;
             return (
@@ -40,9 +44,9 @@ const Tabs = ({tabs, active, label, size = 'sm', className}: Props) => (
                     aria-selected={on}
                     data-tab={tab.id}
                     className={cn(
-                        'control-type rounded-lg transition-colors',
+                        'control-type rounded-full transition-colors',
                         SIZE[size],
-                        on ? 'bg-brand text-on-brand' : 'text-fg-soft hover:bg-surface-3 hover:text-fg',
+                        on ? 'lifted text-brand' : 'text-fg-soft hover:bg-surface-3 hover:text-fg',
                     )}
                 >
                     {tab.label}

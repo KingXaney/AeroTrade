@@ -74,10 +74,13 @@ const sources = ['app', 'components'].flatMap((dir) =>
         .map((file) => `${dir}/${file.replace(/\\/g, '/')}`));
 const sourceText = sources.map((file) => ({file, text: read(file)}));
 
-// The tokens the look's density is made of.
+// The tokens the look's density is made of: the frame and the content, then what is drawn inside
+// a page — a row's padding, a page title's size, a tab's height, a tall field's, the radii.
 const DENSITY = [
     '--header-h', '--chrome-px', '--chrome-py', '--search-h', '--rail-w', '--rail-tile',
     '--content-pt', '--sticky-top', '--content-px', '--content-px-lg', '--content-pb', '--content-max',
+    '--row-pad-y', '--row-pad-x', '--title-size', '--tab-pad-y', '--field-h',
+    '--panel-radius', '--control-radius', '--card-radius',
 ] as const;
 
 describe("the look's density tokens (app/globals.css)", () => {
@@ -94,7 +97,8 @@ describe("the look's density tokens (app/globals.css)", () => {
     // sticky panels onto it.
     it.each(DENSITY.filter((token) => token !== '--sticky-top'))('%s is read by the stylesheet or by a class at a call site', (token) => {
         const inSheet = css.split(`var(${token})`).length - 1;
-        const atCallSites = sourceText.filter(({text}) => text.includes(`(${token})`)).length;
+        // A utility that reads a variable: pt-(--content-pt), or with its type, text-(length:--title-size).
+        const atCallSites = sourceText.filter(({text}) => text.includes(`(${token})`) || text.includes(`:${token})`)).length;
         expect(inSheet + atCallSites).toBeGreaterThan(0);
     });
 
@@ -133,6 +137,47 @@ describe("the look's density tokens (app/globals.css)", () => {
         expect(valuesOf(one('.rail'), 'width')).toEqual(['var(--rail-w)']);
         expect(valuesOf(one('.rail'), 'top')).toEqual(['var(--header-h)']);
         expect(valuesOf(one('.header-wrapper'), 'padding')).toEqual(['var(--chrome-py) var(--chrome-px)']);
+    });
+
+    // A row's padding is the token's, in the components layer, so a row that asks for its own at
+    // the call site gets it: RowCard's own classes leave the padding to the rule.
+    it('pads a row with the row tokens, which a call site may override', () => {
+        const rows = rules.filter((rule) => rule.selector === '.row-card');
+        expect(rows.length).toBeGreaterThan(0);
+        for (const rule of rows) expect(rule.context).toEqual(['@layer components']);
+        expect(rows.flatMap((rule) => valuesOf(rule, 'padding'))).toEqual(['var(--row-pad-y) var(--row-pad-x)']);
+        expect(read('components/primitives/RowCard.tsx')).toMatch(/const BASE = 'row-card';/);
+    });
+
+    // One track for a section's pages and for a page's views, a class in the components layer that
+    // both carry (never a rule on the tablist role), each tab as tall as --tab-pad-y makes it.
+    it('draws both kinds of tabs in one track, their height from --tab-pad-y', () => {
+        const track = rules.filter((rule) => rule.selector === '.tab-track');
+        expect(track.length).toBe(1);
+        expect(track[0].context).toEqual(['@layer components']);
+        expect(rules.filter((rule) => /\[role=["']?tab/.test(rule.selector)).map((rule) => rule.selector)).toEqual([]);
+        for (const file of ['components/shell/SectionTabs.tsx', 'components/primitives/Tabs.tsx']) {
+            const text = read(file);
+            expect(text, file).toMatch(/\btab-track\b/);
+            expect(text, file).toContain('py-(--tab-pad-y)');
+        }
+    });
+
+    // Every page title is the shared one's size: PageTitle draws its h1 with the class it exports.
+    it("sizes the shared page title by --title-size", () => {
+        const title = read('components/primitives/PageTitle.tsx');
+        expect(title).toMatch(/export const pageTitleClass = '[^']*text-\(length:--title-size\)[^']*';/);
+        expect(title).toMatch(/<h1 className=\{cn\(pageTitleClass\b/);
+    });
+
+    // The auth pages' tall fields and their main button, one height.
+    it('makes the tall fields and the main button --field-h tall', () => {
+        for (const selector of ['.form-input', '.yellow-btn', '.select-trigger', '.country-select-trigger']) {
+            const own = rules.filter((rule) => rule.selector === selector);
+            expect(own.length, selector).toBe(1);
+            expect(valuesOf(own[0], 'height').map((value) => value.replace(/\s*!important$/, '')), selector).toEqual(['var(--field-h)']);
+            expect(own[0].body, selector).not.toMatch(/@apply[^;]*\bh-\d/);
+        }
     });
 
     // The stylesheet says nothing about a page's own spacing or a component's own size: the gap a

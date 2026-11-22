@@ -101,8 +101,8 @@
   --panel-border: 1px solid color-mix(in srgb, var(--fg) 5%, transparent);
   --panel-blur: none;
   --panel-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent), 0 1px 2px var(--shade-1), 0 10px 28px color-mix(in srgb, var(--brand) 7%, var(--shade-1)), 0 24px 48px var(--shade-2);
-  --panel-radius: 1.25rem;
-  --control-radius: 0.875rem;
+  --panel-radius: 1rem;
+  --control-radius: 0.75rem;
   --glow: 0 6px 20px color-mix(in srgb, var(--brand) 22%, transparent);
   --type-display: var(--font-sora);
   --type-body: var(--font-inter);
@@ -131,7 +131,7 @@
   --card-bg: color-mix(in srgb, var(--fg) 4%, transparent);
   --card-border-width: 1px;
   --card-border-color: transparent;
-  --card-radius: 1rem;
+  --card-radius: 0.75rem;
 
   /* The app frame (the header, the navigation) and what floats over the page (menus, popovers,
      dialogs, the drawer, the chat window). */
@@ -162,6 +162,14 @@
      and its offset from the corner, so it never covers a page's last panel. */
   --content-pb: 5rem;
   --content-max: 72rem;
+  /* Inside a page: a row's padding (.row-card; a call site may ask for its own), the shared page
+     title's size (components/primitives/PageTitle's pageTitleClass), a tab's vertical padding in
+     the tab track (.tab-track), and the auth pages' tall fields and main button. */
+  --row-pad-y: 0.625rem;
+  --row-pad-x: 0.875rem;
+  --title-size: 1.5rem;
+  --tab-pad-y: 0.25rem;
+  --field-h: 2.75rem;
 
   /* Motion. Both reduced-motion guards at the foot of this file zero them. */
   --motion-fast: 120ms;
@@ -412,10 +420,13 @@ html[data-mode="light"] {
     text-transform: var(--control-transform);
     letter-spacing: var(--control-tracking);
   }
+  /* The padding is the row tokens' unless the call site asks for its own (px-3 py-2 is a list's
+     tighter row): RowCard's own classes say none. */
   .row-card {
     background-color: var(--card-bg);
     border: var(--card-border-width) solid var(--card-border-color);
     border-radius: var(--card-radius);
+    padding: var(--row-pad-y) var(--row-pad-x);
   }
 
   /* The lab's unit bodies (components/lab/LabMarkdown): markdown with KaTeX maths and fenced
@@ -445,9 +456,10 @@ html[data-mode="light"] {
 
 /* ═══════════════════════════════════════
    THE FRAME — the bar (components/shell/Header.tsx; the landing page's header keeps the plain
-   wrapper) and the rail (components/shell/Rail.tsx), sized by the density tokens. In the
-   components layer, so a class written at a call site still wins: in the utilities layer these
-   came after Tailwind's own utilities and beat it.
+   wrapper) and the rail (components/shell/Rail.tsx), sized by the density tokens, then what the
+   navigation shares with the pages: the lifted current one and the tab track. In the components
+   layer, so a class written at a call site still wins: in the utilities layer these came after
+   Tailwind's own utilities and beat it.
    ═══════════════════════════════════════ */
 @layer components {
   .header {
@@ -492,12 +504,26 @@ html[data-mode="light"] {
     .header-bar > :last-child { justify-self: end; }
   }
 
-  /* The current one of a set — the rail's tile, a section's tab, a settings section — is a small
-     piece of panel lifted off its track: the panel's own fill and layered shadow. Each component
-     keeps its own text colour beside it. */
+  /* The current one of a set — the rail's tile, a tab, a settings section — is a small piece of
+     panel lifted off its track: the panel's own fill and layered shadow. Each component keeps its
+     own text colour beside it. */
   .lifted {
     background: var(--panel-bg);
     box-shadow: var(--panel-shadow);
+  }
+  /* The pill track both kinds of tabs are drawn in — a section's pages (components/shell/
+     SectionTabs) and a page's views (components/primitives/Tabs) — at the left of what holds it.
+     Each tab is a pill around its text, --tab-pad-y above and below it, the current one lifted. */
+  .tab-track {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0.1875rem;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--fg) 5%, transparent);
   }
 }
 
@@ -1678,8 +1704,10 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
    ═══════════════════════════════════════ */
 @layer utilities {
   /* ─── PRIMARY CTA BUTTON ─── */
+  /* The auth pages' main button, as tall as their fields (--field-h). */
   .yellow-btn {
-    @apply h-12 cursor-pointer font-medium text-base rounded-lg disabled:opacity-50;
+    @apply cursor-pointer font-medium text-base rounded-lg disabled:opacity-50;
+    height: var(--field-h);
     background: var(--brand);
     color: var(--on-brand);
   }
@@ -1724,7 +1752,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     font-size: 12px;
   }
   .form-input {
-    @apply h-12 px-3 py-3 text-base rounded-lg focus:ring-0;
+    @apply px-3 py-3 text-base rounded-lg focus:ring-0;
+    height: var(--field-h);
     border-radius: var(--control-radius);
     color: var(--fg);
     background-color: var(--surface-0);
@@ -1752,7 +1781,9 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
 
   /* ─── SELECT FIELDS ─── */
   .select-trigger {
-    @apply w-full !h-12 px-3 py-3 text-base rounded-lg focus:ring-0;
+    @apply w-full px-3 py-3 text-base rounded-lg focus:ring-0;
+    /* !important: the trigger's own data-[size=default]:h-8 is the more specific selector. */
+    height: var(--field-h) !important;
     border: 1px solid color-mix(in srgb, var(--line-strong) 40%, transparent);
     background-color: var(--surface-0);
     color: var(--fg);
@@ -1761,7 +1792,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
     border-color: var(--brand-strong) !important;
   }
   .country-select-trigger {
-    @apply h-12 px-3 py-3 text-base w-full justify-between font-normal rounded-lg focus:ring-0;
+    @apply px-3 py-3 text-base w-full justify-between font-normal rounded-lg focus:ring-0;
+    height: var(--field-h);
     border: 1px solid color-mix(in srgb, var(--line-strong) 40%, transparent);
     background-color: var(--surface-0);
     color: var(--fg-soft);
@@ -2074,8 +2106,6 @@ summary [data-panel-title]::before { content: none; }
 .news-tag { border-radius: 999px; }
 :is(.yellow-btn, .search-btn) { box-shadow: var(--glow); }
 
-/* A row inside a panel, a step roomier than its call site asks for. */
-.row-card { padding: 0.875rem 1.125rem; }
 /* A soft wash of the accent behind the page. */
 body::before {
   content: "";

@@ -7,7 +7,7 @@ import {ChevronLeft, ChevronRight, GripVertical, X} from "lucide-react";
 import {cn} from "@/lib/utils";
 import type {WidgetDefinition, WidgetSpan} from "@/lib/dashboard/catalog";
 import MicroLabel from "@/components/primitives/MicroLabel";
-import Panel, {type PanelPad} from "@/components/primitives/Panel";
+import Panel, {panelPad, type PanelPad} from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {iconButton} from "@/components/primitives/iconButton";
 import SpanPicker from "@/components/dashboard/SpanPicker";
@@ -54,9 +54,14 @@ const PANEL_PADDING: Record<WidgetDefinition['chrome'], PanelPad> = {
 // affordance, not a heading, so it stays a span.
 
 // The body padding in edit mode, where the Panel itself is pad={0} so the toolbar can
-// sit flush against the top edge.
+// sit flush against the top edge: the padding the same chrome draws when viewed, read from
+// Panel's own map so the two never drift (a bare widget, unframed when viewed, gets the small one).
 const PADDING_CLASS: Record<WidgetDefinition['chrome'], string> = {
-    link: 'p-5', panel: 'p-5', 'panel-lg': 'p-6', 'panel-sm': 'p-3', bare: 'p-3',
+    link: panelPad(PANEL_PADDING.link),
+    panel: panelPad(PANEL_PADDING.panel),
+    'panel-lg': panelPad(PANEL_PADDING['panel-lg']),
+    'panel-sm': panelPad(PANEL_PADDING['panel-sm']),
+    bare: panelPad(3),
 };
 
 const WidgetShell = ({def, span, editing, index, count, className, children, onSpan, onRemove, onMoveBy, onMoveTo}: Props) => {
