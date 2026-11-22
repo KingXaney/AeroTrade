@@ -105,9 +105,39 @@ its topics and lesson sections are pure builders covered by unit tests instead.
 
 - **README images** — `npm run qa -- screenshots` writes `output/screenshots/*.png`; copy the
   ones the README uses into `docs/screenshots/`.
-- **Visual sweep** — `npm run qa -- visual-sweep` screenshots every page, signed out and signed
-  in, at 1440 px and 390 px into `output/sweep/`. For a change meant to look identical: run it on
-  the base, move `output/sweep` aside, run it on the change, then compare:
+- **Visual sweep** — `npm run qa -- visual-sweep` screenshots every page at 1440 px and 390 px
+  into `output/sweep/desktop/` and `output/sweep/phone/`, in three passes, since no one reader
+  has every page:
+
+  | Pass | Who | Pictures |
+  |---|---|---|
+  | signed out | nobody | `landing`, `sign-in`, `sign-up`, `forgot-password`, `reset-password-bad-token` |
+  | an account | `qa-sweep@example.com`, not the owner, as most accounts are | `home`, `dashboard`, `topics`, `topics-edit`, `topic` (one followed topic's own page, `/topics/<slug>`, the first by slug on the account's rail), `news`, `portfolio`, `trade`, `trade-heatmap`, `watchlist`, `friends`, `history`, every settings section (`settings` is the first, Topics; `settings-news`, `settings-appearance`, `settings-dashboard`, `settings-notifications`, `settings-account`), `glossary`, the games (`games`, `games-puzzle`, `games-archive`, `games-arithmetic`, `games-kelly`, `games-market`, `games-correlation`), `poker`, `poker-push-fold`, `poker-pot-odds`, `poker-night`, `stock-spy`, `not-found` |
+  | the owner | `ownerEmail('sweep')` in `owners.mjs` | named `owner-<name>.png`, beside the account's: the pages that are the owner's alone — `owner-learn` (the lab), `owner-brain`, `owner-culture`, `owner-culture-picks`, `owner-strategies`, `owner-strategy-rsi2`, `owner-strategy-buy-and-hold`, `owner-agent-world`, `owner-settings-broker` — and the ones drawn differently for them: `owner-home`, `owner-topic`, `owner-stock-spy`, `owner-settings` and the five other settings sections |
+
+  That is 55 pictures a width. An account that is not the owner is sent Home from the owner's
+  pages, so they are in the owner's pass alone. Both accounts keep their address from run to run
+  (the Account section prints it), so a second sweep in one harness signs in instead of up.
+
+  Each pass opens every page once before its first picture: `next dev` has then compiled the
+  route, and what a first visit changes — the topics' first fetch, the News dot, the first-week
+  step that opening a topic ticks — is the same in every picture, whichever theme comes first.
+  While it runs the sweep has the harness's stand-ins answer as the services do, and puts them
+  back at the end: Tiingo up, so the front door and Home draw the momentum terrain's panel, and
+  Finnhub pricing SPY and AAPL at prices that never move, so `/stocks/SPY` is the stock's page
+  for an account that is not the owner (unpriced, it is the 404) and the order ticket shows a
+  price. The app keeps what it read from them, so in a run that names suites too, name the sweep
+  last. Canvases, embeds, the robot's tip and `next dev`'s indicator are hidden, and animations
+  stopped, so a diff means markup. What the pictures still carry from the day they were taken:
+  live headlines and their ages, the market status, the day's puzzle and lab unit.
+
+  The sweep asserts nothing. A picture that is a poor record of its page — it landed on another
+  page, shows the 404, a route's error boundary or a skeleton, is in the wrong theme, or drew its
+  icons as their names — gets a `NOTE` line in `output/logs/visual-sweep.log`, which also lists
+  every picture taken and how long it took; the run exits 1 only when a picture could not be taken.
+
+  For a change meant to look identical: run it on the base, move `output/sweep` aside, run it on
+  the change, then compare:
 
   ```bash
   node scripts/qa/visual-diff.mjs before/ scripts/qa/output/sweep/ [--out diffs/] [--max 0.1]
@@ -116,9 +146,11 @@ its topics and lesson sections are pure builders covered by unit tests instead.
   It prints the share of changed pixels per image, worst first, writes a diff image beside each
   changed one and exits 1 when any image differs by more than `--max` percent or changed size.
 
-  The sweep runs under the default theme. `QA_THEME=<palette>:<style> npm run qa -- visual-sweep`
-  (say `nord:brutalist`) runs it under that one instead, into `output/sweep-<palette>-<style>/` —
-  a change to a visual style is checked one style at a time.
+  The sweep runs under the default theme. `QA_THEME=<palette>:<style>[,<palette>:<style>…]`
+  (say `QA_THEME=nord:brutalist,paper:minimal npm run qa -- visual-sweep`) runs it under each
+  theme named instead, into `output/sweep-<palette>-<style>/` — a change to a visual style is
+  checked style by style in one harness run. `QA_SWEEP_PAGES=home,owner-brain,…` limits it to
+  those pictures, by the names above (a name the sweep does not know stops it before it starts).
 
 ## Windows
 
