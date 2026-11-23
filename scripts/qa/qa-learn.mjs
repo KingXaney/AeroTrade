@@ -576,6 +576,20 @@ try {
             await pageE.locator('#time-in-market-window').innerText());
         check('three ways render side by side', await pageE.locator('#time-in-market-ways > *').count() === 3
             && await pageE.locator('#time-in-market-ways [data-term="lump-sum"][title], #time-in-market-ways [data-term="dollar-cost-averaging"][title], #time-in-market-ways [data-term="cash-only"][title]').count() === 3);
+        // Panels stand the page's own gap apart, the one between the section and what follows it on
+        // the strategy page: the three ways from each other and from the panel above them alike.
+        const timeGaps = await pageE.evaluate(() => {
+            const section = document.querySelector('#time-in-market');
+            const panel = document.querySelector('#time-in-market-panel').getBoundingClientRect();
+            const ways = [...document.querySelectorAll('#time-in-market-ways > *')].map((el) => el.getBoundingClientRect());
+            const next = section.nextElementSibling?.getBoundingClientRect();
+            return {page: next ? +(next.top - section.getBoundingClientRect().bottom).toFixed(1) : null,
+                below: ways[0] ? +(ways[0].top - panel.bottom).toFixed(1) : null,
+                between: ways.slice(1).map((way, i) => +(way.left - ways[i].right).toFixed(1))};
+        });
+        check('…standing the page\'s own gap apart, from each other and from the panel above them',
+            timeGaps.page !== null && timeGaps.page > 0 && Math.abs(timeGaps.below - timeGaps.page) <= 0.5
+            && timeGaps.between.length === 2 && timeGaps.between.every((gap) => Math.abs(gap - timeGaps.page) <= 0.5), JSON.stringify(timeGaps));
 
         const lumpPeak = await tiles('lumpSum');
         check('all at once from the peak: the closes\' own ratio, to the cent', parseMoney(lumpPeak.end) === cents(10_000 * close(N - 1) / close(P)) && lumpPeak.endHint === null,
