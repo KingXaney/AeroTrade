@@ -562,6 +562,13 @@ html[data-mode="light"] {
     }
     .tab-track::-webkit-scrollbar { display: none; }
   }
+  /* A row that scrolls sideways (a phone's tab track, the topics' chips) fades out at an end with
+     more of it to scroll to, so a row cut at the screen's edge reads as a row that goes on, not as a
+     clipped word: hooks/useCurrentInTrack names those ends from the row's own scroll. The fade is as
+     wide as the room the hook keeps beside the current tab, so the current one is never under it. */
+  [data-edge-fade="start"] { mask-image: linear-gradient(to left, black calc(100% - 1.5rem), transparent); }
+  [data-edge-fade="end"] { mask-image: linear-gradient(to right, black calc(100% - 1.5rem), transparent); }
+  [data-edge-fade="both"] { mask-image: linear-gradient(to right, transparent, black 1.5rem, black calc(100% - 1.5rem), transparent); }
 }
 
 /* ═══════════════════════════════════════

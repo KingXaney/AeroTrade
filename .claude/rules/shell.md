@@ -73,3 +73,9 @@ the map is `docs/MAP.md`.
   anchor and a sticky panel stop at `--sticky-top`, through `html { scroll-padding-top }` and
   `lg:top-(--sticky-top)`, never an offset of their own (only poker night's Hands drawer, which
   scrolls inside itself, keeps a scroll margin).
+- On a phone a tab track (`.tab-track`: `components/shell/SectionTabs`, `components/primitives/Tabs`)
+  is one row that scrolls sideways. `hooks/useCurrentInTrack` keeps its current tab in sight — placed
+  at once on load, gliding there on a change unless motion is reduced — and names the ends of the
+  row with more to scroll to in `data-edge-fade`, where the row fades out (`app/globals.css`), so a
+  tab cut at the screen's edge reads as a row that goes on; the sums are `lib/shell/track-scroll`
+  (`scrollToShow`, `edgeFade`).

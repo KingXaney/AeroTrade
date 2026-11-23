@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {scrollToShow} from '@/lib/shell/track-scroll';
+import {edgeFade, scrollToShow} from '@/lib/shell/track-scroll';
 
 // A tab track 343px wide (a 375px phone less its 16px sides), its current tab 80px wide, 16px of
 // the row kept in sight beside it.
@@ -41,5 +41,25 @@ describe('scrollToShow', () => {
 
     it('takes no room when none is asked for', () => {
         expect(scrollToShow({start: 300, end: 380, scrollLeft: 0, width: 343})).toBe(37);
+    });
+});
+
+// The Learn section's five tabs on a 320px phone: a row 413px long in a track 288px wide.
+const row = (scrollLeft: number, {width = 288, scrollWidth = 413} = {}) => edgeFade({scrollLeft, width, scrollWidth});
+
+describe('edgeFade', () => {
+    it('fades the end while the row is at its start, and the start once it is at its end', () => {
+        expect(row(0)).toBe('end');
+        expect(row(125)).toBe('start');
+    });
+
+    it('fades both ends in between', () => {
+        expect(row(63)).toBe('both');
+    });
+
+    it('fades nowhere when the row fits, nor for a pixel of rounding', () => {
+        expect(row(0, {width: 343, scrollWidth: 343})).toBeNull();
+        expect(row(0.5, {width: 358, scrollWidth: 359})).toBeNull();
+        expect(row(124.5)).toBe('start');
     });
 });

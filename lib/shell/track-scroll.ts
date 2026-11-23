@@ -25,3 +25,17 @@ export const scrollToShow = ({start, end, scrollLeft, width, inset = 0}: TrackSp
     else if (end + room > scrollLeft + width) target = end + room - width;
     return target === null || target === scrollLeft ? null : target;
 };
+
+export type EdgeFade = 'start' | 'end' | 'both' | null;
+
+// The ends of a row that scrolls sideways with more of it to scroll to: where it fades
+// (data-edge-fade in app/globals.css), so a row cut at the screen's edge reads as one that goes on.
+// A row that fits fades nowhere, and a pixel of rounding is not more.
+export const edgeFade = ({scrollLeft, width, scrollWidth}: {scrollLeft: number; width: number; scrollWidth: number}): EdgeFade => {
+    const before = scrollLeft > 1;
+    const after = scrollLeft + width < scrollWidth - 1;
+    if (before && after) return 'both';
+    if (before) return 'start';
+    if (after) return 'end';
+    return null;
+};
