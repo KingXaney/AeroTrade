@@ -9,7 +9,8 @@ export const recordJobRun = async (jobId: string, message: string): Promise<void
         await connectToDatabase();
         await JobRun.updateOne(
             {jobId},
-            {$set: {lastRunAt: new Date(), lastMessage: message}},
+            // A completed run is the end of whatever failure came before it.
+            {$set: {lastRunAt: new Date(), lastMessage: message}, $unset: {lastError: 1, lastErrorAt: 1}},
             {upsert: true},
         );
     } catch (error) {

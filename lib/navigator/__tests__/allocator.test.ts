@@ -90,6 +90,18 @@ describe('diffToOrders — exit triggers', () => {
         expect(orders[0].reason).toContain('exit: score -0.10');
     });
 
+    it('exits a holding of less than one share too: the order sells the fraction', () => {
+        // A reverse split can leave half a share; a sub-share sell is otherwise dropped.
+        const orders = diffToOrders({
+            totalValue: 100_000,
+            cash: 10_000,
+            positions: [position({symbol: 'AAA', quantity: 0.5, avgCost: 100, price: 100, heldTradingDays: 100, score: -0.10})],
+            targets: [],
+        });
+        expect(orders).toHaveLength(1);
+        expect(orders[0]).toMatchObject({symbol: 'AAA', side: 'sell', quantity: 0.5});
+    });
+
     it('full-exits on a broken thesis', () => {
         const orders = diffToOrders({
             totalValue: 100_000,

@@ -11,6 +11,10 @@ export const formatPrice = (price: number) => {
 
 // Round first, then decide the sign and the colour, so a $3 loss on $100,000 reads "0.00%"
 // in neutral rather than "-0.00%" in red. (-0).toFixed(2) is already "0.00".
+// A share count: whole as it is, a fraction (a split can leave one) to four places at most.
+export const formatShares = (quantity: number): string =>
+    (Number.isInteger(quantity) ? String(quantity) : String(Math.round(quantity * 10_000) / 10_000));
+
 export const roundPct = (value: number, digits = 2): number => Math.round(value * 10 ** digits) / 10 ** digits;
 
 export const formatPct = (value: number | null, digits = 2): string => {

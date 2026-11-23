@@ -13,7 +13,7 @@
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
-import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, REPO_ROOT, check, outDir, signUp, summary, hydrated} from './lib.mjs';
 
 const OUT = outDir('steady-prices');
 const STUB = `http://localhost:${process.env.QA_FINNHUB_PORT ?? 8791}`;
@@ -460,14 +460,52 @@ try {
     check('…so the page that follows values the holding at the price that filled', (await read()).holdings.QSPA === money(fill.price), JSON.stringify((await read()).holdings));
 
     // --- the trade desk's switcher -----------------------------------------------------------------
-    await page.goto(`${BASE}/trade`, {waitUntil: 'domcontentloaded'});
+    await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     const deskTrigger = page.locator('[data-account-switcher]');
-    await deskTrigger.waitFor({timeout: 30000});
-    await deskTrigger.click();
-    const deskRequests = watchRequests();
-    await page.getByRole('menuitemradio', {name: /Second/}).click();
-    await page.waitForFunction((want) => document.querySelector('[data-account-switcher]')?.getAttribute('data-account-switcher') === want
-        && document.querySelectorAll('.account-region[aria-busy="true"]').length === 0 && /QSPC/.test(document.querySelector('main')?.textContent ?? ''), ids.second, {timeout: 30000});
+    // Hydrated, not just present: a trigger clicked before React has it opens no menu.
+    await hydrated(deskTrigger);
+    // The ticket asks for its symbol's price as it mounts — server actions that are not the
+    // switch's. The page is left until it has sent none for a second, so the counts below are
+    // the switch's alone.
+    await new Promise((resolve) => {
+        const started = Date.now();
+        let last = started;
+        const heard = (request) => { if (request.method() === 'POST' && request.headers()['next-action']) last = Date.now(); };
+        page.on('request', heard);
+        const tick = setInterval(() => {
+            if (Date.now() - last < 1000 && Date.now() - started < 15000) return;
+            clearInterval(tick);
+            page.off('request', heard);
+            resolve(undefined);
+        }, 100);
+    });
+    let deskRequests = watchRequests();
+    // The menu is opened and its row pressed until the page shows the account. A press made
+    // while the page is still settling under an open menu can go unheard (the menu stays open
+    // and nothing is written); unheard, it is pressed again, counted afresh, and the counts
+    // below still read one write and one page request.
+    const deskShows = (timeout) => page.waitForFunction((want) => document.querySelector('[data-account-switcher]')?.getAttribute('data-account-switcher') === want
+        && document.querySelectorAll('.account-region[aria-busy="true"]').length === 0 && /QSPC/.test(document.querySelector('main')?.textContent ?? ''), ids.second, {timeout})
+        .then(() => true, () => false);
+    let deskSwitched = false;
+    let deskPresses = 0;
+    for (; deskPresses < 4 && !deskSwitched; deskPresses++) {
+        const secondRow = page.getByRole('menuitemradio', {name: /Second/});
+        if (!(await secondRow.isVisible().catch(() => false))) await deskTrigger.click({timeout: 5000}).catch(() => {});
+        deskRequests.stop();
+        deskRequests = watchRequests();
+        await secondRow.click({timeout: 5000}).catch(() => {});
+        deskSwitched = await deskShows(deskPresses === 3 ? 30000 : 6000);
+    }
+    // What the page held if the switch never showed, so a failure says which part did not happen.
+    const deskState = deskSwitched ? `${deskPresses} press(es)` : JSON.stringify(await page.evaluate(() => ({
+        switcher: document.querySelector('[data-account-switcher]')?.getAttribute('data-account-switcher'),
+        busy: document.querySelectorAll('.account-region[aria-busy="true"]').length,
+        qspc: /QSPC/.test(document.querySelector('main')?.textContent ?? ''),
+        menuOpen: document.querySelectorAll('[role="menuitemradio"]').length,
+        url: location.pathname + location.search,
+    })));
+    check('the trade desk shows the account picked from its switcher', deskSwitched, `${deskState} ${JSON.stringify(deskRequests.seen)}`);
     deskRequests.stop();
     check('the trade desk switches with the same one write and one page request, and shows the account\'s positions',
         deskRequests.seen.writes === 1 && deskRequests.seen.pages === 1 && deskRequests.seen.actions === 0, JSON.stringify(deskRequests.seen));

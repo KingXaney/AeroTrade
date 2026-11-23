@@ -8,7 +8,7 @@ import {INVESTMENT_GOALS, PREFERRED_INDUSTRIES, RISK_TOLERANCE_OPTIONS} from "@/
 import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
-import {EMAIL_RULE, PASSWORD_RULE} from "@/lib/auth/validation";
+import {EMAIL_RULE, FULL_NAME_RULE, PASSWORD_RULE} from "@/lib/auth/validation";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import type {SignUpFormData} from '@/lib/auth/types';
@@ -63,7 +63,7 @@ const SignUp = () => {
                     placeholder="Your name"
                     register={register}
                     error={errors.fullName}
-                    validation={{ required: 'Full name is required', minLength: { value: 2, message: 'Name must be at least 2 characters' } }}
+                    validation={FULL_NAME_RULE}
                 />
 
                 <InputField

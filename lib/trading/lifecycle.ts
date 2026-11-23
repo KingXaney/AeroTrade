@@ -60,7 +60,9 @@ export const restartAccount = async (
         {_id: account._id, userId},
         {
             $set: {cash: balance, startingBalance: balance, positions: [], inceptionAt: new Date()},
-            $unset: {incomeThrough: 1, incomeTotals: 1},
+            // ...nor a fill of the old epoch still waiting for its row, nor the splits its old
+            // fills were read with.
+            $unset: {incomeThrough: 1, incomeTotals: 1, pendingFill: 1, splits: 1},
         },
     );
     await PaperTrade.deleteMany(claimsLegacy

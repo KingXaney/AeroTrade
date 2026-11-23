@@ -5,6 +5,7 @@
 import {connectToDatabase} from "@/database/mongoose";
 import SuggestionSet from "@/database/models/suggestion-set.model";
 import {appUrl, sendNewsSummaryEmail} from "@/lib/email/send";
+import {unsubscribeLinks} from "@/lib/email/unsubscribe";
 import {buildTopicsSectionHtml, topicsSectionLinks} from "@/lib/email/sections/topics";
 import {lessonSectionFor} from "@/lib/email/sections/lesson";
 import {claimDigestDay, releaseDigestDay} from "@/lib/email/digest-store";
@@ -171,11 +172,11 @@ export type DigestSendInput = {
 export type DigestSendResult = 'sent' | 'sent-fallback' | 'already-sent';
 
 // The brief as mailed: what the model wrote, or the articles in their outlets' own words.
-export const composeDigest = ({day, news, navigator, culture = null, sections, modelText}: Omit<DigestSendInput, 'user' | 'test'>) => {
+export const composeDigest = ({day, news, navigator, culture = null, sections, modelText, unsubscribeUrl}: Omit<DigestSendInput, 'user' | 'test'> & {unsubscribeUrl?: string}) => {
     const summary = parseDigestSummary(modelText, news.articles, news.symbols) ?? fallbackDigestSummary(news.articles, news.symbols);
     const view = buildDigestView({
         day, appUrl: appUrl(), summary, readerSymbols: news.symbols, navigator, culture,
-        topicsHtml: sections.topicsSection, lessonHtml: sections.lessonSection,
+        topicsHtml: sections.topicsSection, lessonHtml: sections.lessonSection, unsubscribeUrl,
     });
     return {subject: view.subject, html: renderDigestHtml(view), text: renderDigestText(view), fallback: summary.fallback};
 };
@@ -186,8 +187,11 @@ export const sendUserDigest = async (input: DigestSendInput): Promise<DigestSend
     const {user, day, test} = input;
     if (!test && !(await claimDigestDay(user.id, day))) return 'already-sent';
     try {
-        const composed = composeDigest(input);
-        await sendNewsSummaryEmail({email: user.email, subject: composed.subject, html: composed.html, text: composed.text});
+        // Each reader's own signed link: the footer's page, and the one-click header a mail
+        // client shows as its own Unsubscribe button.
+        const unsubscribe = unsubscribeLinks(appUrl(), user.id);
+        const composed = composeDigest({...input, unsubscribeUrl: unsubscribe?.page});
+        await sendNewsSummaryEmail({email: user.email, subject: composed.subject, html: composed.html, text: composed.text, unsubscribeUrl: unsubscribe?.oneClick});
         return composed.fallback ? 'sent-fallback' : 'sent';
     } catch (error) {
         if (!test) await releaseDigestDay(user.id, day);

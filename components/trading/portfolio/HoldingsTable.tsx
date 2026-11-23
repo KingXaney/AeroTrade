@@ -1,7 +1,7 @@
 import type {ReactNode} from "react";
 import Link from "next/link";
 import {cn} from "@/lib/utils";
-import {formatSignedPrice, formatPrice, formatChangePercent, getChangeColorClass} from "@/lib/format";
+import {formatSignedPrice, formatPrice, formatChangePercent, formatShares, getChangeColorClass} from "@/lib/format";
 import UnpricedNote from "@/components/trading/UnpricedNote";
 import Term from "@/components/primitives/Term";
 import type {EnrichedPosition} from '@/lib/trading/types';
@@ -60,7 +60,7 @@ const HoldingsTable = ({positions, emptyText = 'No open positions.', showUnprice
                         </div>
                     </div>
                     {/* Below md the header row is hidden, so each cell names itself. */}
-                    <div className="flex justify-between md:block md:text-right text-fg font-mono"><MicroLabel className="md:hidden mr-2">Qty</MicroLabel>{p.quantity}</div>
+                    <div className="flex justify-between md:block md:text-right text-fg font-mono"><MicroLabel className="md:hidden mr-2">Qty</MicroLabel>{formatShares(p.quantity)}</div>
                     <div className="flex justify-between md:block md:text-right text-fg-soft font-mono"><MicroLabel className="md:hidden mr-2">Avg Cost</MicroLabel>{formatPrice(p.avgCost)}</div>
                     <div className="flex justify-between md:block md:text-right text-fg font-mono">
                         <MicroLabel className="md:hidden mr-2">Price</MicroLabel>

@@ -21,7 +21,7 @@ import {
     livePrice,
     mergeLivePoint,
 } from "@/lib/trading/analytics";
-import {getOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
+import {getCachedOwnedAccount, toAccountSummary, toPlainPositions} from "@/lib/trading/accounts";
 import {buildHoldingsPriceMap, computePortfolio} from "@/lib/trading/valuation";
 import {epochTradesOf, getTradeLedger} from "@/lib/trading/ledger";
 import {getIncomeSummary} from "@/lib/income/page-store";
@@ -32,23 +32,25 @@ import type {AccountAnalytics, SnapshotPoint} from '@/lib/trading/types';
 // The math lives in analytics.ts (pure); this assembles its inputs.
 export const getAccountAnalytics = async (userId: string, accountId: string): Promise<AccountAnalytics | null> => {
     try {
-        const account = await getOwnedAccount(userId, accountId);
+        // The render's own copy of the account (the page, the income panel and the ledger share it).
+        const account = await getCachedOwnedAccount(userId, accountId);
         if (!account) return null;
 
         const summaryInfo = toAccountSummary(account);
         const inceptionDate = getEasternDateString(new Date(summaryInfo.inceptionAt));
         const key = String(account._id);
+        const positions = toPlainPositions(account);
 
-        const [snapshots, benchmark, trades] = await Promise.all([
-            AccountSnapshot.find({accountId: key}).sort({date: 1}).lean(),
+        // Everything the account alone decides is read together: none of these waits on another.
+        // SPY rides along in the quote map: the benchmark needs today's point too. A holding
+        // without a quote is valued at its stored close; SPY's point is taken from a live quote only.
+        const [snapshots, benchmark, trades, priceMap, income] = await Promise.all([
+            AccountSnapshot.find({accountId: key}, {_id: 0, date: 1, totalValue: 1}).sort({date: 1}).lean<{date: string; totalValue: number}[]>(),
             getBenchmarkIndex(inceptionDate),
             getTradeLedger(userId, key),
+            buildHoldingsPriceMap([...positions.map((p) => p.symbol), BENCHMARK_SYMBOL]),
+            getIncomeSummary(account),
         ]);
-
-        const positions = toPlainPositions(account);
-        // SPY rides along in the same quote map: the benchmark needs today's point too. A holding
-        // without a quote is valued at its stored close; SPY's point is taken from a live quote only.
-        const priceMap = await buildHoldingsPriceMap([...positions.map((p) => p.symbol), BENCHMARK_SYMBOL]);
         const summary = computePortfolio(
             {cash: account.cash, startingBalance: account.startingBalance, positions},
             priceMap,
@@ -71,7 +73,7 @@ export const getAccountAnalytics = async (userId: string, accountId: string): Pr
         return {
             account: summaryInfo,
             summary,
-            income: await getIncomeSummary(account),
+            income,
             series,
             snapshotThrough: snapshotPoints.at(-1)?.date ?? null,
             maxDrawdownPct: drawdown?.pct ?? null,
@@ -112,7 +114,8 @@ export const getComparisonStats = async (
         };
         const [trades, snapshots] = await Promise.all([
             epochTradesForUser(),
-            AccountSnapshot.find({userId}).sort({date: 1}).lean(),
+            AccountSnapshot.find({userId}, {_id: 0, accountId: 1, date: 1, totalValue: 1}).sort({date: 1})
+                .lean<{accountId: string; date: string; totalValue: number}[]>(),
         ]);
 
         const tradesByAccount = new Map<string, {side: string; realizedPnl?: number}[]>();

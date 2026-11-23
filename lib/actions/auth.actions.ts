@@ -8,18 +8,17 @@ import {THEME_COOKIE} from "@/lib/theme/resolve";
 import {syncThemeCookieForUser} from "@/lib/theme/store";
 import {takeRateLimit} from "@/lib/rate-limit";
 import {
-    PASSWORD_RESET_LIMIT,
-    PASSWORD_RESET_WINDOW_MS,
     SIGN_IN_INVALID_MESSAGE,
     SIGN_IN_LIMITED_MESSAGE,
     SIGN_UP_LIMITED_MESSAGE,
     clientIpFrom,
-    passwordResetKey,
     resolveSignUpLimit,
     signInCredentials,
+    withinPasswordResetLimits,
     withinSignInLimits,
     withinSignUpLimit,
 } from "@/lib/auth/limits";
+import {FULL_NAME_INVALID_MESSAGE, passwordResetEmail, signUpName} from "@/lib/auth/validation";
 import {SIGN_UP_PROFILE_INVALID_MESSAGE, signUpProfile} from "@/lib/auth/sign-up-profile";
 import {seedDefaultTopics} from "@/lib/topics/seed";
 import type {SignInFormData, SignUpFormData} from '@/lib/auth/types';
@@ -34,11 +33,16 @@ const extractAuthError = (e: unknown, fallback: string): string => {
 }
 
 export const signUpWithEmail = async (input: SignUpFormData) => {
-    const { email, password, fullName } = input;
+    const { email, password } = input;
     // The form only offers listed answers, so one outside its list means a direct call: refused
     // before any counter is spent, and only the checked answers reach the welcome prompt.
     const profile = signUpProfile(input);
     if (!profile) return { success: false, error: SIGN_UP_PROFILE_INVALID_MESSAGE }
+    // The name heads the welcome email, mailed to an address nobody has verified, and is shown
+    // wherever a name is: held to the form's own rule (lib/auth/validation.ts signUpName) before
+    // any counter is spent, and only its trimmed reading reaches better-auth and the event.
+    const name = signUpName(input.fullName);
+    if (!name) return { success: false, error: FULL_NAME_INVALID_MESSAGE }
 
     try {
         // Every attempt counts, refused before better-auth is asked: a refused one creates
@@ -50,7 +54,7 @@ export const signUpWithEmail = async (input: SignUpFormData) => {
             return { success: false, error: SIGN_UP_LIMITED_MESSAGE }
         }
 
-        const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
+        const response = await auth.api.signUpEmail({ body: { email, password, name } })
 
         if(response) {
             // Awaited, not queued: the user is redirected to the dashboard the moment this
@@ -64,7 +68,7 @@ export const signUpWithEmail = async (input: SignUpFormData) => {
 
             await inngest.send({
                 name: JOBS.signUpEmail.event,
-                data: { email, name: fullName, ...profile }
+                data: { email, name, ...profile }
             }).catch((e) => console.error('Failed to queue welcome email', e))
         }
 
@@ -112,13 +116,20 @@ export const signInWithEmail = async (input: SignInFormData) => {
 // emails have accounts.
 const RESET_REQUESTED = 'If an account exists for that address, a reset link is on its way. It expires in 30 minutes.';
 
-export const requestPasswordReset = async ({ email }: { email: string }): Promise<{ success: true; message: string }> => {
-    const normalized = (email ?? '').trim().toLowerCase();
+export const requestPasswordReset = async (input: { email: string }): Promise<{ success: true; message: string }> => {
+    // Reachable signed out, and the address becomes a counter's key: input that names no address
+    // (passwordResetEmail — not a string, longer than a mailbox's can be, refused by the forms'
+    // own pattern) gets the one answer before any counter is spent, so it writes nothing and
+    // throws nothing.
+    const email = passwordResetEmail(input);
+    if (!email) return { success: true, message: RESET_REQUESTED };
+
     try {
-        if (normalized && await takeRateLimit(passwordResetKey(normalized), PASSWORD_RESET_LIMIT, PASSWORD_RESET_WINDOW_MS)) {
-            await auth.api.requestPasswordReset({ body: { email: normalized } });
-        } else if (normalized) {
-            console.warn('Password reset rate limit reached for an address');
+        // The order the two counters are spent in is withinPasswordResetLimits' (lib/auth/limits.ts).
+        if (await withinPasswordResetLimits({ ip: clientIpFrom(await headers()), email }, takeRateLimit)) {
+            await auth.api.requestPasswordReset({ body: { email } });
+        } else {
+            console.warn('Password reset rate limit reached');
         }
     } catch (e) {
         console.error('Password reset request failed', e);

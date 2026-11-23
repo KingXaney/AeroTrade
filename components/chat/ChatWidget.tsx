@@ -2,9 +2,9 @@
 
 import {useCallback, useEffect, useRef, useState} from "react";
 import {createPortal} from "react-dom";
+import dynamic from "next/dynamic";
 import {usePathname} from "next/navigation";
 import type {UIMessage} from "ai";
-import ChatPanel from "@/components/chat/ChatPanel";
 import RobotMascot from "@/components/chat/RobotMascot";
 import RobotTipBubble, {type RobotTipAttention} from "@/components/chat/RobotTipBubble";
 import {askAdvisor, subscribeAsk} from "@/lib/chat/ask";
@@ -21,6 +21,14 @@ import {
 } from "@/lib/chat/robot-tips";
 import {getEasternDateString} from "@/lib/dates";
 import type {RobotTip} from "@/lib/learn/copy/robot";
+
+// The panel — the chat client, its transport and the markdown renderer — is fetched when it is
+// first wanted, not with every signed-in page: the widget is in the (root) layout and most
+// visits never open it. The launcher asks for it as soon as the pointer or the focus reaches
+// it, so the first open rarely waits; a panel still loading draws nothing.
+const loadChatPanel = () => import("@/components/chat/ChatPanel");
+const ChatPanel = dynamic(loadChatPanel, {ssr: false, loading: () => null});
+const preloadChatPanel = () => { void loadChatPanel().catch(() => undefined); };
 
 type ChatWidgetProps = {
     userId: string;
@@ -75,6 +83,7 @@ const ChatWidget = ({userId, owner}: ChatWidgetProps) => {
     // An Ask link anywhere on the page opens the panel with its question in the composer.
     // A click while the panel is already open is handled by the panel itself.
     useEffect(() => subscribeAsk((text) => {
+        preloadChatPanel();
         setPendingInput(text);
         setOpen(true);
     }), []);
@@ -161,6 +170,9 @@ const ChatWidget = ({userId, owner}: ChatWidgetProps) => {
                     ref={launcherRef}
                     type="button"
                     onClick={() => setOpen(true)}
+                    onPointerEnter={preloadChatPanel}
+                    onFocus={preloadChatPanel}
+                    onTouchStart={preloadChatPanel}
                     aria-label="Open Aero-AI Assistant"
                     // The robot floats bottom-right at every width — the panel opens in the same
                     // corner — and the (root) layout's content wrapper ends in pb-24 so it never

@@ -2,6 +2,7 @@
 // order can obviously not fill. Pure on purpose so it is unit-tested; the server
 // (executeOrder) re-checks everything with the live price and stays authoritative.
 
+import {formatShares} from "@/lib/format";
 import {TRADE_REASON_MAX} from "@/lib/trading/config";
 import {interestOverDays} from "@/lib/income/accrual";
 
@@ -39,8 +40,14 @@ export const affordableShares = (cash: number, price: number | null): number | n
 // Quick-fill buttons. Sell presets are fractions of what is owned (as the sell dialog
 // already does); buy presets are fractions of what the cash affords at the last price.
 // Null when there is nothing to fill from — no position, no price, or under one share.
+// The most whole shares a sell may name. A holding can carry a fraction of a share (a split
+// leaves one): the fraction leaves with the last whole share, and a holding of less than one
+// share sells as one (lib/trading/fill.applyFill).
+export const sellableShares = (owned: number): number =>
+    (Number.isFinite(owned) && owned > 0 ? Math.max(1, Math.floor(owned + 1e-9)) : 0);
+
 export const presetQuantities = (side: OrderSide, {cash, price, owned}: Pick<OrderInputs, 'cash' | 'price' | 'owned'>): Preset[] | null => {
-    const max = side === 'sell' ? Math.floor(owned) : affordableShares(cash, price);
+    const max = side === 'sell' ? sellableShares(owned) : affordableShares(cash, price);
     if (max === null || max < 1) return null;
     return [
         ...FRACTIONS.map(([label, f]) => ({label, value: Math.max(1, Math.floor(max * f))})),
@@ -145,8 +152,9 @@ export const checkOrder = ({side, quantity, price, cash, owned}: OrderInputs): O
         return {ok: false, message: 'Enter a whole number of shares', estTotal: null};
     }
     if (side === 'sell') {
-        if (owned < 1) return {ok: false, message: "You don't own any shares of this symbol in this account", estTotal};
-        if (qty > owned) return {ok: false, message: `You only own ${owned} share${owned === 1 ? '' : 's'}`, estTotal};
+        const max = sellableShares(owned);
+        if (max < 1) return {ok: false, message: "You don't own any shares of this symbol in this account", estTotal};
+        if (qty > max) return {ok: false, message: `You only own ${formatShares(owned)} share${owned === 1 ? '' : 's'}`, estTotal};
         return {ok: true, message: null, estTotal};
     }
     // Buy. Without a price the cost is unknown; that is not a reason to block — the QA

@@ -18,8 +18,9 @@ describe('job registry', () => {
             ['sign-up-email', 'app/user.created'],
             ['daily-brain-update', 'app/update.news.brain', 'TZ=America/New_York 30 7 * * *'],
             ['daily-news-summary', 'app/send.daily.news', 'TZ=America/New_York 0 12 * * *'],
-            ['daily-account-snapshots', 'app/record.daily.snapshots', 'TZ=America/New_York 10 16 * * 1-5'],
-            ['ai-navigator-weekly', 'app/run.ai.navigator', 'TZ=America/New_York 0 10 * * 1'],
+            ['daily-account-snapshots', 'app/record.daily.snapshots', 'TZ=America/New_York 10 16 * * 1-5', 'TZ=America/New_York 40 16 * * 1-5'],
+            ['stock-splits', 'app/apply.stock.splits', 'TZ=America/New_York 40 9 * * 1-5'],
+            ['ai-navigator-weekly', 'app/run.ai.navigator', 'TZ=America/New_York 0 10 * * 1', 'TZ=America/New_York 0 10 * * 2'],
             ['ai-navigator-bootstrap', 'app/bootstrap.ai.navigator'],
             ['claude-second-opinion', 'app/generate.second.opinion'],
             ['refresh-topic-feeds', 'app/refresh.topic.feeds', 'TZ=America/New_York 0 */3 * * *'],
@@ -36,6 +37,7 @@ describe('job registry', () => {
             ['culture-follow-bootstrap', 'app/bootstrap.culture.follow'],
             ['broker-sync', 'app/sync.broker.mirror', 'TZ=America/New_York 15 11 * * 1-5'],
             ['agent-world-weekly', 'app/run.agent.world', 'TZ=America/New_York 30 8 * * 1', 'TZ=America/New_York 30 8 * * 2'],
+            ['job-alerts', 'app/check.job.health', 'TZ=America/New_York 0 9 * * *'],
         ]);
     });
 

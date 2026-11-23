@@ -11,12 +11,14 @@ import {
     drawdownBandLabel,
     drawdownLine,
     DRAWDOWN_COPY,
+    GONE_COPY,
     HOLDINGS_COPY,
     PERFORMANCE_COPY,
     pctOneDecimal,
     RISK_COPY,
     shortDate,
     signedMoney,
+    SPLIT_COPY,
     SWITCH_COPY,
     TRADED_BY_COPY,
 } from '@/lib/learn/copy/portfolio';
@@ -296,5 +298,38 @@ describe('TRADED_BY_COPY', () => {
         expect(TRADED_BY_COPY.navigator).toBe('Traded by the AI Navigator');
         expect(TRADED_BY_COPY.culture('Spike')).toBe('Traded by the Spike culture picker');
         for (const text of [TRADED_BY_COPY.navigator, TRADED_BY_COPY.culture('Quiet'), TRADED_BY_COPY.paused, TRADED_BY_COPY.link]) clean(text);
+    });
+});
+
+describe('a holding that has stopped quoting', () => {
+    it('says what the close-out does, at which close, and what that price is not', () => {
+        expect(GONE_COPY.body('XYZ', '2026-11-12', 3)).toBe('XYZ has had no live quote for 3 sessions, so it cannot be sold at a live price. This closes the whole holding at its Nov 12 close, the last price stored for it.');
+        expect(GONE_COPY.reason('2026-11-12', 3)).toBe('Closed at the Nov 12 close: no live quote for 3 sessions.');
+        expect(GONE_COPY.confirm(1)).toBe('Close 1 share');
+        expect(GONE_COPY.confirm(7.5)).toBe('Close 7.5 shares');
+    });
+
+    it('keeps every sentence descriptive', () => {
+        [
+            GONE_COPY.action, GONE_COPY.title('XYZ'), GONE_COPY.body('XYZ', '2026-11-12', 3), GONE_COPY.caveat, GONE_COPY.confirm(3),
+            GONE_COPY.working, GONE_COPY.done, GONE_COPY.failed, GONE_COPY.reason('2026-11-12', 3),
+            GONE_COPY.notHeld('XYZ'), GONE_COPY.stillQuoted('XYZ'), GONE_COPY.noClose('XYZ'),
+        ].forEach(clean);
+    });
+});
+
+describe('an order that met a split', () => {
+    it('says why it was not sent', () => {
+        expect(SPLIT_COPY.fillApplied('NVDA')).toContain('The order was not sent');
+        expect(SPLIT_COPY.fillUnchecked('NVDA')).toContain('The order was not sent');
+        [SPLIT_COPY.fillApplied('NVDA'), SPLIT_COPY.fillUnchecked('NVDA')].forEach(clean);
+    });
+});
+
+describe('the split note under the trade log', () => {
+    it('names each split once, in today\'s shares', () => {
+        const note = SPLIT_COPY.note([{symbol: 'NVDA', label: '10-for-1', exDate: '2024-06-10'}, {symbol: 'XYZ', label: '1-for-8', exDate: '2026-03-02'}]);
+        expect(note).toBe('Fills before a split are shown in today\'s shares: NVDA 10-for-1 on Jun 10, XYZ 1-for-8 on Mar 2.');
+        clean(note);
     });
 });

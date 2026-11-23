@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {GLOSSARY, GLOSSARY_KEYS} from '@/lib/learn/glossary';
-import {GLOSSARY_GROUPS, glossaryGroupsFor, groupOf} from '@/lib/learn/where';
+import {GLOSSARY_GROUPS, glossaryGroupsFor, glossaryKeysFor, groupOf, searchGlossaryFor} from '@/lib/learn/where';
 import {EVENT_BADGES} from '@/lib/brain/event-types';
 import {SIGNAL_BADGES} from '@/lib/culture/signal-types';
 
@@ -106,5 +106,36 @@ describe('where each term lives', () => {
         expect(GLOSSARY_GROUPS.filter((group) => group.home.owner).map((group) => group.id)).toEqual(['board', 'brain', 'rails', 'culture', 'agent-world']);
         expect(everyone.map((group) => group.id)).toEqual(['portfolio', 'market', 'concepts', 'games', 'poker', 'landing', 'poker-night']);
         for (const group of everyone) expect(group.home.href, group.id).not.toMatch(/^\/(strategies|brain|culture|agent-world)/);
+    });
+
+    it("lists one reader's keys as their glossary page renders them", () => {
+        expect([...glossaryKeysFor({owner: true})].sort()).toEqual([...GLOSSARY_KEYS].sort());
+        const everyone = glossaryKeysFor({owner: false});
+        expect(everyone).toEqual(glossaryGroupsFor({owner: false}).flatMap((group) => group.keys));
+        expect(everyone.length).toBeLessThan(GLOSSARY_KEYS.length);
+        for (const key of ['max-drawdown', 'pe-ratio', 'fomc', 'kelly-criterion', 'pot-odds', 'side-pot'] as const) expect(everyone, key).toContain(key);
+        for (const key of ['rsi2', 'thesis', 'position-cap', 'attention', 'desk-rating'] as const) expect(everyone, key).not.toContain(key);
+    });
+
+    // The palette's Learn rows open /glossary#key, so a row is offered only for a key the reader's
+    // glossary renders: anyone else's search never reaches a term homed on the owner's pages.
+    it("keeps the terms homed on the owner's pages out of anyone else's search", () => {
+        expect(searchGlossaryFor('thesis', 4, {owner: true}).map((entry) => entry.key)).toContain('thesis');
+        expect(searchGlossaryFor('thesis', 4, {owner: false})).toEqual([]);
+        expect(searchGlossaryFor('attention', 4, {owner: false})).toEqual([]);
+        expect(searchGlossaryFor('drawdown', 4, {owner: false}).map((entry) => entry.key)).toEqual(['max-drawdown']);
+        const everyone = new Set<string>(glossaryKeysFor({owner: false}));
+        for (const query of ['sma', 'momentum', 'weight', 'cap', 'rating', 'signal', 'spread', 'target', 'position', 'vol', 'return', 'record', 'rate']) {
+            for (const entry of searchGlossaryFor(query, 4, {owner: false})) expect(everyone.has(entry.key), `${query}: ${entry.key}`).toBe(true);
+        }
+    });
+
+    it('filters before it caps, so a hidden term never takes a row from one the reader can open', () => {
+        // The owner's two leading hits for "return" include a strategy board's column.
+        expect(searchGlossaryFor('return', 2, {owner: true}).map((entry) => entry.key)).toEqual(['total-return', 'r12']);
+        const everyone = searchGlossaryFor('return', 2, {owner: false}).map((entry) => entry.key);
+        expect(everyone).toHaveLength(2);
+        expect(everyone[0]).toBe('total-return');
+        expect(everyone).not.toContain('r12');
     });
 });

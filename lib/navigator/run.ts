@@ -20,6 +20,7 @@ import {MIN_CASH_WEIGHT} from "@/lib/navigator/config";
 import {buildRationalePrompt} from "@/lib/navigator/prompts";
 import {navigatorTargets, type NavigatorUniverse} from "@/lib/navigator/universe";
 import {buildHoldItems, buildOrderItem, planAccountOrders, type AccountPlan} from "@/lib/navigator/store";
+import {getGoneSymbols} from "@/lib/prices/quote-store";
 import type {TargetWeight} from "@/lib/navigator/allocator";
 import type {ScoredSymbol} from "@/lib/navigator/scoring";
 import type {ActionResult} from '@/lib/actions/types';
@@ -73,6 +74,31 @@ export const claimNavigatorWeek = async (userId: string, weekKey: string): Promi
     return doc !== null;
 };
 
+// Gives the week's claim back: only while it is still this week's, and only before any order
+// was sent (the weekly run calls it straight after the plan). The next run, Tuesday's retry
+// or one fired by hand, then claims and trades the week as if this one had not run.
+export const releaseNavigatorWeek = async (userId: string, weekKey: string): Promise<void> => {
+    await connectToDatabase();
+    await AiNavigator.updateOne({userId, lastRunDate: weekKey}, {$unset: {lastRunDate: 1}});
+};
+
+// Active enrolments that have not traded this week yet.
+export const countWaitingNavigators = async (weekKey: string): Promise<number> => {
+    await connectToDatabase();
+    return AiNavigator.countDocuments({status: 'active', lastRunDate: {$ne: weekKey}});
+};
+
+// Of a plan's unpriced symbols, the ones worth holding the week back for. A HOLDING without a
+// quote is a refusal unless its symbol has stopped quoting, which no retry will price
+// (lib/prices/gone.ts: every holding is quoted each session, so a long silence means that). An
+// unheld TARGET has no such history — nobody has asked about it — so it is taken as refused,
+// but only on the week's first run: the retry trades without it, and a symbol Finnhub never
+// prices cannot keep an account from trading at all.
+export const refusedQuotes = async (unpriced: {held: readonly string[]; targets: readonly string[]}, {retry}: {retry: boolean}): Promise<string[]> => {
+    const gone = unpriced.held.length === 0 ? new Set<string>() : new Set(await getGoneSymbols(unpriced.held));
+    return [...unpriced.held.filter((symbol) => !gone.has(symbol)), ...(retry ? [] : unpriced.targets)].sort();
+};
+
 // One account's orders under the holding rails; null (and the error recorded on the enrollment)
 // when the account is gone.
 export const planNavigatorOrders = async (
@@ -90,13 +116,16 @@ export const planNavigatorOrders = async (
 
 type PlanContext = NavigatorDecisionInputs & {plan: AccountPlan};
 
+export const navigatorOrderKey = (userId: string, weekKey: string, side: 'buy' | 'sell', symbol: string): string =>
+    `navigator:${userId}:${weekKey}:${side}:${symbol.toUpperCase()}`;
+
 // Every planned order, each its own memoized step (`${orderStepPrefix}-${side}-${symbol}`,
 // sanitised): a retry after partial execution replays completed orders instead of re-trading
 // them, and diffToOrders emits at most one order per symbol, so the ids are unique within the
 // run. Returns the decisions — the orders, then the kept positions.
 export const executeNavigatorPlan = async (
     step: JobStep,
-    {userId, accountId, plan, targets, scoreBySymbol, orderStepPrefix}: PlanContext & {userId: string; accountId: string; orderStepPrefix: string},
+    {userId, accountId, plan, targets, scoreBySymbol, orderStepPrefix, weekKey}: PlanContext & {userId: string; accountId: string; orderStepPrefix: string; weekKey: string},
 ): Promise<SuggestionItem[]> => {
     const items: SuggestionItem[] = [];
     let sellFailed = false;
@@ -114,6 +143,10 @@ export const executeNavigatorPlan = async (
                     side: order.side,
                     quantity: order.quantity,
                     source: 'ai-navigator',
+                    // One fill per order per week, whatever is replayed: a step whose answer was
+                    // lost after the fill landed finds the earlier fill instead of filling again
+                    // (the week is the claim's own unit, and a re-enrolment deletes the trades).
+                    idempotencyKey: navigatorOrderKey(userId, weekKey, order.side, order.symbol),
                     // Re-enforce the cash floor at execution time — live prices
                     // may have drifted since planning.
                     ...(order.side === 'buy' ? {minCashAfter: MIN_CASH_WEIGHT * plan.totalValue} : {}),

@@ -4,10 +4,10 @@
 // the prompt into the chat composer and sends nothing, so a prompt is chat input and held to the
 // advice tier like a chip. Import-free: the numbers are literals, so the client bundle carries no
 // catalog on every page; lib/learn/__tests__/robot-copy.test.ts pins each one to the constant it
-// quotes and holds every string to lib/learn/banned.ts at both tiers. Neither control names chat,
+// quotes, holds the file to no imports and every string to lib/learn/banned.ts at both tiers. (The
+// glossary tip counts no terms: the count once imported all 120 KB of the glossary into every
+// page, and a reader's own glossary leaves the owner's groups out.) Neither control names chat,
 // assistant or advisor: the browser QA finds the launcher by those words.
-
-import {GLOSSARY_KEYS} from "@/lib/learn/glossary";
 
 // `owner`: a tip about the owner's pages (lib/lab/owner.ts), which no one else is told (lib/chat/robot-tips.robotTipsFor).
 export type RobotTip = {id: string; text: string; prompt?: string; owner?: true};
@@ -57,7 +57,7 @@ export const ROBOT_TIPS: readonly RobotTip[] = [
     },
     {
         id: 'learn-glossary',
-        text: `The glossary at /glossary defines every number the app shows — ${GLOSSARY_KEYS.length} terms, each in plain words with a link to the screen it is about.`,
+        text: 'The glossary at /glossary defines every number the app shows, each term in plain words with a link to the screen it is about.',
     },
     {
         id: 'rail-portfolio',

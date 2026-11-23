@@ -8,7 +8,7 @@ import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 
 const ROOT = path.resolve(__dirname, '../..');
-const DIRS = ['app', 'components', 'lib', 'database', 'scripts', 'docs', 'public', 'hooks', '.github'];
+const DIRS = ['app', 'components', 'lib', 'database', 'scripts', 'docs', 'public', 'hooks', '.github', '.claude/rules'];
 const ROOT_FILES = ['README.md', 'AGENTS.md', 'CLAUDE.md', 'package.json', '.env.example', 'proxy.ts', 'next.config.ts'];
 const TEXT = /\.(ts|tsx|mts|mjs|js|json|md|css|sh|ya?ml|svg|txt|html|example)$/;
 const SKIP = new Set(['node_modules', '.next', '.git', 'test-results', 'playwright-report']);

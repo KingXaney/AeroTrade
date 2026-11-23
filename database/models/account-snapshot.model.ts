@@ -15,6 +15,12 @@ export interface AccountSnapshotDoc extends Document {
     // dated on or before `incomeThrough`. Absent = none (written before income existed, or
     // before the account's first credit). The income job tops snapshots up from here.
     incomeThrough?: string;
+    // Set by the daily job when it writes the day's close (a day-zero row seeded at an account's
+    // start has none): what the job's late pass reads to know an account is done for the day.
+    closedAt?: Date;
+    // Holdings this row values at their last stored close because the symbol has stopped
+    // quoting (lib/prices/gone.ts). Absent when every holding had a quote.
+    atClose?: string[];
 }
 
 const AccountSnapshotSchema = new Schema<AccountSnapshotDoc>({
@@ -29,6 +35,8 @@ const AccountSnapshotSchema = new Schema<AccountSnapshotDoc>({
     // accompanying $inc still applied, and a guard on it would match on every retry.
     epoch: {type: Number},
     incomeThrough: {type: String},
+    closedAt: {type: Date},
+    atClose: {type: [String], default: undefined},
 });
 
 // Idempotency key: the daily cron upserts on {accountId, date}, so re-runs overwrite.

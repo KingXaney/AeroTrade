@@ -5,12 +5,31 @@
 // They take no user id, so they read nothing of anyone's.
 
 import {getCurrentUserId} from "@/lib/auth/session";
-import {searchStocks as fetchStocks} from "@/lib/prices/finnhub";
+import {searchQuery, withinSearchLimit} from "@/lib/prices/action-limits";
+import {findStocks as fetchStocks} from "@/lib/prices/finnhub";
 import {getSheetQuote} from "@/lib/prices/quote-store";
+import {takeRateLimit} from "@/lib/rate-limit";
 import type {QuoteData} from '@/lib/prices/types';
 import type {Stock} from '@/lib/stocks/types';
 
-export const searchStocks = async (query?: string): Promise<Stock[]> => fetchStocks(query);
+// The stock search behind ⌘K, /watchlist's add dialog and the ticket's symbol field — every one
+// of them inside the signed-in shell. Each new query is a Finnhub call on the plan's one shared
+// minute, so it is the signed-in reader's alone, for a query short enough to be a name
+// (lib/prices/action-limits.ts searchQuery, read before anything is spent), and counted per
+// reader, by the minute and by the hour. Nothing typed is the popular list, which asks Finnhub
+// nothing and is not counted.
+//
+// It answers the stocks found — none is [] — or null when the search did not answer: no session,
+// the reader's count spent, or Finnhub gave nothing back. The boxes tell the two apart
+// (lib/shell/palette.ts): "no stocks found" is said only of a search that looked.
+export const searchStocks = async (query?: string): Promise<Stock[] | null> => {
+    const asked = searchQuery(query);
+    if (asked === null) return [];
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+    if (asked && !(await withinSearchLimit(userId, takeRateLimit))) return null;
+    return fetchStocks(asked);
+};
 
 // The ticket's "Last Price": the quote sheet's price for this window — the one the page's
 // positions are valued at — as Finnhub's `c` and `dp`. No price is exactly {} (the order then

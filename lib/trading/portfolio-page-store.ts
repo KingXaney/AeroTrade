@@ -11,6 +11,7 @@ import {getTradingHabits} from "@/lib/trading/learn/habits-store";
 import {pickActiveAccount} from "@/lib/trading/active-account";
 import {TRADE_HISTORY_LIMIT} from "@/lib/trading/config";
 import {lastSessionClose, marketStatus} from "@/lib/prices/market-hours";
+import {getGoneSymbols} from "@/lib/prices/quote-store";
 import {tradedBy as readTradedBy, type TradedBy} from "@/lib/trading/traded-by";
 import {getFollowDecisionsForDates} from "@/lib/culture/follow-store";
 import {cultureFillDates, replaysFromDecisions, type FillReplay} from "@/lib/culture/page-store";
@@ -69,15 +70,25 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
         console.error('Portfolio: reading the culture fills\' decisions failed:', error);
         return {};
     });
-    const [ledger, analytics, comparisonStats, income, luck, habits, tradedBy, fillReplays] = await Promise.all([
+    // Only a holding the page is already valuing at a stored close can have stopped quoting, so
+    // the usual page — every holding on a quote — reads nothing here.
+    const atClose = portfolio.positions.filter((position) => position.closeDate).map((position) => position.symbol);
+    const goneRead: Promise<string[]> = atClose.length === 0 ? Promise.resolve([]) : getGoneSymbols(atClose).catch((error) => {
+        console.error('Portfolio: reading which holdings stopped quoting failed:', error);
+        return [];
+    });
+    const [ledger, analytics, comparisonStats, income, luck, habits, tradedBy, fillReplays, goneSymbols] = await Promise.all([
         ledgerRead,
         getAccountAnalytics(userId, account.id),
-        getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))),
+        // The comparison table is drawn only for more than one account; with one, its two reads
+        // of every trade and every snapshot of the user would feed nothing.
+        all.length > 1 ? getComparisonStats(userId, Object.fromEntries(all.map((x) => [x.account.id, x.summary.totalValue]))) : Promise.resolve({}),
         getIncomeActivity(userId, account.id),
         luckRead,
         habitsRead,
         tradedByRead,
         replaysRead,
+        goneRead,
     ]);
 
     const status = marketStatus();
@@ -94,5 +105,6 @@ export const getPortfolioPageView = async (userId: string, preferredId: string |
         quoteTimes: {lastClose: lastSessionClose(new Date(status.at)), now: status.at},
         tradedBy,
         fillReplays,
+        goneSymbols,
     });
 };

@@ -7,6 +7,8 @@ import {generateSecondOpinion, updateNewsBrain} from "@/lib/jobs/functions/brain
 import {bootstrapAiNavigator, runWeeklyNavigator} from "@/lib/jobs/functions/navigator";
 import {sendDailyNewsSummary, sendSignUpEmail} from "@/lib/jobs/functions/email";
 import {recordDailySnapshots} from "@/lib/jobs/functions/trading";
+import {applyStockSplits} from "@/lib/jobs/functions/splits";
+import {watchJobs} from "@/lib/jobs/functions/alerts";
 import {fillFirstRunTopics, generateTopicBriefs, refreshTopicFeeds, refreshTopicOnDemand} from "@/lib/jobs/functions/topics";
 import {runStrategiesDaily} from "@/lib/jobs/functions/strategies";
 import {generateMarketBriefing} from "@/lib/jobs/functions/news";
@@ -19,6 +21,7 @@ export const functions = [
     sendSignUpEmail,
     sendDailyNewsSummary,
     recordDailySnapshots,
+    applyStockSplits,
     updateNewsBrain,
     runWeeklyNavigator,
     bootstrapAiNavigator,
@@ -37,4 +40,5 @@ export const functions = [
     bootstrapCultureFollow,
     syncBrokerMirror,
     runAgentWorldWeekly,
+    watchJobs,
 ];

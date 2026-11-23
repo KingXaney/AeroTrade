@@ -1,19 +1,23 @@
 // Paper trading (lib/trading, /trade, /portfolio, /history): a new user's "Main account", trade
 // deep links and the trade `source` chip, the CSV export (a note that looks like a formula exports
 // as text), the order ticket's presets, advisory checks and 200-character note, what the cash left
-// would earn, chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
+// would earn, the desk's order (the ticket before a shorter chart below 1280 px, the chart beside it
+// from there), chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
 // tables that label themselves below md, the account comparison (a layout saved with the old
 // 'strategy-comparison' id included), and /history's trade feed, which, like every trade read,
-// leaves out a row from before its account's inception. Also the brain's rows, which drill into
-// their evidence with valid markup.
+// leaves out a row from before its account's inception. Also /watchlist's own add dialog (a stock
+// search answered by the Finnhub stand-in) and the brain's rows, which drill into their evidence
+// with valid markup.
 // No Finnhub key, so prices are unknown and the ticket's price-based paths stay open; the ticket's
 // getQuote is answered with a fixed price for the interest line.
 // Run: npm run qa -- trading   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
-import {BASE, MONGO, check, outDir, ownerEmail, settledClick, signUp, summary} from './lib.mjs';
+import {BASE, MONGO, check, outDir, ownerEmail, settledClick, signUp, summary, hydrated} from './lib.mjs';
 
 const OUT = outDir('trading');
+// The Finnhub stand-in (start-finnhub-stub.mjs): the watchlist's add dialog searches through it.
+const FINNHUB_STUB = `http://localhost:${process.env.QA_FINNHUB_PORT ?? 8791}`;
 
 const browser = await chromium.launch({channel: 'chrome'});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
@@ -39,6 +43,24 @@ const quoteStub = async (route) => {
     if (stubbed !== body) quotesStubbed++;
     return route.fulfill({response, body: stubbed});
 };
+// Where the trade desk's two halves are: the ticket by its symbol field, the chart by its heading
+// (document coordinates), which comes first in the document, and the height the chart was asked for.
+const deskLayout = () => page.evaluate(() => {
+    const box = (el) => {
+        const r = el?.getBoundingClientRect();
+        return r ? {x: Math.round(r.x), y: Math.round(r.y + scrollY), bottom: Math.round(r.bottom + scrollY)} : null;
+    };
+    const desk = document.querySelector('[data-trade-desk]');
+    const ticket = desk?.querySelector('#order-symbol') ?? null;
+    const chart = [...(desk?.querySelectorAll('h3') ?? [])].find((h) => h.textContent.trim() === 'Advanced Chart') ?? null;
+    return {
+        height: desk?.getAttribute('data-chart-height') ?? null,
+        ticket: box(ticket),
+        chart: box(chart),
+        ticketFirst: Boolean(ticket && chart && (ticket.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    };
+});
+const chartHeightIs = (want) => page.waitForFunction((h) => document.querySelector('[data-trade-desk]')?.getAttribute('data-chart-height') === h, want, {timeout: 30000}).catch(() => {});
 // The ^IRX row this suite seeds, removed again so later suites see the database they expect.
 let seededRate = null;
 // The stored closes the at-close check seeds for two symbols nobody else uses, removed the same way.
@@ -133,28 +155,38 @@ try {
     // --- no live quote: the newest stored close stands in, dated; an old one does not -------
     // The harness has no Finnhub key, so every quote is missing. QACLS has a close from yesterday,
     // inside the fallback window: it is priced there, with a P&L. QAOLD's only close is twenty days
-    // old: it stays at cost. The header says both once; the price cell dates the close.
+    // old: it is priced there too, dated. QANOB has no stored close: it stays at cost. The header
+    // says all of it once; a price cell dates its close.
     const closeDay = etDay(86_400_000);
+    const oldDay = etDay(20 * 86_400_000);
     await db.collection('pricebars').insertMany([
         {symbol: 'QACLS', date: closeDay, close: 45, open: 45, high: 45, low: 45, source: 'yahoo', dividend: 0},
-        {symbol: 'QAOLD', date: etDay(20 * 86_400_000), close: 99, open: 99, high: 99, low: 99, source: 'yahoo', dividend: 0},
+        {symbol: 'QAOLD', date: oldDay, close: 99, open: 99, high: 99, low: 99, source: 'yahoo', dividend: 0},
     ]);
     await accounts.updateOne({_id: valueInsert.insertedId}, {$set: {cash: 99_000, positions: [
         {symbol: 'QACLS', company: 'QA Close Co', quantity: 4, avgCost: 40},
         {symbol: 'QAOLD', company: 'QA Old Co', quantity: 2, avgCost: 50},
+        {symbol: 'QANOB', company: 'QA No Bar Co', quantity: 1, avgCost: 10},
     ]}});
     await page.goto(`${BASE}/portfolio?account=${String(valueInsert.insertedId)}`, {waitUntil: 'load'});
     await page.getByText('Holdings', {exact: true}).waitFor({timeout: 30000});
-    const basisLine = `2 holdings · 1 of 2 valued at cost · 1 of 2 at the ${shortDay(closeDay)} close`;
+    const basisLine = '3 holdings · 1 of 3 valued at cost · 2 of 3 at their last close';
     check('the header says which holdings stand at cost and which at a stored close, once', await page.getByText(basisLine, {exact: true}).count() === 1, basisLine);
-    const closeCell = page.locator('[data-price-close]').first();
+    const closeCell = page.locator(`[data-price-close="${closeDay}"]`);
     check('a holding with no quote is priced at its stored close, the cell dated',
-        await page.locator('[data-price-close]').count() === 1 && (await closeCell.getAttribute('data-price-close')) === closeDay
+        await closeCell.count() === 1
         && (await closeCell.innerText()).trim() === '$45.00' && (await closeCell.getAttribute('title')) === `No live quote — the ${shortDay(closeDay)} close`,
-        `${await closeCell.getAttribute('data-price-close')} ${await closeCell.innerText().catch(() => '')}`);
+        `${await closeCell.count()} ${await closeCell.innerText().catch(() => '')}`);
     check('…and carries its P&L from that close', await page.getByText('+$20.00 (+12.50%)').count() >= 1);
-    check('a holding whose only close is outside the window stays at cost, with no P&L',
-        await page.getByText('$99.00').count() === 0 && await page.locator('[title="No live quote — value shown at cost"]').count() === 1);
+    // No quote and no close inside the week: the symbol has stopped trading under that name, and
+    // its newest stored close, dated, is nearer what the holding is worth than its cost.
+    const oldCell = page.locator(`[data-price-close="${oldDay}"]`);
+    check('a holding whose only close is older than a week is valued at that close, dated',
+        await oldCell.count() === 1 && (await oldCell.innerText()).trim() === '$99.00'
+        && (await oldCell.getAttribute('title')) === `No live quote — the ${shortDay(oldDay)} close`,
+        `${await oldCell.count()} ${await oldCell.innerText().catch(() => '')}`);
+    check('a holding with no quote and no stored close at all stays at cost, with no P&L',
+        await page.locator('[data-price-close]').count() === 2 && await page.locator('[title="No live quote — value shown at cost"]').count() === 1);
 
     await page.setViewportSize({width: 390, height: 844});
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
@@ -210,10 +242,83 @@ try {
     }));
     check('a watchlist row has no pointer cursor of its own', rowStyle.cursor !== 'pointer', rowStyle.cursor);
     check('a watchlist row is a theme surface: no blur under the minimal style', rowStyle.panel && rowStyle.blur === 'none', JSON.stringify(rowStyle));
+    // The page's own add control (components/stocks/AddToWatchlist.tsx), with a list already
+    // there, and from its box on by keyboard alone. A pick is a write and Enter runs the selected
+    // row, so the dialog draws no row while its search is out. The stand-in lists two symbols no
+    // other suite searches for (the search is cached by its address).
+    await fetch(`${FINNHUB_STUB}/__search?QTWA=QA%20Watch%20Alpha&QTWB=QA%20Watch%20Beta`);
+    const addStock = page.locator('[data-watchlist-add="title"]');
+    check('a watchlist with rows has one Add a stock button, in the title',
+        await addStock.count() === 1 && await page.locator('[data-watchlist-add]').count() === 1);
+    const addDialog = page.locator('[data-watchlist-add-dialog]');
+    // A click before the page has hydrated goes nowhere: press until the dialog is there.
+    for (let i = 0; i < 5 && !(await addDialog.isVisible()); i++) {
+        await addStock.click({timeout: 3000}).catch(() => {});
+        await addDialog.waitFor({timeout: 3000}).catch(() => {});
+    }
+    const hits = addDialog.locator('[data-watchlist-hit]');
+    await hits.first().waitFor({timeout: 15000}).catch(() => {});
+    const suggested = await hits.evaluateAll((els) => els.map((el) => el.getAttribute('data-watchlist-hit')));
+    check('its suggestions leave out the stock already on the list',
+        suggested.length === 10 && !suggested.includes('AAPL') && suggested.includes('MSFT'), suggested.join(','));
+    await page.keyboard.type('QTW');
+    // Inside the search's debounce: nothing has answered for "QTW" yet.
+    const early = await hits.count();
+    await page.keyboard.press('Enter');
+    await addDialog.locator('[data-watchlist-hit="QTWA"]').waitFor({timeout: 15000}).catch(() => {});
+    check('while its search is out the dialog draws no row, so Enter adds nothing',
+        early === 0 && await addDialog.isVisible() && await db.collection('watchlists').countDocuments({userId}) === 1, String(early));
+    // Arrows + Enter alone, as in ⌘K.
+    await page.keyboard.press('ArrowDown');
+    const moved = await addDialog.locator('[cmdk-item][aria-selected="true"]').getAttribute('data-watchlist-hit').catch(() => null);
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    await page.locator('a[aria-label="Trade QTWA"]').first().waitFor({timeout: 30000}).catch(() => {});
+    const added = await db.collection('watchlists').findOne({userId, symbol: 'QTWA'});
+    check('the arrows move the selection and Enter adds the first stock, under the name the search gave',
+        moved === 'QTWB' && added?.company === 'QA Watch Alpha', `${moved} ${added?.company}`);
+    check('…and the reader stays on /watchlist, where its row now is',
+        /\/watchlist$/.test(page.url()) && await page.locator('a[aria-label="Trade QTWA"]').count() >= 1, page.url());
+    await addDialog.waitFor({state: 'detached', timeout: 5000}).catch(() => {});
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-watchlist-add') === 'title', null, {timeout: 5000}).catch(() => {});
+    check('…the dialog closes and the focus is back on the button',
+        await addDialog.count() === 0 && await page.evaluate(() => document.activeElement?.getAttribute('data-watchlist-add')) === 'title');
+    // Searched for again, the stock just added is in the answer, marked, and cannot be run.
+    // Enter on the focused button opens the dialog, as a click does.
+    await page.keyboard.press('Enter');
+    await addDialog.locator('[cmdk-input]').waitFor({timeout: 15000}).catch(() => {});
+    await page.keyboard.type('QTW');
+    await addDialog.locator('[data-watchlist-hit="QTWB"]').waitFor({timeout: 15000}).catch(() => {});
+    const marked = addDialog.locator('[data-watchlist-hit="QTWA"]');
+    check('a stock already on the list is marked in a search, cannot be run, and the next one is selected',
+        await marked.getAttribute('aria-disabled').catch(() => null) === 'true' && /on your watchlist/i.test(await marked.innerText().catch(() => ''))
+        && await addDialog.locator('[data-watchlist-hit="QTWB"]').getAttribute('aria-selected').catch(() => null) === 'true');
+    // The search is counted per reader, by the minute and by the hour
+    // (lib/prices/action-limits.ts). With the minute's counter set to its limit of 60, the next
+    // query — "QT", which both listings match — is refused before Finnhub is asked. A search
+    // that did not answer has not found that there is no such stock, and the dialog says which.
+    const searchKey = `search:${userId}`;
+    await db.collection('ratelimits').updateOne({key: searchKey},
+        {$set: {count: 60, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+    await page.keyboard.press('Backspace');
+    const addStatus = addDialog.locator('[data-watchlist-add-status]');
+    const refusedSearch = addStatus.filter({hasText: 'The stock search did not answer. Type it again in a moment.'});
+    await refusedSearch.waitFor({timeout: 15000}).catch(() => {});
+    check('a search past the reader\'s count for the minute draws no stock and is said as unanswered, not as "No stocks found"',
+        await refusedSearch.count() === 1 && await hits.count() === 0 && !/No stocks found/i.test(await addStatus.innerText().catch(() => '')),
+        `${await hits.count()} rows`);
+    await db.collection('ratelimits').deleteMany({key: {$in: [searchKey, `search:hour:${userId}`]}});
+    await page.keyboard.press('Escape');
+    await addDialog.waitFor({state: 'detached', timeout: 5000}).catch(() => {});
+    // The checks below read the watchlist this suite seeded: AAPL alone.
+    await db.collection('watchlists').deleteOne({userId, symbol: 'QTWA'});
+    await fetch(`${FINNHUB_STUB}/__search`).catch(() => {});
     await page.setViewportSize({width: 390, height: 844});
     await page.reload({waitUntil: 'load'});
     await page.locator('a[aria-label="Trade AAPL"]').first().waitFor({timeout: 30000});
     check('at 390px watchlist cells name themselves', await page.getByText('Market Cap', {exact: true}).filter({visible: true}).count() >= 1);
+    const addBox = await page.locator('[data-watchlist-add="title"]').boundingBox();
+    check('at 390px the Add a stock button is a 44px target', (addBox?.height ?? 0) >= 44, String(addBox?.height));
     await page.setViewportSize({width: 1440, height: 900});
     // AAPL is on the large-cap strategies' boards, so its stock page renders even without a
     // Finnhub key (a symbol no strategy watches still 404s keyless — qa-styles).
@@ -222,11 +327,72 @@ try {
     // The button is uppercased by CSS, and innerText follows it.
     check('the stock page has an explicit Trade button', /trade/i.test(await page.locator('a[href="/trade?symbol=AAPL"]').first().innerText()));
 
+    // --- the desk below 1280 px: the ticket leads, over a shorter chart -----------------------
+    // Home's first step for a new account opens this address. The chart used to come first at
+    // its desktop height, so a phone opened on a screen of chart with the ticket under it.
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
+    await page.locator('#order-symbol').waitFor({timeout: 30000});
+    await chartHeightIs('360');
+    const phoneDesk = await deskLayout();
+    check('at 390px the order ticket comes before the chart, on the first screen',
+        phoneDesk.ticket !== null && phoneDesk.chart !== null && phoneDesk.ticket.y < phoneDesk.chart.y && phoneDesk.ticket.bottom <= 844,
+        JSON.stringify(phoneDesk));
+    check('…in the document too, so the keyboard reaches it before the chart\'s frame', phoneDesk.ticketFirst);
+    check('…and the chart under it is asked for at 360 px', phoneDesk.height === '360', String(phoneDesk.height));
+    // The embed itself is TradingView's, over the network: measured when it arrives, else said.
+    const phoneFrame = page.locator('[data-trade-desk] .tradingview-widget-container iframe').first();
+    if (await phoneFrame.waitFor({timeout: 20000}).then(() => true, () => false)) {
+        const frameHeight = Math.round((await phoneFrame.boundingBox())?.height ?? 0);
+        check('…which is the height its frame is drawn at', frameHeight >= 330 && frameHeight <= 390, `${frameHeight}px`);
+    } else {
+        console.log('SKIP  the chart frame\'s height at 390px  — the TradingView embed did not load');
+    }
+    await shot('02b-desk-390');
+    // Widening the same page past xl stands the two side by side, at the chart's full height.
+    await page.setViewportSize({width: 1440, height: 900});
+    await chartHeightIs('560');
+    const widened = await deskLayout();
+    check('widening the window to 1440px puts the chart left of the ticket at 560 px',
+        widened.height === '560' && widened.ticket !== null && widened.chart !== null && widened.chart.x < widened.ticket.x,
+        JSON.stringify(widened));
+
+    // Nothing under the embeds moves when their frames arrive, a second after the page: the
+    // tape's place and the chart's are held from the first paint. Read once before any frame is
+    // there and once after; without the network there is nothing to compare, and it says so.
+    await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'commit'});
+    await page.locator('[data-trade-desk]').waitFor({state: 'attached', timeout: 30000});
+    const place = () => page.evaluate(() => {
+        const desk = document.querySelector('[data-trade-desk]');
+        const chart = desk?.querySelector('.tradingview-widget-container');
+        return {
+            deskTop: desk ? Math.round(desk.getBoundingClientRect().top + scrollY) : null,
+            chart: chart ? Math.round(chart.getBoundingClientRect().height) : null,
+            frames: document.querySelectorAll('main .tradingview-widget-container iframe').length,
+        };
+    });
+    const placeEarly = await place();
+    await page.waitForFunction(() => document.querySelectorAll('main .tradingview-widget-container iframe').length >= 3, null, {timeout: 20000}).catch(() => {});
+    await page.waitForTimeout(500);
+    const placeLate = await place();
+    if (placeEarly.frames === 0 && placeLate.frames >= 3) {
+        check('the desk does not move when the tape\'s and the chart\'s frames arrive: their places are held from the first paint',
+            placeEarly.deskTop !== null && placeEarly.deskTop === placeLate.deskTop && placeEarly.chart === 560 && placeLate.chart === 560, `${JSON.stringify(placeEarly)} ${JSON.stringify(placeLate)}`);
+    } else {
+        console.log(`SKIP  the desk's place before and after the embeds  — ${JSON.stringify(placeEarly)} ${JSON.stringify(placeLate)}`);
+    }
+
     // --- the order ticket ---------------------------------------------------------------
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
     const symbolInput = page.locator('#order-symbol');
-    await symbolInput.waitFor({timeout: 30000});
+    await hydrated(symbolInput);
     check('deep link prefills the ticket', (await symbolInput.inputValue()) === 'AAPL');
+    await chartHeightIs('560');
+    const wideDesk = await deskLayout();
+    check('at 1440px the chart and the ticket share a row, the chart on the left at 560 px',
+        wideDesk.height === '560' && wideDesk.ticket !== null && wideDesk.chart !== null
+        && wideDesk.chart.x < wideDesk.ticket.x && Math.abs(wideDesk.ticket.y - wideDesk.chart.y) < 200,
+        JSON.stringify(wideDesk));
     // exact: the page header's "live prices" would otherwise match a substring search
     check('the ticket says Last Price, not Live Price', await page.getByText('Last Price', {exact: true}).count() === 1 && await page.getByText('Live Price', {exact: true}).count() === 0);
     const ticket = page.locator('form').first();
@@ -301,7 +467,7 @@ try {
     // A Trade link clicked while already on the desk is a soft navigation: the page
     // instance survives, so the ticket has to adopt the new symbol from its props.
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
-    await symbolInput.waitFor({timeout: 30000});
+    await hydrated(symbolInput);
     // The strip sits at the fold after hours, when the ticket's queue note is two lines taller.
     await settledClick(page.locator('a[aria-label="Trade MSFT"]').first());
     await page.waitForURL(/\/trade\?symbol=MSFT/, {timeout: 15000});
@@ -314,7 +480,7 @@ try {
     const pricebars = db.collection('pricebars');
     const buyLine = async () => {
         await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
-        await symbolInput.waitFor({timeout: 30000});
+        await hydrated(symbolInput);
         await page.locator('#order-shares').fill('10');
         const line = page.locator('[data-testid="order-effect"]');
         await line.waitFor({timeout: 30000}).catch(() => {});
@@ -376,9 +542,17 @@ try {
     };
     await page.route(onTicketPages, capturePlaceOrder);
     await page.goto(`${BASE}/trade?symbol=AAPL`, {waitUntil: 'domcontentloaded'});
-    await symbolInput.waitFor({timeout: 30000});
+    await hydrated(symbolInput);
     await page.locator('#order-shares').fill('1');
     await noteField.fill(note);
+    // A field typed into before React has hydrated is reset to its empty state: type again
+    // until the note holds (a busy machine hydrates late).
+    for (let i = 0; i < 10; i++) {
+        await page.waitForTimeout(300);
+        if ((await noteField.inputValue()) === note && (await page.locator('#order-shares').inputValue()) === '1') break;
+        await page.locator('#order-shares').fill('1');
+        await noteField.fill(note);
+    }
     const tradesBeforeNote = await db.collection('papertrades').countDocuments({accountId: mainId});
     await page.getByRole('button', {name: 'Buy AAPL'}).click();
     await page.getByText(/Couldn.t fetch a live price/).waitFor({timeout: 30000}).catch(() => {});
@@ -386,6 +560,20 @@ try {
         placeOrderBody ?? 'no placeOrder POST');
     check('…and the server stayed the authority (nothing traded)', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBeforeNote);
     await page.unroute(onTicketPages, capturePlaceOrder);
+    await settleToasts();
+
+    // --- orders are counted per reader by the minute (lib/prices/action-limits.ts) --------
+    // The counter is set to its limit of 20 rather than spent by twenty orders. The next order
+    // is refused with the limit's own sentence — not the "live price" refusal an order that
+    // reached executeOrder gets in this harness — so no quote was asked for it.
+    const orderKey = `order:${userId}`;
+    await db.collection('ratelimits').updateOne({key: orderKey},
+        {$set: {count: 20, windowStartedAt: new Date(), expiresAt: new Date(Date.now() + 60_000)}}, {upsert: true});
+    await page.getByRole('button', {name: 'Buy AAPL'}).click();
+    const orderLimited = await page.getByText('That was a lot of orders in a minute').first().waitFor({timeout: 30000}).then(() => true, () => false);
+    check('an order past the reader\'s count for the minute is refused with the limit\'s sentence', orderLimited);
+    check('…and nothing traded', (await db.collection('papertrades').countDocuments({accountId: mainId})) === tradesBeforeNote);
+    await db.collection('ratelimits').deleteMany({key: orderKey});
     await settleToasts();
 
     // --- the dashboard quick-trade widget must not navigate -----------------------------
@@ -408,6 +596,7 @@ try {
     await recent.waitFor({timeout: 30000});
     check('the recent-trades widget lists this epoch\'s fills and not the old epoch\'s',
         /AAPL/.test(await recent.innerText()) && !/ZZOLD/.test(await recent.innerText()), (await recent.innerText()).replace(/\s+/g, ' ').slice(0, 160));
+    await hydrated(widget.locator('#order-symbol'));
     await widget.locator('#order-symbol').fill('TSLA');
     await widget.locator('#order-symbol').press('Enter');
     await page.waitForTimeout(1500);
@@ -485,6 +674,7 @@ try {
 } finally {
     if (seededRate) await mongo.db().collection('pricebars').deleteOne(seededRate).catch(() => {});
     await mongo.db().collection('pricebars').deleteMany({symbol: {$in: CLOSE_SYMBOLS}}).catch(() => {});
+    await fetch(`${FINNHUB_STUB}/__search`).catch(() => {});
     await mongo.close().catch(() => {});
     await browser.close();
 }

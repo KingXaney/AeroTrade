@@ -918,8 +918,10 @@ export const resolveTerm = (query: string): GlossaryEntry | null => {
 };
 
 // Palette rows: entries whose term, key or alias starts with (then contains) the query,
-// best matches first. Plain string comparison; never a RegExp from the query.
-export const searchGlossary = (query: string, limit = 5): GlossaryEntry[] => {
+// best matches first. Plain string comparison; never a RegExp from the query. `keep` narrows
+// the entries searched before the cap, so a reader's rows are filled from their own glossary
+// (lib/learn/where.ts searchGlossaryFor).
+export const searchGlossary = (query: string, limit = 5, keep?: (entry: GlossaryEntry) => boolean): GlossaryEntry[] => {
     const q = query.toLowerCase().trim();
     if (q.length < 2) return [];
     const rank = (entry: GlossaryEntry): number => {
@@ -928,7 +930,7 @@ export const searchGlossary = (query: string, limit = 5): GlossaryEntry[] => {
         if (names.some((name) => name.includes(q))) return 1;
         return 2;
     };
-    return ENTRIES
+    return (keep ? ENTRIES.filter(keep) : ENTRIES)
         .map((entry) => [rank(entry), entry] as const)
         .filter(([score]) => score < 2)
         .sort((a, b) => a[0] - b[0])

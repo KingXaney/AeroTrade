@@ -6,7 +6,7 @@
 
 export const LAB_OWNER_EMAIL = 'qa-lab-owner@example.com';
 
-export const OWNER_TAGS = ['shell', 'styles', 'chat', 'trading', 'strategies', 'learn-a', 'learn-b', 'learn-c', 'learn-e', 'learn-f', 'culture'];
+export const OWNER_TAGS = ['shell', 'styles', 'chat', 'trading', 'strategies', 'learn-a', 'learn-b', 'learn-c', 'learn-e', 'learn-f', 'culture', 'alerts'];
 
 const emailOf = (tag) => `qa-owner-${tag}@example.com`;
 

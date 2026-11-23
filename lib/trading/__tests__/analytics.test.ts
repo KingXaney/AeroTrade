@@ -501,3 +501,24 @@ describe('unpriced summaries', () => {
         expect(describeUnpriced(1, 1)).toBe('This holding is unpriced — valued at cost, P&L withheld');
     });
 });
+
+// A quote the sheet could not renew for sessions is the mark of a symbol that stopped quoting.
+describe('withoutGoneQuotes', () => {
+    const DAY = 86_400_000;
+    const now = Date.UTC(2026, 10, 19, 21, 10);   // Thursday 2026-11-19, 16:10 ET
+
+    it('drops a quote from before the last three sessions and keeps a recent one', async () => {
+        const {withoutGoneQuotes} = await import('@/lib/trading/analytics');
+        const prices = new Map([['OLD', {price: 5, asOf: now - 10 * DAY}], ['NEW', {price: 9, asOf: now - DAY}], ['NONE', {}]]);
+        const kept = withoutGoneQuotes(prices, now);
+        expect(kept.get('OLD')).toEqual({});
+        expect(kept.get('NEW')).toEqual({price: 9, asOf: now - DAY});
+        expect(kept.get('NONE')).toEqual({});
+    });
+
+    it('hands back the same map when nothing is gone, and never drops a stored close', async () => {
+        const {withoutGoneQuotes} = await import('@/lib/trading/analytics');
+        const prices = new Map([['NEW', {price: 9, asOf: now - DAY}], ['CLOSE', {price: 4.2, closeDate: '2026-11-06'}]]);
+        expect(withoutGoneQuotes(prices, now)).toBe(prices);
+    });
+});

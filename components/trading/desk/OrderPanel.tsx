@@ -86,8 +86,10 @@ const OrderPanel = ({defaultSymbol = '', cash, accountId, positions = [], onSymb
     const runSearch = useCallback(async (q: string) => {
         if (!q || q.length < 1) { setResults([]); return; }
         try {
+            // null: the search did not answer. The dropdown then offers nothing; the symbol
+            // typed is still the ticket's, and its price line says whether it is one.
             const hits = await searchStocks(q);
-            setResults(hits.slice(0, 6));
+            setResults((hits ?? []).slice(0, 6));
         } catch {
             setResults([]);
         }

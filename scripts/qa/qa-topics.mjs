@@ -314,8 +314,14 @@ const until = async (page, fn, ms) => {
     // what makes arrow keys and Enter work.
     const followRow = page.getByRole('option', {name: /Follow topic: “climate policy”/});
     check('⌘K shows Follow topic row', await followRow.count() === 1);
+    // The row is the palette's last and waits, disabled, until the stock search has answered for
+    // this query (lib/shell/palette.ts). It found no stock, and the query names no page and no
+    // glossary entry, so the row is then the selected one.
+    await page.locator('[data-topic-row="ready"][aria-selected="true"]').waitFor({timeout: 15000}).catch(() => {});
+    check('…which Enter runs once the stock search has found nothing',
+        await followRow.getAttribute('aria-disabled') === 'false' && await followRow.getAttribute('aria-selected') === 'true'
+        && await page.locator('[cmdk-list] [cmdk-item]').count() === 1);
     // Drive it from the keyboard, which the old raw <li>/<Link> rows could not do.
-    await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     await page.waitForURL(/\/topics\/climate-policy/, {timeout: 60000});
     await page.waitForTimeout(1200);
