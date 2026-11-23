@@ -518,10 +518,23 @@ html[data-mode="light"] {
 
   /* The current one of a set — the rail's tile, a tab, a settings section — is a small piece of
      panel lifted off its track: the panel's own fill and layered shadow. Each component keeps its
-     own text colour beside it. */
+     own text colour beside it.
+     A shadow shows on a panel as light as nord's, not on a near-black one (quiet-cyber's,
+     catppuccin's), where the piece was the panel's own colour on the panel and only its text said
+     which was current. So the fill has a floor, an OKLab lightness of 0.33 in the panel's own tint,
+     and a hairline a step lighter rings it, strongest on the darkest panel and gone by one of 0.36:
+     a palette whose panel is lighter than that (nord's, the two light ones) draws the piece exactly
+     as before. OKLab, not OKLCH: Chrome reads a near-grey's hue as none, and paints the raised fill
+     red. Where relative colours are not read, the piece is the panel's own fill as it was. */
   .lifted {
     background: var(--panel-bg);
     box-shadow: var(--panel-shadow);
+  }
+  @supports (color: oklab(from red max(l, 0.5) a b / clamp(0, (0.5 - l) * 2, 1))) {
+    .lifted {
+      background: oklab(from var(--panel-bg) max(l, 0.33) a b);
+      box-shadow: inset 0 0 0 1px oklab(from var(--panel-bg) calc(l + 0.12) a b / clamp(0, calc((0.36 - l) * 2.5), 0.5)), var(--panel-shadow);
+    }
   }
   /* The pill track both kinds of tabs are drawn in — a section's pages (components/shell/
      SectionTabs) and a page's views (components/primitives/Tabs) — at the left of what holds it.
