@@ -36,8 +36,20 @@ the map is `docs/MAP.md`.
   test), and a searched stock, which Finnhub names in capitals (`lib/stocks/watchlist-add.isShouting`),
   is saved under its profile's name when there is one (`lib/actions/watchlist.actions.addToWatchlist`).
 - `components/stocks/StockHit` is the one stock search row, shared by ⌘K and the add dialog.
-- `components/stocks/TradingViewWidget` takes `height: number | null`: null renders the title and
-  the frame and embeds nothing until the height is a number (`components/stocks/useTradingViewWidget`).
+- /watchlist's list is one panel of rows (`components/stocks/WatchlistTable`: the panel
+  `[data-watchlist-table]`, a flat `RowCard` per stock, `[data-watchlist-row]`), never a panel per
+  row, with its one `WhatTheseMean` inside it. The column header is inset by a row's border and
+  padding (`mx-px px-(--row-pad-x)`), so each header cell sits over its cells, edge for edge
+  (`qa-trading` holds both).
+- The market-status badge (`components/stocks/MarketStatus`, on Home, /trade and /watchlist) takes
+  its dot's class from `lib/stocks/market-dot.marketDotClass`: the page's one beacon (`.fx-beacon`)
+  while the regular session is open, still otherwise. Its test holds both states from the app's own
+  clock, since the browser QA cannot set the session.
+- `components/stocks/TradingViewWidget` takes `height: number | null`: null renders the frame (and
+  the title, when it is given one) and embeds nothing until the height is a number
+  (`components/stocks/useTradingViewWidget`). The two chart panels, the stock page's and /trade's
+  desk (### trading), draw their heading themselves — a `SectionHeading`, "Advanced Chart", with
+  its TRADINGVIEW note, on the 28px line the embed's own title took — and give the embed no title.
   An embed's place is held only by a height on its container (`className`): the stylesheet sizes
   the widget's own box to 100% of that, so a height given to the inner box holds nothing, and
   without one the page under an embed moves when its frame arrives.

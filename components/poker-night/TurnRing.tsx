@@ -5,8 +5,8 @@
 // warning colour at 30 %, the negative one at 10 % (lib/poker-night/client-clock.turnTone; the
 // seconds are printed in the dock for the viewer's own turn, so colour is never the only cue). The
 // server's two seconds of grace are never shown. It steps once a second and a CSS transition runs
-// it smoothly to where the next second will be; brutalist and both motion guards turn the
-// transition off, so it steps.
+// it smoothly to where the next second will be; both motion guards turn the transition off,
+// so it steps.
 
 import {useServerNow} from "@/components/poker-night/room-controller";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";

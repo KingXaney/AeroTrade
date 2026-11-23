@@ -5,7 +5,7 @@
 // drawn over it (SceneArt). Decoration only; nothing readable ever sits on it bare.
 //
 // When the host picks another scene, the new one fades in over the one it replaces
-// (.pn-scene-fade, on the motion token, so a guard or brutalist shows it at once); the old sky stays
+// (.pn-scene-fade, on the motion token, so either motion guard shows it at once); the old sky stays
 // beneath it, without its art, until the next change. Which scene was before is worked out during
 // render (the React pattern for state that follows a prop), never in an effect.
 

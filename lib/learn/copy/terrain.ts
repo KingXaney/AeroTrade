@@ -44,6 +44,12 @@ export const TERRAIN_COPY = {
         lookback: (n: number): string => `${n}-day lookback`,
         close: (price: number): string => `SPY close $${price.toFixed(2)}`,
     },
+    // Home's strip: its one button swaps the strip for the full panel in place, and back. Its
+    // accessible name keeps the word on the button first and says what it changes.
+    expand: 'Expand',
+    collapse: 'Collapse',
+    expandName: 'Expand the momentum surface',
+    collapseName: 'Collapse the momentum surface',
     cameraLabel: 'Camera',
     presets: {angle: 'Angle', top: 'Top', side: 'Side'} as const satisfies Record<CameraPreset, string>,
     flatten: 'Flatten',

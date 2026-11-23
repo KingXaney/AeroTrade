@@ -43,6 +43,10 @@ type Props = {
     four?: boolean; // the four-colour deck
     // The sections' heading level: h2 on the lobby's page, h3 in the table's drawer.
     level?: Level;
+    // The scroll margin each game's anchor keeps (a scroll-mt-* class): none on the lobby's page,
+    // where the root's scroll padding lands an anchor under the bar; the table's drawer, which
+    // scrolls itself, hands its own.
+    scrollMargin?: string;
     className?: string;
 };
 
@@ -129,10 +133,10 @@ const PloExample = ({look}: {look: Look}) => (
 
 // One game: its name as its glossary entry, the entry's short, the limit it plays by (its entry and
 // short) when that is not no limit, PLO's hand, then what it is like at this table.
-const Game = ({game, heading, here, look}: {game: GuideGameEntry; heading: (id: string, children: ReactNode) => ReactNode; here: boolean; look: Look}) => {
+const Game = ({game, heading, here, look, scrollMargin}: {game: GuideGameEntry; heading: (id: string, children: ReactNode) => ReactNode; here: boolean; look: Look; scrollMargin?: string}) => {
     const copy = HANDS_COPY.games[game.id];
     return (
-        <article id={game.anchor} aria-labelledby={`${game.anchor}-name`} className="scroll-mt-24 space-y-2" data-guide-game={game.id}
+        <article id={game.anchor} aria-labelledby={`${game.anchor}-name`} className={cn('space-y-2', scrollMargin)} data-guide-game={game.id}
                  {...(here ? {'data-guide-here': ''} : {})}>
             {here && <MicroLabel as="p" tone="brand">{HANDS_COPY.atThisTable}</MicroLabel>}
             {heading(`${game.anchor}-name`, <Term k={game.term}>{copy.name}</Term>)}
@@ -146,14 +150,14 @@ const Game = ({game, heading, here, look}: {game: GuideGameEntry; heading: (id: 
     );
 };
 
-const HandsGuide = ({focus = null, lead = false, face = DEFAULT_PERSONAL_LOOK.cardFace, four = DEFAULT_PERSONAL_LOOK.fourColour, level = 'h2', className}: Props) => {
+const HandsGuide = ({focus = null, lead = false, face = DEFAULT_PERSONAL_LOOK.cardFace, four = DEFAULT_PERSONAL_LOOK.fourColour, level = 'h2', scrollMargin, className}: Props) => {
     const look: Look = {face, four};
     const {here, others} = guideGames(focus);
     // At the table: the game it deals, after the rankings (before them with `lead`) and before any
     // other game, its name at the sections' own level.
     const atTable = here && (
         <div className="mb-6 break-inside-avoid" data-guide-section="here" data-guide-lead={lead ? '' : undefined}>
-            <Game game={here} here look={look} heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
+            <Game game={here} here look={look} scrollMargin={scrollMargin} heading={(id, children) => <SectionHeading as={level} id={id} spacing="none">{children}</SectionHeading>}/>
         </div>
     );
     return (
@@ -166,7 +170,7 @@ const HandsGuide = ({focus = null, lead = false, face = DEFAULT_PERSONAL_LOOK.ca
                 <section aria-labelledby="hands-games" className="mb-6 break-inside-avoid space-y-4" data-guide-section="games">
                     <SectionHeading as={level} id="hands-games" spacing="none">{HANDS_COPY.gamesHeading}</SectionHeading>
                     {others.map((game) => (
-                        <Game key={game.id} game={game} here={false} look={look} heading={(id, children) => <SubHeading level={level} id={id}>{children}</SubHeading>}/>
+                        <Game key={game.id} game={game} here={false} look={look} scrollMargin={scrollMargin} heading={(id, children) => <SubHeading level={level} id={id}>{children}</SubHeading>}/>
                     ))}
                 </section>
             )}

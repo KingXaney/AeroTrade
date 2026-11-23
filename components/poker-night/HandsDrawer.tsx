@@ -23,7 +23,9 @@ const HandsDrawer = ({open, onOpenChange, toTable, lead = false}: Props) => {
     const focus = guideGameOf(modeOf(room.table.hand, room.config).variant);
     return (
         <Drawer open={open} onOpenChange={onOpenChange} title={HANDS_COPY.sheetTitle} toTable={toTable} wide data-pn-drawer="hands">
-            <HandsGuide focus={focus} lead={lead} face={room.personal.cardFace} four={room.personal.fourColour} level="h3"/>
+            {/* The drawer scrolls itself, out of reach of the page's scroll padding: each game's
+                anchor keeps a margin of its own. */}
+            <HandsGuide focus={focus} lead={lead} face={room.personal.cardFace} four={room.personal.fourColour} level="h3" scrollMargin="scroll-mt-24"/>
         </Drawer>
     );
 };

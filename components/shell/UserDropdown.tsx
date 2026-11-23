@@ -48,7 +48,7 @@ function UserDropdown({user, friendRequests = 0, owner = false}: {user: User; fr
                         </AvatarFallback>
                     </Avatar>
                     {/* Search takes the bar's middle, so the name shows only where there is room for both. */}
-                    <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap" data-user-name>
+                    <div className="hidden xl:flex flex-col items-start leading-tight whitespace-nowrap">
                         <span className="text-sm font-medium text-fg font-heading">
                             {user.name}
                         </span>

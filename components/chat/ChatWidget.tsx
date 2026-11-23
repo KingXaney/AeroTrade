@@ -175,11 +175,14 @@ const ChatWidget = ({userId, owner}: ChatWidgetProps) => {
                     onTouchStart={preloadChatPanel}
                     aria-label="Open Aero-AI Assistant"
                     // The robot floats bottom-right at every width — the panel opens in the same
-                    // corner — and the (root) layout's content wrapper ends in pb-24 so it never
-                    // sits on a page's last panel. .robot-launcher carries the scale transition.
-                    className="robot-launcher fixed bottom-5 right-5 z-[80] inline-flex size-14 items-center justify-center rounded-full bg-brand-strong text-on-brand [box-shadow:var(--glow)] hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:bottom-6 sm:right-6"
+                    // corner — and the (root) layout's content wrapper ends in --content-pb, room
+                    // for its size, its offset and a little air, so it never sits on a page's last
+                    // panel (app/globals.css says the sum: change one, change both). Below md it
+                    // is 48px, still a thumb's target, so a phone's first screen keeps its own links
+                    // clear of it; from md, 56px. .robot-launcher carries the scale transition.
+                    className="robot-launcher fixed bottom-5 right-5 z-[80] inline-flex size-12 items-center justify-center rounded-full bg-brand-strong text-on-brand [box-shadow:var(--glow)] hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:bottom-6 sm:right-6 md:size-14"
                 >
-                    <RobotMascot className="size-9"/>
+                    <RobotMascot className="size-8 md:size-9"/>
                 </button>
             )}
 

@@ -42,7 +42,7 @@ type Props = {
 
 const TradeHistory = ({trades, totalCount, exportHref, detail, receipts, buyNotesBySellId}: Props) => {
     if (trades.length === 0) {
-        return <p className="text-sm text-fg-muted p-4">No trades yet. Place your first order to get started.</p>;
+        return <p className="text-sm text-fg-muted py-4">No trades yet. Place your first order to get started.</p>;
     }
     const capped = typeof totalCount === 'number' && totalCount > trades.length;
 

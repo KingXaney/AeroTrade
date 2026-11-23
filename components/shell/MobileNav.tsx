@@ -45,7 +45,7 @@ const MobileNav = ({badges, sections}: {badges?: NavBadges; sections?: readonly 
             </SheetTrigger>
 
             <SheetContent title="Navigation">
-                <div className="flex items-center gap-2 px-4 h-16 border-b border-line-strong/15">
+                <div className="flex items-center gap-2 px-4 h-(--header-h) border-b border-line-strong/15">
                     <span className="material-symbols-outlined text-brand-strong"
                           style={{fontVariationSettings: "'FILL' 1"}}>terminal</span>
                     <span className="text-lg font-semibold tracking-tighter text-brand font-heading">AeroTrade</span>

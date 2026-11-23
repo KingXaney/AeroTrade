@@ -526,32 +526,33 @@ try {
     await shot('04-phone');
     await page.setViewportSize({width: 1440, height: 900});
 
-    // --- the pending state in each visual style ----------------------------------------------------
-    // The write is held for a moment so the page can be photographed between the click and the arrival.
-    for (const style of ['minimal', 'futuristic', 'liquid-glass', 'brutalist', 'soft']) {
-        await context.addCookies([{name: 'aero-theme', value: `v1:nord:${style}:0`, domain: new URL(BASE).hostname, path: '/'}]);
-        await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
-        const shown = (await read()).headingId;
-        const target = shown === ids.main ? ids.second : ids.main;
-        await row(target).waitFor({state: 'visible'});
-        await sleep(1200);   // the panels' own entry animation, in the style's tempo, is over
-        await page.route('**/api/accounts/active', async (route) => { await sleep(900); await route.continue().catch(() => {}); });
-        await row(target).click();
-        await page.locator('[data-account-opening]').waitFor({timeout: 5000});
-        await sleep(350);
-        const pending = await page.evaluate(() => {
-            const region = document.querySelector('.account-region[data-pending]');
-            const faded = region?.querySelector('.glass-panel > *');
-            return {busy: document.querySelectorAll('.account-region[aria-busy="true"]').length, opacity: faded ? getComputedStyle(faded).opacity : null,
-                panel: region?.querySelector('.glass-panel') ? getComputedStyle(region.querySelector('.glass-panel')).opacity : null};
-        });
-        check(`${style}: the account's panels fade their content, never themselves, while it is opened`,
-            pending.busy >= 2 && Number(pending.opacity) < 0.6 && pending.panel === '1', JSON.stringify(pending));
-        await page.screenshot({path: `${OUT}05-pending-${style}.png`});
-        await settled(target);
-        await page.unroute('**/api/accounts/active');
-    }
-    await context.addCookies([{name: 'aero-theme', value: 'v1:nord:minimal:1', domain: new URL(BASE).hostname, path: '/'}]);
+    // --- the pending state -------------------------------------------------------------------------
+    // The write is held for a moment so the page can be photographed between the click and the
+    // arrival. The theme cookie is the app's own shape (lib/theme/resolve.ts, v2:<palette>:<0|1>):
+    // first with motion as it comes, then the same palette with motion reduced.
+    const themeCookie = (value) => context.addCookies([{name: 'aero-theme', value, domain: new URL(BASE).hostname, path: '/'}]);
+    await themeCookie('v2:nord:0');
+    await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
+    const shown = (await read()).headingId;
+    const target = shown === ids.main ? ids.second : ids.main;
+    await row(target).waitFor({state: 'visible'});
+    await sleep(1200);   // the panels' own entry animation is over
+    await page.route('**/api/accounts/active', async (route) => { await sleep(900); await route.continue().catch(() => {}); });
+    await row(target).click();
+    await page.locator('[data-account-opening]').waitFor({timeout: 5000});
+    await sleep(350);
+    const pending = await page.evaluate(() => {
+        const region = document.querySelector('.account-region[data-pending]');
+        const faded = region?.querySelector('.glass-panel > *');
+        return {busy: document.querySelectorAll('.account-region[aria-busy="true"]').length, opacity: faded ? getComputedStyle(faded).opacity : null,
+            panel: region?.querySelector('.glass-panel') ? getComputedStyle(region.querySelector('.glass-panel')).opacity : null};
+    });
+    check('the account\'s panels fade their content, never themselves, while it is opened',
+        pending.busy >= 2 && Number(pending.opacity) < 0.6 && pending.panel === '1', JSON.stringify(pending));
+    await page.screenshot({path: `${OUT}05-pending.png`});
+    await settled(target);
+    await page.unroute('**/api/accounts/active');
+    await themeCookie('v2:nord:1');
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     const reduced = await page.evaluate(() => {
         const child = document.querySelector('.account-region .glass-panel > *');

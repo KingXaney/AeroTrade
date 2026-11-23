@@ -12,7 +12,8 @@ import Panel from '@/components/primitives/Panel';
 // only; the account's own page says where part of the return came from.
 // `definitions` opts a page into the "What these mean" disclosure; the account-summary
 // widget never passes it (its "Ask in chat" links stay off the dashboard, invariant 12).
-const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: PortfolioSummary; income?: AccountIncomeSummary; definitions?: boolean}) => {
+// `sheen` marks it the page's headline panel (Panel's sheen, one per view): /portfolio's.
+const AccountSummary = ({portfolio, income, definitions = false, sheen = false}: {portfolio: PortfolioSummary; income?: AccountIncomeSummary; definitions?: boolean; sheen?: boolean}) => {
     const earned = income ? income.interest + income.dividends : 0;
     const returnHint = income && earned > 0
         ? INCOME_COPY.returnHint(formatPrice(income.interest), formatPrice(income.dividends))
@@ -22,7 +23,7 @@ const AccountSummary = ({portfolio, income, definitions = false}: {portfolio: Po
     const returnClass = getChangeColorClass(portfolio.totalReturnPct);
 
     return (
-        <Panel as="div" className="shimmer">
+        <Panel as="div" sheen={sheen}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatTile label={<Term k="net-worth">Net Worth</Term>} value={formatPrice(portfolio.totalValue)} valueClass="text-brand" />
                 <StatTile

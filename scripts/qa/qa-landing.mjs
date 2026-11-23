@@ -5,11 +5,14 @@
 // stored bars — the plan's shape, its cells matching a recomputation here, cached five minutes;
 // with the stand-in up the route prefers it: the surface equals the one the app's own modules build
 // from its rows (through jiti), the token travels in a header, and a second request asks it
-// nothing. Then the page: the 3D canvas named for a screen reader, the tooltip on hover, the camera
-// presets and the flatten toggle, the legend and the 20-day slice, one "What these mean" with its
-// three terms and no Ask links, the Tiingo credit, a theme repaint; then, signed in, Home drawing
-// the same surface as a panel with its Ask links; then reduced motion stopping the rotation, and a
-// phone.
+// nothing. Then the page: the 3D canvas named for a screen reader at the hero's own size, the tooltip
+// on hover, the camera presets and the flatten toggle, the legend and the 20-day slice, one "What
+// these mean" with its three terms and no Ask links, the Tiingo credit, a theme repaint; then, signed
+// in, Home drawing the same surface as a strip with its Ask links, held by geometry — the accounts
+// first (the total on the first screen at 1440×900), the strip under them and above the topics, its
+// canvas a band no taller than 240 px, a hover in the band's top quarter showing the whole tooltip,
+// Expand growing it in place with the focus kept, and no sideways scroll on a phone; then reduced
+// motion stopping the rotation, and a phone.
 // Run: npm run qa -- landing   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -163,6 +166,15 @@ try {
     await page.locator('[data-terrain-state="ready"], [data-terrain-state="flat"]').waitFor({timeout: 45000}).catch(() => {});
     const state = await terrain.getAttribute('data-terrain-state');
     check('the hero draws the terrain', state === 'ready' || state === 'flat', String(state));
+    // The hero keeps its own size (SIZE.hero in components/landing/MomentumTerrain: 500 px tall from
+    // lg): the strip and its Expand are Home's alone.
+    const heroSize = await page.evaluate(() => {
+        const root = document.querySelector('[data-landing-terrain] [data-terrain]');
+        const canvas = root?.querySelector('canvas[role="img"]')?.getBoundingClientRect();
+        return {size: root?.getAttribute('data-terrain-size') ?? null, height: canvas ? Math.round(canvas.height) : 0, expand: document.querySelectorAll('[data-terrain-expand]').length};
+    });
+    check('…at the hero\'s own size, 500 px tall at a desktop\'s width, with no Expand',
+        heroSize.size === 'hero' && heroSize.height === 500 && heroSize.expand === 0, JSON.stringify(heroSize));
     await page.waitForTimeout(1200);   // the intro rise
     await shot('01-hero');
     if (state === 'flat') note('this browser gave no WebGL: the 2D heatmap stands in, so the 3D-only checks are skipped');
@@ -269,26 +281,144 @@ try {
         await shot('05-paper');
     }
 
-    // --- Home: the same surface as a panel, read on the server, with its Ask links ------------
+    // --- Home: the same surface as a strip under the accounts, read on the server, with its Ask links ---
     await signUp(page, 'terrain', {stay: true});
-    const homePanel = page.locator('[data-home-terrain]');
-    await homePanel.locator('[data-terrain-state="ready"], [data-terrain-state="flat"]').waitFor({timeout: 45000}).catch(() => {});
-    const homeState = await homePanel.locator('[data-terrain]').getAttribute('data-terrain-state').catch(() => null);
-    check('signed in, Home draws the terrain as a panel under its own heading, with no second eyebrow',
-        await homePanel.count() === 1 && (homeState === 'ready' || homeState === 'flat')
-        && (await homePanel.locator('[data-terrain]').getAttribute('data-terrain-size')) === 'panel'
-        && ((await homePanel.innerText()).match(/S&P 500 momentum/g) ?? []).length === 1, String(homeState));
+    const homeTerrain = page.locator('[data-home-terrain]');
+    const homeRoot = homeTerrain.locator('[data-terrain]');
+    const homeCanvas = homeTerrain.locator('canvas[role="img"]');
+    await homeTerrain.locator('[data-terrain-state="ready"], [data-terrain-state="flat"]').waitFor({timeout: 45000}).catch(() => {});
+    const homeState = await homeRoot.getAttribute('data-terrain-state').catch(() => null);
+    check('signed in, Home draws the terrain as a strip under its own heading, with no second eyebrow',
+        await homeTerrain.count() === 1 && (homeState === 'ready' || homeState === 'flat')
+        && (await homeRoot.getAttribute('data-terrain-size')) === 'strip'
+        && ((await homeTerrain.innerText()).match(/S&P 500 momentum/g) ?? []).length === 1, String(homeState));
     check('…the same surface the route serves, drawn at once from the page\'s own read',
-        ((await homePanel.locator('canvas[role="img"]').getAttribute('aria-label')) ?? '').includes(`updated ${shortDate(shown.updated)}`)
-        && (await homePanel.locator('[data-terrain-source]').getAttribute('data-terrain-source')) === 'tiingo');
+        ((await homeCanvas.getAttribute('aria-label')) ?? '').includes(`updated ${shortDate(shown.updated)}`)
+        && (await homeTerrain.locator('[data-terrain-source]').getAttribute('data-terrain-source')) === 'tiingo');
     check('…one "What these mean", its three terms with Ask in chat, since the chat is mounted here',
-        await homePanel.locator('[data-what-these-mean]').count() === 1 && await homePanel.locator('[data-what-these-mean] [data-ask]').count() === 3);
-    check('…above the accounts, which keep their place',
-        await page.locator('[data-home] > *').nth(1).getAttribute('data-home-terrain') !== null
-        && await page.locator('#home-accounts [data-home-total]').count() === 1);
+        await homeTerrain.locator('[data-what-these-mean]').count() === 1 && await homeTerrain.locator('[data-what-these-mean] [data-ask]').count() === 3);
+    // The order and the band by where they are drawn, never by a section's place among the page's
+    // children (home.md): the reader's own figures first — the accounts, their total on the first
+    // screen at 1440×900 though the terrain is drawn — then the strip, then the topics.
     await page.evaluate(() => window.scrollTo(0, 0));
+    const homeLayout = await page.evaluate(() => {
+        const box = (sel) => {
+            const r = document.querySelector(sel)?.getBoundingClientRect();
+            return r ? {top: Math.round(r.top + scrollY), bottom: Math.round(r.bottom + scrollY), height: Math.round(r.height)} : null;
+        };
+        return {total: box('[data-home-total]'), accounts: box('#home-accounts'), strip: box('[data-home-terrain]'), topics: box('#home-topics'), canvas: box('[data-home-terrain] canvas[role="img"]')};
+    });
+    check('…the accounts first: their total on the first screen at 1440×900, above y=400',
+        homeLayout.total !== null && homeLayout.total.top < 400, JSON.stringify(homeLayout.total));
+    check('…the strip under the accounts and above the topics',
+        homeLayout.accounts !== null && homeLayout.strip !== null && homeLayout.topics !== null
+        && homeLayout.strip.top >= homeLayout.accounts.bottom && homeLayout.strip.bottom <= homeLayout.topics.top, JSON.stringify(homeLayout));
+    check('…its canvas a band no taller than 240 px',
+        homeLayout.canvas !== null && homeLayout.canvas.height > 0 && homeLayout.canvas.height <= 240, JSON.stringify(homeLayout.canvas));
+    // The source line ends on the Tiingo credit, a link that keeps its words together on one line —
+    // the strip's reading column is narrow, and "Data" once ended a line with "via Tiingo" under it.
+    const creditLines = () => homeTerrain.locator('[data-terrain-updated] a').evaluate((a) => a.getClientRects().length).catch(() => 0);
+    const creditDesk = await creditLines();
+    check('…its source line\'s Tiingo credit in one piece, on one line', creditDesk === 1, String(creditDesk));
     await page.waitForTimeout(300);
     await shot('07-home');
+
+    if (homeState === 'ready') {
+        // A hover in the band's top quarter: the tooltip drops below the pointer and is held inside
+        // the band, which clips it, so all of it shows, on the screen. The surface turns on its own,
+        // so the pointer looks for it along the quarter's rows; a still pointer keeps its hover.
+        await homeCanvas.scrollIntoViewIfNeeded();
+        const band = await homeCanvas.boundingBox();
+        const homeTip = homeTerrain.locator('[data-terrain-tip]');
+        let hovered = null;
+        for (const fy of [0.2, 0.15, 0.1]) {
+            for (let fx = 0.2; fx <= 0.8 && hovered === null; fx += 0.04) {
+                await page.mouse.move(band.x + band.width * fx, band.y + band.height * fy);
+                if (await homeTip.waitFor({timeout: 150}).then(() => true, () => false)) hovered = {fx: +fx.toFixed(2), fy};
+            }
+            if (hovered !== null) break;
+        }
+        const tipFit = hovered && await page.evaluate(() => {
+            const tip = document.querySelector('[data-home-terrain] [data-terrain-tip]');
+            if (!tip) return null;
+            const t = tip.getBoundingClientRect();
+            const b = tip.parentElement.getBoundingClientRect();
+            return {
+                placement: tip.getAttribute('data-terrain-tip'),
+                inBand: t.top >= b.top - 0.5 && t.bottom <= b.bottom + 0.5 && t.left >= b.left - 0.5 && t.right <= b.right + 0.5,
+                onScreen: t.top >= 0 && t.left >= 0 && t.bottom <= window.innerHeight && t.right <= window.innerWidth,
+            };
+        });
+        check('…a hover in the band\'s top quarter drops the tooltip below the pointer, all of it inside the band and on the screen',
+            tipFit?.placement === 'below' && tipFit.inBand && tipFit.onScreen, JSON.stringify({hovered, tipFit}));
+        await shot('07b-home-tip');
+        await page.mouse.move(5, 5);
+    } else {
+        note('no WebGL: the flat heatmap has no hover, so the strip\'s tooltip is not checked');
+    }
+
+    // Expand puts the panel in the strip's place — state alone: the same canvas, no navigation, and
+    // the focus left on the button, which ends the heading's line and stays where it was pressed.
+    const expand = homeTerrain.locator('[data-terrain-expand]');
+    const nextFrames = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined)))));
+    const drawnSize = (size) => page.waitForFunction((s) => document.querySelector('[data-home-terrain] [data-terrain]')?.getAttribute('data-terrain-size') === s, size, {timeout: 5000}).catch(() => {});
+    const onExpand = () => page.evaluate(() => document.activeElement?.hasAttribute('data-terrain-expand') ?? false);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await homeCanvas.evaluate((el) => { el.dataset.qaStrip = 'same'; }).catch(() => {});
+    const stripBox = await homeCanvas.boundingBox();
+    const pressedAt = await expand.boundingBox();
+    const address = page.url();
+    await expand.focus();
+    await page.keyboard.press('Enter');
+    await drawnSize('panel');
+    await nextFrames();
+    const panelBox = await homeCanvas.boundingBox();
+    const afterPress = await expand.boundingBox();
+    const grown = {
+        size: await homeRoot.getAttribute('data-terrain-size'), expanded: await expand.getAttribute('aria-expanded'),
+        sameCanvas: await homeTerrain.locator('canvas[data-qa-strip="same"]').count() === 1, focus: await onExpand(),
+        canvas: [Math.round(stripBox?.height ?? 0), Math.round(panelBox?.height ?? 0)], sameAddress: page.url() === address,
+        // Its top and its right edge hold while its word changes from Expand to Collapse.
+        moved: pressedAt && afterPress ? [Math.round(afterPress.y - pressedAt.y), Math.round(afterPress.x + afterPress.width - pressedAt.x - pressedAt.width)] : null,
+    };
+    check('…Expand grows it in place: the panel\'s size on the same canvas, no navigation, the focus kept on the button, which stays put',
+        grown.size === 'panel' && grown.expanded === 'true' && grown.sameCanvas && grown.focus && grown.canvas[1] > grown.canvas[0]
+        && grown.sameAddress && grown.moved !== null && grown.moved.every((d) => Math.abs(d) <= 1), JSON.stringify(grown));
+    await page.keyboard.press('Enter');
+    await drawnSize('strip');
+    await nextFrames();
+    const backBox = await homeCanvas.boundingBox();
+    check('…and pressed again it is the strip once more, the focus still on the button',
+        (await homeRoot.getAttribute('data-terrain-size')) === 'strip' && Math.abs((backBox?.height ?? 0) - (stripBox?.height ?? -9)) <= 1 && await onExpand(),
+        `${Math.round(backBox?.height ?? 0)} vs ${Math.round(stripBox?.height ?? 0)}`);
+
+    // A phone: the strip stacked under its heading, nothing sideways.
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}/`, {waitUntil: 'load'});
+    await homeTerrain.locator('[data-terrain-state="ready"], [data-terrain-state="flat"]').waitFor({timeout: 45000}).catch(() => {});
+    const phoneHome = await page.evaluate(() => {
+        const canvas = document.querySelector('[data-home-terrain] canvas[role="img"]')?.getBoundingClientRect();
+        return {overflow: document.documentElement.scrollWidth - window.innerWidth, canvas: canvas ? [Math.round(canvas.width), Math.round(canvas.height)] : null};
+    });
+    check('…and on a phone Home keeps the strip with nothing sideways, its band still no taller than 240 px',
+        phoneHome.overflow <= 1 && phoneHome.canvas !== null && phoneHome.canvas[1] > 0 && phoneHome.canvas[1] <= 240, JSON.stringify(phoneHome));
+    const creditPhone = await creditLines();
+    check('…its Tiingo credit still in one piece', creditPhone === 1, String(creditPhone));
+    // On a phone Expand sits under the heading at its left, out of the corner the robot floats in
+    // (it met the robot at the heading line's end): the two columns stay apart, at 390 and at 375.
+    const expandClear = {};
+    for (const width of [390, 375]) {
+        if (width !== 390) await page.setViewportSize({width, height: 812});
+        await page.locator('button[aria-label="Open Aero-AI Assistant"]').waitFor({timeout: 15000}).catch(() => {});
+        expandClear[width] = await page.evaluate(() => {
+            const expand = document.querySelector('[data-home-terrain] [data-terrain-expand]')?.getBoundingClientRect();
+            const robot = document.querySelector('button[aria-label="Open Aero-AI Assistant"]')?.getBoundingClientRect();
+            return expand && robot ? +(robot.left - expand.right).toFixed(1) : null;
+        });
+    }
+    check('…and its Expand button keeps out of the robot\'s corner, 24 px or more to the left of it, at 390 and 375',
+        Object.values(expandClear).every((gap) => gap !== null && gap >= 24), JSON.stringify(expandClear));
+    await page.setViewportSize({width: 1440, height: 900});
 
     // --- reduced motion: no rotation, no intro, still drawn ---------------------------------
     const still = await browser.newContext({viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'});

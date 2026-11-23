@@ -6,7 +6,7 @@ import {cn} from "@/lib/utils";
 // `field-focus` (globals.css) for the keyboard focus ring — the ring's border-color is
 // !important, which is what beats the hairline's border utility, so keep the two together.
 //
-// TextField vs .form-input: `.form-input` is the tall (h-12) auth-page field and the
+// TextField vs .form-input: `.form-input` is the tall (--field-h) auth-page field and the
 // topic composer's; TextField is everything else. Use `TextArea` for multi-line input and
 // `fieldClass` for a native <select> that should match.
 

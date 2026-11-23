@@ -9,6 +9,7 @@ import {BOARD_COPY} from "@/lib/learn/copy/board";
 import {EXPORT_COPY} from "@/lib/learn/copy/export";
 import {STRATEGY_PAGE_COPY} from "@/lib/learn/copy/strategies";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {pageTitleClass} from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
@@ -65,7 +66,7 @@ const StrategyPage = async ({params, searchParams}: StrategyPageProps) => {
                         <span className="material-symbols-outlined">arrow_back</span>
                     </Link>
                     <div className="min-w-0">
-                        <h1 className="font-heading text-2xl font-semibold text-fg tracking-tight">{def.name}</h1>
+                        <h1 className={pageTitleClass}>{def.name}</h1>
                         <p className="font-mono text-xs text-fg-muted mt-1" id="strategy-meta">
                             {view.meta} ·{' '}
                             {started && liveSince ? STRATEGY_PAGE_COPY.liveSince(liveSince) : <span className="text-warning">{STRATEGY_PAGE_COPY.notStarted}</span>}

@@ -11,8 +11,9 @@ import NewsSidebarCard from "@/components/shell/NewsSidebarCard";
 import {useNewsSeen} from "@/components/shell/useNewsSeen";
 import type {SidebarNews, SidebarPortfolio} from "@/lib/shell/sidebar";
 
-// The desktop navigation: one icon per section, 64px wide, on every page. It replaced a header
-// of eight tabs repeated inside a sidebar of thirteen links and two summary cards.
+// The desktop navigation: one icon per section, --rail-w wide, on every page, each a tile of
+// --rail-tile with the current one lifted (app/globals.css). It replaced a header of eight tabs
+// repeated inside a sidebar of thirteen links and two summary cards.
 //
 // The rail never widens. A name is a tooltip and a summary is a hover card, both portaled: a
 // rail that grew on hover would clip its own flyouts (overflow) or strip their blur (a
@@ -56,15 +57,15 @@ const Rail = ({portfolio, news, badges, sections = NAV_SECTIONS}: Props) => {
                 aria-current={active ? 'page' : undefined}
                 data-rail={section.id}
                 className={cn(
-                    'relative flex size-11 items-center justify-center rounded-lg transition-colors outline-none focus-visible:outline-2 focus-visible:outline-brand-strong',
-                    active ? 'bg-brand/10 text-brand' : 'text-fg-soft hover:bg-surface-3 hover:text-fg',
+                    'relative flex size-(--rail-tile) items-center justify-center rounded-lg transition-colors outline-none focus-visible:outline-2 focus-visible:outline-brand-strong',
+                    active ? 'lifted text-brand' : 'text-fg-soft hover:bg-surface-3 hover:text-fg',
                 )}
             >
                 <span className="material-symbols-outlined" aria-hidden="true"
                       style={active ? {fontVariationSettings: "'FILL' 1"} : undefined}>{section.icon}</span>
                 {count > 0 && (
                     <span aria-hidden="true"
-                          className={cn('absolute right-2 top-2 size-2 rounded-full', section.badge === 'unpriced' ? 'bg-warning' : 'bg-brand')}/>
+                          className={cn('absolute right-1.5 top-1.5 size-2 rounded-full', section.badge === 'unpriced' ? 'bg-warning' : 'bg-brand')}/>
                 )}
             </Link>
         );

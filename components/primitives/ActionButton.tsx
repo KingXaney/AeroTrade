@@ -2,8 +2,8 @@ import type {ComponentProps} from "react";
 import {cn} from "@/lib/utils";
 
 // The one labelled button, on the control radius (rounded-lg is var(--radius) =
-// var(--control-radius)) and in the active style's control type (.control-type in
-// app/globals.css), so both follow the style axis. Restyling every
+// var(--control-radius)) and in the look's control type (.control-type in app/globals.css,
+// the --control-* tokens), so both come from the look's tokens. Restyling every
 // call-to-action in the app is an edit to VARIANT or SIZE below.
 //
 // Use it for a button with a text label. Not for: an icon-only affordance (`iconButton`),
@@ -42,8 +42,7 @@ const SIZE: Record<ActionSize, string> = {
     block: 'w-full py-3 text-sm',
 };
 
-// The halo under a form's commit button: the active style's --glow, so a style with no
-// effects draws none and a brutalist one draws its hard offset.
+// The halo under a form's commit button: the look's --glow (app/globals.css).
 const GLOW = '[box-shadow:var(--glow)]';
 
 type Recipe = {variant?: ActionVariant; size?: ActionSize; className?: string};

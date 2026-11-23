@@ -40,15 +40,19 @@ const OUT = outDir('screenshots');
     await page.goto(`${BASE}/trade`, {waitUntil: 'load'});
     await shot('trade', 2500);
 
+    // The theme picker is the palettes (Settings › Appearance): the app has one look, so a theme
+    // is a palette and the motion choice. One dark palette picked for the picker's own picture,
+    // then Paper, a light one, for the topics page.
+    const palette = (name) => page.getByRole('radiogroup', {name: 'Colour palette'}).getByRole('radio', {name});
     await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
-    await page.getByRole('radio', {name: /^Neon Terminal/}).first().click();
+    await palette(/^Nord/).click();
     await page.waitForTimeout(1500);
     await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await shot('settings-themes', 1500);
     await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
     await page.waitForTimeout(800);
-    await page.getByRole('radio', {name: /^Paper/}).first().click();
+    await palette(/^Paper/).click();
     await page.waitForTimeout(1500);
     await page.goto(`${BASE}/topics`, {waitUntil: 'load'});
     await shot('topics-paper', 2000);

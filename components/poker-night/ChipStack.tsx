@@ -1,8 +1,8 @@
 // An amount of chips as a few short columns of coloured chips (lib/poker-night/chips.chipBreakdown:
 // at most three columns of eight, the largest denominations), always with the amount printed
 // beside it — the drawing is decoration and may not show every chip. The colours are the viewer's
-// chip set (LOOKS_CSS, [data-pn-chips] on the room, [data-denom] on each chip); rounded-full keeps
-// them round in brutalist.
+// chip set (LOOKS_CSS, [data-pn-chips] on the room, [data-denom] on each chip); rounded-full makes
+// each one round.
 
 import {chipBreakdown, compactChips} from "@/lib/poker-night/chips";
 import {cn} from "@/lib/utils";

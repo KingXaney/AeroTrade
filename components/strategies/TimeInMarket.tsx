@@ -28,7 +28,8 @@ const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
     const lines = view.chart.lines.map((line) => ({key: line.key, label: TIM_COPY.wayLabel[line.key], tone: WAY_TONE[line.key], values: line.values}));
 
     return (
-        <section id="time-in-market" aria-labelledby="time-in-market-heading" className="space-y-3 scroll-mt-24">
+        // The page's own gap between panels (gap-4), below the panel and between the three ways alike.
+        <section id="time-in-market" aria-labelledby="time-in-market-heading" className="space-y-4">
             <Panel id="time-in-market-panel">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                     <SectionHeading id="time-in-market-heading" spacing="none">{TIM_COPY.heading}</SectionHeading>
@@ -96,7 +97,7 @@ const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
             </Panel>
 
             {view.status === 'ok' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3" id="time-in-market-ways">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="time-in-market-ways">
                     {WAY_KEYS.map((way) => {
                         const tiles = wayTiles(view.ways[way]);
                         return (

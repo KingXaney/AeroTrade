@@ -1,5 +1,5 @@
 // The dealer button on the felt beside the button seat's plate, where lib/poker-night/stage put it:
-// a white disc marked "D" (rounded-full, so it stays round in brutalist). Its name says what it is.
+// a white disc marked "D" (rounded-full). Its name says what it is.
 
 import type {Px} from "@/lib/poker-night/stage";
 import {TABLE_COPY} from "@/lib/learn/copy/poker-night";

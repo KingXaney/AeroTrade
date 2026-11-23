@@ -3,9 +3,10 @@ import {readdirSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 
 // Invariant 7: every framed surface is <Panel>. A hand-rolled `glass-panel` className
-// drifts from the style axis (and the rounded-*/ring-*/shadow-* written beside it are
-// silent no-ops, since .glass-panel sits outside any cascade layer). Sixty-six of them
-// were folded into Panel; this keeps the count at zero. Comments may still name the class.
+// drifts from Panel (its padding, its `interactive` hook), and the rounded-*/ring-*/shadow-*
+// written beside it are silent no-ops, since .glass-panel sits outside any cascade layer.
+// Sixty-six of them were folded into Panel; this keeps the count at zero. Comments may still
+// name the class.
 describe('framed surfaces go through Panel', () => {
     const root = fileURLToPath(new URL('../..', import.meta.url));
     const PANEL = 'components/primitives/Panel.tsx';

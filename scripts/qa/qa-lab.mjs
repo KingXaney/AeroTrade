@@ -78,11 +78,29 @@ try {
     // The first screen at 1440×900, measured: the list left, the streak at its top right with the unit under it, the folded problem a bar still on screen.
     await page.evaluate(() => window.scrollTo(0, 0));
     const box = (sel) => page.locator(sel).first().evaluate((el) => { const r = el.getBoundingClientRect(); return {top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), bottom: Math.round(r.bottom), height: Math.round(r.height)}; });
-    const [listBox, streakBox, unitBox, problemBox, progressBox] = await Promise.all(['[data-widget-id="list"]', '[data-widget-id="streak"]', '[data-widget-id="unit"]', '#lab-problem', '#lab-progress'].map(box));
+    const [listBox, streakBox, unitBox, problemBox, progressBox, reviewBox] = await Promise.all(['[data-widget-id="list"]', '[data-widget-id="streak"]', '[data-widget-id="unit"]', '#lab-problem', '#lab-progress', '[data-widget-id="review"]'].map(box));
+    // The progress is one strip: its tiles on one line beside its heading, the strip itself (that
+    // line, its padding and border) no taller than 110 px. Its card is as tall as the row it shares with the
+    // review card (h-full, as Today's cards side by side are), so the card's own box measures the
+    // review's sentence beside it, not the strip.
+    const strip = await page.locator('#lab-progress').evaluate((panel) => {
+        const style = getComputedStyle(panel);
+        const line = panel.querySelector(':scope > div').getBoundingClientRect();
+        const tiles = [...panel.querySelectorAll('[data-lab-progress] > *')].map((tile) => tile.getBoundingClientRect());
+        const heading = panel.querySelector('#lab-progress-heading').getBoundingClientRect();
+        const top = Math.min(...tiles.map((t) => t.top));
+        const bottom = Math.max(...tiles.map((t) => t.bottom));
+        return {
+            own: Math.round(line.height + ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((sum, side) => sum + parseFloat(style[side]), 0)),
+            tiles: tiles.length,
+            oneLine: tiles.length > 0 && Math.round(bottom - top) === Math.round(Math.max(...tiles.map((t) => t.height)))
+                && heading.top >= top - 1 && heading.bottom <= bottom + 1,
+        };
+    });
     check('the first screen at 1440×900 holds the list left, the streak at its top right, the unit under the streak and the problem\'s title row; the progress is one strip',
         Math.abs(listBox.top - streakBox.top) <= 2 && streakBox.left > listBox.right && unitBox.top > streakBox.bottom && Math.abs(unitBox.left - streakBox.left) <= 2
-        && problemBox.bottom <= 900 && problemBox.height <= 130 && progressBox.height <= 110,
-        `list ${listBox.top}-${listBox.bottom} (right ${listBox.right}), streak ${streakBox.top}-${streakBox.bottom} (left ${streakBox.left}), unit top ${unitBox.top} left ${unitBox.left}, problem bottom ${problemBox.bottom} h ${problemBox.height}, progress h ${progressBox.height}`);
+        && problemBox.bottom <= 900 && problemBox.height <= 130 && strip.oneLine && strip.own <= 110,
+        `list ${listBox.top}-${listBox.bottom} (right ${listBox.right}), streak ${streakBox.top}-${streakBox.bottom} (left ${streakBox.left}), unit top ${unitBox.top} left ${unitBox.left}, problem bottom ${problemBox.bottom} h ${problemBox.height}, progress: ${strip.tiles} tiles${strip.oneLine ? ' on one line' : ' on more than one line'}, the strip ${strip.own} in a card of ${progressBox.height} (the row's, beside the review's ${reviewBox.height})`);
     check('…the list under its group eyebrows, study then play', (await page.locator('[data-todo-group]').evaluateAll((els) => els.map((el) => el.getAttribute('data-todo-group')))).join(',') === 'study,play');
     await shot('01-lab-today');
 

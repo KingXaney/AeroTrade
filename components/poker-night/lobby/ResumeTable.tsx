@@ -8,8 +8,8 @@ import SectionHeading from "@/components/primitives/SectionHeading";
 // The lobby's first card while the reader holds a seat at an open table (lib/poker-night/lobby.resumeOf,
 // the newest such table): "You are seated at …", the table's line as the lobby's rows print it, and
 // Rejoin. A server component; the page draws it above everything else, across both columns, and
-// only when there is such a table. Its heading is the lobby panels' own (SectionHeading, the active
-// style's .heading-type).
+// only when there is such a table. Its heading is the lobby panels' own (SectionHeading, the look's
+// .heading-type).
 const ResumeTable = ({table}: {table: TableLink}) => (
     <Panel
         id="poker-night-resume"

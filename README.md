@@ -17,7 +17,7 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 ## What it does
 
-**A front door and a home.** A visitor sees what AeroTrade is before making an account — its hero is a 3D terrain of SPY's momentum over the last year, one row per lookback from a week to a year, drawn from Tiingo's end-of-day prices (or, without a key, the app's own stored closes) and refreshed once an hour, that turns, flattens and answers a hover with the session under it; after sign-in, Home opens on the same terrain, then shows your accounts under one total, what changed in your topics, the morning's briefing, the next lesson and one thing to look at next. Navigation is seven icons on a slim rail, with a section's other pages as tabs above the page.
+**A front door and a home.** A visitor sees what AeroTrade is before making an account — its hero is a 3D terrain of SPY's momentum over the last year, one row per lookback from a week to a year, drawn from Tiingo's end-of-day prices (or, without a key, the app's own stored closes) and refreshed once an hour, that turns, flattens and answers a hover with the session under it; after sign-in, Home opens on your accounts under one total and one thing to look at next, then the same terrain as a strip that expands in place, what changed in your topics, the morning's briefing and the next lesson. Navigation is five icons on a slim rail (seven for the owner), with a section's other pages as tabs above the page.
 
 **A morning briefing.** Once a day a scheduled job condenses the most important articles the news brain read into a few points, each linked to the articles it draws on, and the news page sets it above your topics, the stories that name what you hold or watch, and a handful of top headlines.
 
@@ -49,12 +49,12 @@ Follow the topics you care about, test trading strategies with virtual money, an
 
 **A second opinion, a chat advisor, and a digest.** Claude can critique the brain's current picture; a tool-using chat assistant (18 tools) — behind the robot in the bottom-right corner, which offers tips about the app on the topics pages — answers "what's new in my topics?", "what does max drawdown mean?" or "why did RSI-2 buy?"; a daily brief by email opens with the day in 30 seconds, then the stories about the reader's own stocks, the markets, their news feed, filings and what people are posting — each written from the articles it cites, with links to those articles and to the stock's page in the app — followed by the AI Navigator's week, their topics and the day's lesson.
 
-**Make it yours.** 12 colour palettes × 5 visual styles (minimal, futuristic, liquid glass, brutalist, soft), saved per account and rendered without a flash. A 37-widget dashboard you can drag, resize and extend.
+**Make it yours.** One compact look in 12 colour palettes, with a Reduce motion switch, saved per account and rendered without a flash. A 37-widget dashboard you can drag, resize and extend.
 
 <div align="center">
-<img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="Trade desk: price chart and paper order entry" width="440">
+<img src="docs/screenshots/topic-ai-chips.png" alt="A followed topic: keyword chips, refresh, matched articles" width="440"> <img src="docs/screenshots/trade.png" alt="The Markets page: ticker tape, price chart and paper order entry" width="440">
 <br>
-<img src="docs/screenshots/settings-themes.png" alt="Theme picker in settings" width="440"> <img src="docs/screenshots/topics-paper.png" alt="The topics page in the Paper light theme" width="440">
+<img src="docs/screenshots/settings-themes.png" alt="Settings, Appearance: the twelve palettes and Reduce motion" width="440"> <img src="docs/screenshots/topics-paper.png" alt="The topics page in the Paper light palette" width="440">
 </div>
 
 ## How it works
@@ -198,7 +198,7 @@ lib/            one folder per feature, named as in components/:
   jobs/         the Inngest client, the job registry, one file of thin job wrappers per feature, the status read
   prices/       daily bars (Yahoo first, Stooq fallback), dividends + the T-bill rate, signals, NYSE hours, Finnhub
   stocks/       the watchlist, the stock page's key numbers and "what the rules see", TradingView embeds
-  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav sections + the rail cards · palettes + styles
+  friends/ · settings/ · shell/ · theme/   friends and their leaderboard · preferences · nav sections + the rail cards · palettes + the saved theme
   actions/      'use server' entry points (session-derived, userId-scoped), one file per feature
   ai/           model matrix by task and tier, inference, prompt helpers
   *.ts          shared: format, dates, text, rate-limit, day-memo, action-toast

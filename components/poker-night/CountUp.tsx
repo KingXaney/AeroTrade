@@ -2,9 +2,9 @@
 
 // A winner's stack counting up on their plate: the count stepped as text in the plate's own format
 // (lib/poker-night/chips: "1,980" … "2,050", "125k"), on the table's timeline — the wait and the
-// length are in units of --motion-base, read off the element, so brutalist and both motion guards
-// (they zero the token) show the new count at once. Text a timer steps, not an animation: a CSS
-// counter cannot print the separators every other stack shows. The plate keeps the count in its
+// length are in units of --motion-base, read off the element, so both motion guards (they zero
+// the token) show the new count at once. Text a timer steps, not an animation: a CSS counter
+// cannot print the separators every other stack shows. The plate keeps the count in its
 // accessible text beside it; this is for the eye only.
 
 import {useEffect, useRef, useState} from "react";

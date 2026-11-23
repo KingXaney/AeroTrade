@@ -12,7 +12,6 @@
 
 import {glossaryKeysFor} from "@/lib/learn/where";
 import {PALETTE_IDS} from "@/lib/theme/palettes";
-import {STYLE_IDS} from "@/lib/theme/styles";
 import {DEFAULT_TOPIC_NAMES} from "@/lib/topics/starters";
 import {PAPER_STARTING_BALANCE} from "@/lib/trading/starting-balance";
 
@@ -32,6 +31,9 @@ export type LandingPillar = {
 
 export const LANDING_COPY = {
     metaTitle: 'AeroTrade — keep up with the markets, and learn how they work',
+    // The landing page's description, and — through app/layout.tsx — every other page's that
+    // sets none of its own: the sign-in and sign-up pages are public too, so the app is described
+    // once, here, by what every account can open.
     metaDescription: `Follow finance and technology news by topic, learn what the numbers mean, and practise with ${dollars(PAPER_STARTING_BALANCE)} of paper money. No real money is involved.`,
 
     signIn: 'Sign in',
@@ -87,7 +89,9 @@ export const LANDING_COPY = {
 
 
     themesHeading: 'Make it look like yours',
-    themesBody: `${PALETTE_IDS.length} colour palettes and ${STYLE_IDS.length} visual styles, saved to your account. Try one here.`,
+    themesBody: `${PALETTE_IDS.length} colour palettes, saved to your account. Try one here.`,
+    // The group of palette buttons (components/landing/ThemeDemo), for a screen reader.
+    themesGroup: 'Preview a palette',
 
     previewLabel: 'Example screen',
     previewAccount: 'Paper balance',

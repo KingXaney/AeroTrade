@@ -17,7 +17,7 @@ const rankClass = (rank: number) => (rank >= 1 && rank <= 3 ? '' : 'text-fg-mute
 
 const Leaderboard = ({entries}: {entries: LeaderboardEntry[]}) => {
     return (
-        <Panel as="div" className="shimmer">
+        <Panel as="div">
             <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-brand">emoji_events</span>
                 <SectionHeading spacing="none">

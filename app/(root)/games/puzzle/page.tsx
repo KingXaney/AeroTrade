@@ -28,7 +28,7 @@ const PuzzlePage = async () => {
                         subtitle={`${PUZZLE_COPY.number(view.puzzle.number)} · ${PUZZLE_CATEGORY_LABEL[view.puzzle.category]} · ${PUZZLE_DIFFICULTY_LABEL[view.puzzle.difficulty]}`}
                         actions={<StreakChip current={view.streak.current} todayDone={view.streak.todayDone} atRisk={view.streak.atRisk}/>}
                     />
-                    <Panel pad={6}>
+                    <Panel>
                         <PuzzleSolver key={`${view.puzzle.id}:${view.day}`} puzzle={view.puzzle} daily initial={view.progress}/>
                     </Panel>
                     <p className="text-xs leading-relaxed text-fg-muted">{PUZZLE_COPY.dailyRule}</p>

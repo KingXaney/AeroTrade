@@ -11,9 +11,10 @@ import StatTile from "@/components/primitives/StatTile";
 // week as seven day pills (a check inside a day that counted, today ringed and breathing while
 // it is at risk), and the last twelve weeks as a grid under their month labels. Presentational;
 // the streak is lib/learn/activity-store's. The grid is one picture, so a screen reader gets one
-// sentence for it rather than 84 squares. No keyframe of its own: the ring uses Tailwind's pulse
-// under motion-safe only. Lab › Today draws components/learn/StreakMini from the same pieces: the
-// tone, the disc's classes and the day pill are exported here for it.
+// sentence for it rather than 84 squares. No keyframe of its own: the ring uses Tailwind's pulse,
+// which both motion guards stop by name (app/globals.css). Lab › Today draws
+// components/learn/StreakMini from the same pieces: the tone, the disc's classes and the day pill
+// are exported here for it.
 
 export type StreakTone = 'done' | 'risk' | 'alive' | 'none';
 
@@ -59,7 +60,7 @@ export const DayPill = ({day, atRisk, size = 'md'}: {day: StreakDay; atRisk: boo
                 size === 'sm' ? 'size-8 text-xs' : 'size-9 text-sm',
                 day.solved ? 'border-brand bg-brand text-brand-ink' : 'border-line-strong/50 bg-surface-3 text-fg-muted',
                 day.today && !day.solved && 'outline outline-2 outline-offset-2',
-                day.today && !day.solved && (atRisk ? 'outline-warning/70 motion-safe:animate-pulse' : 'outline-brand/50'),
+                day.today && !day.solved && (atRisk ? 'outline-warning/70 animate-pulse' : 'outline-brand/50'),
                 day.today && day.solved && 'outline outline-2 outline-offset-2 outline-brand/40',
             )}
         >
@@ -85,8 +86,8 @@ const StreakHero = ({streak, extraTiles = [], headingId = 'streak-heading'}: Pro
     const labels = monthLabels(streak.weeks);
     const tone = toneOf(streak);
     return (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto]" data-streak-hero data-streak-tone={tone} data-streak-current={streak.current}>
-            <div className="min-w-0 space-y-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]" data-streak-hero data-streak-tone={tone} data-streak-current={streak.current}>
+            <div className="min-w-0 space-y-4">
                 <div className="flex items-center gap-4">
                     <span
                         aria-hidden="true"
@@ -106,7 +107,7 @@ const StreakHero = ({streak, extraTiles = [], headingId = 'streak-heading'}: Pro
                         </MicroLabel>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-x-8 gap-y-3">
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
                     <StatTile label={STREAK_COPY.longestLabel} value={String(streak.longest)} hint={STREAK_COPY.days(streak.longest)} />
                     <StatTile label={STREAK_COPY.activeLabel} value={String(streak.total)} hint={STREAK_COPY.activeDays(streak.total)} />
                     {extraTiles.map((tile) => <StatTile key={tile.label} label={tile.label} value={tile.value} hint={tile.hint} />)}

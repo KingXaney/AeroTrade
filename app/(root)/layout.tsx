@@ -38,10 +38,14 @@ const Layout = async ({children}: {children: React.ReactNode}) => {
                 owner={audience.owner}
             />
             <Rail portfolio={shell.portfolio} news={shell.news} badges={shell.navBadges} sections={sections} />
-            {/* pb-24: the assistant's launcher floats over this corner (components/chat/ChatWidget). */}
-            <div className="pt-20 lg:ml-16 px-6 pb-24" data-app-content>
-                <SectionTabs badges={shell.navBadges} sections={sections} />
-                {children}
+            {/* Under the bar and beside the rail, one column holds a section's tabs and the page,
+                sized by the density tokens (app/globals.css). Its foot is the launcher's room: the
+                assistant's robot floats over this corner (components/chat/ChatWidget). */}
+            <div className="pt-(--content-pt) pb-(--content-pb) px-(--content-px) lg:px-(--content-px-lg) lg:ml-(--rail-w)" data-app-content>
+                <div className="mx-auto max-w-(--content-max)">
+                    <SectionTabs badges={shell.navBadges} sections={sections} />
+                    {children}
+                </div>
             </div>
             <ChatWidget userId={user.id} owner={audience.owner}/>
             <ThemeSync dbTheme={shell.savedTheme}/>

@@ -45,6 +45,8 @@ import {
     colorAt,
     easeInOut,
     rowOfLookback,
+    STRIP_ANGLE,
+    STRIP_MIN_ASPECT,
     type CameraPreset,
     type Rgb,
     type TerrainScale,
@@ -53,8 +55,9 @@ import {paintHeatmap} from "@/components/landing/terrain-heatmap";
 
 export type TerrainPalette = {scale: TerrainScale; fg: Rgb; zero: Rgb};
 // The cell under the pointer and where, in CSS pixels from the canvas's top-left, with the
-// canvas's width so the tooltip can pick its side without reading the DOM.
-export type TerrainHit = {cell: SurfaceCell; x: number; y: number; width: number};
+// canvas's width and height so the tooltip can pick its side (and, in Home's strip, whether it
+// drops below the pointer) without reading the DOM.
+export type TerrainHit = {cell: SurfaceCell; x: number; y: number; width: number; height: number};
 
 export type SceneOptions = {
     canvas: HTMLCanvasElement;
@@ -68,10 +71,15 @@ export type SceneOptions = {
     onZoom?: (distance: number) => void;
     // The story markers' elements, in surface.notable order; read on every drawn frame.
     markers: () => readonly (HTMLElement | null)[];
+    // Home's strip: on a band (a canvas at least STRIP_MIN_ASPECT times as wide as it is tall) the
+    // Angle preset looks from lower down (terrain-view's STRIP_ANGLE), so the surface fills the band.
+    band?: boolean;
 };
 
 export type TerrainScene = {
     setPreset: (preset: CameraPreset) => void;
+    // The strip swapped for the panel in place, and back (MomentumTerrain's Expand).
+    setBand: (band: boolean) => void;
     setFlat: (flat: boolean) => void;
     // Multiplies the camera's distance: under 1 zooms in, over 1 out, within the limits.
     zoom: (factor: number) => void;
@@ -120,6 +128,11 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
     const {canvas, surface} = options;
     let palette = options.palette;
     let reduceMotion = options.reduceMotion;
+    let band = options.band ?? false;
+    // The preset the camera was last put on, and whether the Angle preset stands where a band puts
+    // it: a change of band (Expand) or of the canvas's shape moves the Angle preset with it.
+    let preset: CameraPreset = 'angle';
+    let aimedLow = false;
     const days = surface.dates.length;
     const rows = surface.lookbacks.length;
 
@@ -405,7 +418,24 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
         distance = fitDistance(dir, target);
         return {target, position: target.clone().addScaledVector(dir, distance)};
     };
-    const directionOf = (preset: CameraPreset): Vector3 => new Vector3(...CAMERA_PRESETS[preset]).normalize();
+    // On a band the Angle preset looks from lower down (STRIP_ANGLE): from its own 35° the turning
+    // surface fits a band by its height and covers a third of it.
+    const lowAngle = (): boolean => band && camera.aspect >= STRIP_MIN_ASPECT;
+    const directionOf = (p: CameraPreset): Vector3 => new Vector3(...(p === 'angle' && lowAngle() ? STRIP_ANGLE : CAMERA_PRESETS[p])).normalize();
+    // When the band, or the canvas's shape, changes which Angle that is, the camera keeps its turn
+    // round the surface and takes the other Angle's height, at once; another preset stays put.
+    const followBand = () => {
+        if (preset !== 'angle' || lowAngle() === aimedLow) return;
+        aimedLow = lowAngle();
+        const offset = camera.position.clone().sub(controls.target);
+        const azimuth = Math.atan2(offset.x, offset.z);
+        const elevation = Math.asin(directionOf('angle').y);
+        const framing = framingFor(new Vector3(Math.sin(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.cos(azimuth) * Math.cos(elevation)));
+        cameraTween = null;
+        controls.target.copy(framing.target);
+        camera.position.copy(framing.position);
+        camera.lookAt(framing.target);
+    };
     // The current direction, re-fitted (a resize); no tween.
     const refit = () => {
         const dir = camera.position.clone().sub(controls.target);
@@ -468,7 +498,7 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
         rowLine.visible = true;
         columnLine.visible = true;
         syncHighlight();
-        options.onHover({cell: hovered, x: point.x, y: point.y, width});
+        options.onHover({cell: hovered, x: point.x, y: point.y, width, height});
         dirty = true;
     };
 
@@ -536,6 +566,7 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
         renderer.setSize(rect.width, rect.height, false);
         camera.aspect = rect.width / rect.height;
         camera.updateProjectionMatrix();
+        followBand();
         refit();
         dirty = true;
         schedule();
@@ -550,8 +581,10 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
     schedule();
 
     return {
-        setPreset: (preset) => {
-            const framing = framingFor(directionOf(preset));
+        setPreset: (next) => {
+            preset = next;
+            aimedLow = next === 'angle' && lowAngle();
+            const framing = framingFor(directionOf(next));
             pause();
             if (reduceMotion) {
                 camera.position.copy(framing.position);
@@ -566,6 +599,14 @@ export const createTerrainScene = (options: SceneOptions): TerrainScene => {
                 };
             }
             resumeLater();
+            schedule();
+        },
+        setBand: (next) => {
+            if (band === next) return;
+            band = next;
+            followBand();
+            refit();
+            dirty = true;
             schedule();
         },
         zoom: (factor) => zoomBy(factor),

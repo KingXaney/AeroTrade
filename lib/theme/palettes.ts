@@ -1,7 +1,7 @@
-// The "palette" axis: every colour token for every palette, in one registry that is
-// the single source of truth. buildPaletteCss() renders it into the <style> the
-// root layout emits, the Settings cards paint their swatches from it, and the
-// contrast suite checks it — so a colour can only ever be changed here.
+// The palettes — the one thing about the app's look a reader chooses: every colour token for
+// every palette, in one registry that is the single source of truth. buildPaletteCss() renders
+// it into the <style> the root layout emits, the Settings chips paint their swatches from it,
+// and the contrast suite checks it — so a colour can only ever be changed here.
 //
 // Nothing user-supplied is ever interpolated into the CSS: ids are whitelisted
 // through resolve.ts before they reach an <html> attribute, and the values below
@@ -64,7 +64,7 @@ export type Palette = {
     label: string;
     description: string;
     mode: PaletteMode;
-    // [bg, brand, positive] — what a preset card paints.
+    // [bg, brand, positive] — the three dots on a palette's chip in Settings.
     swatch: [string, string, string];
     tokens: PaletteTokens;
 };

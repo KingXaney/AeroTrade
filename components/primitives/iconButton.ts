@@ -3,7 +3,7 @@
 // A class string rather than a component: these sit on buttons that already carry their own
 // handlers, aria-labels and disabled logic, and wrapping them would buy nothing.
 //
-// rounded-[var(--control-radius)] rather than rounded-md so it follows the style axis.
+// rounded-[var(--control-radius)] rather than rounded-md so it takes the look's control radius.
 export const iconButton =
     'inline-flex items-center justify-center size-7 rounded-[var(--control-radius)] text-fg-muted ' +
     'hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-30 disabled:hover:bg-transparent';

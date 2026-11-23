@@ -41,7 +41,7 @@ const WhatIfLab = ({view}: Props) => {
 
     if (stored === null || variants.length === 0) {
         return (
-            <section id="whatif-lab" aria-labelledby="whatif-lab-heading" className="scroll-mt-24">
+            <section id="whatif-lab" aria-labelledby="whatif-lab-heading">
                 <Panel as="div" id="whatif-lab-panel">
                     <SectionHeading id="whatif-lab-heading" spacing="none">{WHATIF_LAB.heading}</SectionHeading>
                     <p className="text-sm text-fg-muted mt-2" data-testid="whatif-pending">{WHATIF_LAB.pending}</p>
@@ -57,7 +57,7 @@ const WhatIfLab = ({view}: Props) => {
     ];
 
     return (
-        <section id="whatif-lab" aria-labelledby="whatif-lab-heading" className="space-y-3 scroll-mt-24">
+        <section id="whatif-lab" aria-labelledby="whatif-lab-heading" className="space-y-3">
             <Panel as="div" id="whatif-lab-panel">
                 <SectionHeading id="whatif-lab-heading" spacing="none">{WHATIF_LAB.heading}</SectionHeading>
                 <p className="font-mono text-[11px] text-fg-muted mt-1" id="whatif-window">{WHATIF_LAB.window(stored.from, stored.to)}</p>

@@ -4,9 +4,9 @@ import {cn} from "@/lib/utils";
 // chat panel's header icon. An inline SVG drawn in currentColor only — text-on-brand on the disc,
 // text-brand in the panel — so it reads on any palette (invariant 5). It moves by CSS keyframes
 // alone (app/globals.css: .robot-bob on the wrapper, .robot-eyes blink, .robot-antenna glow; the
-// hover tilt rides .robot-mascot under .robot-launcher), each listed in both reduced-motion guards
-// and stopped by name in brutalist. No SMIL, no Web Animations: the sweep's STILL css and the
-// guards stop everything it does. Pure markup, so it needs no 'use client' of its own.
+// hover tilt rides .robot-mascot under .robot-launcher), each listed in both reduced-motion
+// guards. No SMIL, no Web Animations: the sweep's STILL css and the guards stop everything it
+// does. Pure markup, so it needs no 'use client' of its own.
 
 type RobotMascotProps = {
     className?: string;

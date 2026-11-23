@@ -1,9 +1,13 @@
 import {Document, model, models, Schema} from "mongoose";
 import type {NewsFeedPrefs} from "@/lib/news/feed-prefs";
 
+// A saved theme (lib/theme/resolve.ts Theme): a palette and the Reduce motion choice. Documents
+// saved before the app kept one look also hold a `style`. No migration removes it: every read
+// goes through resolveTheme, which reads only these two fields, so the stored style is ignored
+// wherever it still sits — and it is the one record of what that reader had chosen. A save
+// (lib/actions/appearance.actions.ts) sets the two fields and leaves a stored style where it is.
 export interface AppearancePrefs {
     palette: string;
-    style: string;
     reduceMotion: boolean;
 }
 
@@ -85,7 +89,6 @@ export interface UserPreferencesDoc extends Document {
 const AppearanceSchema = new Schema<AppearancePrefs>(
     {
         palette: {type: String, required: true},
-        style: {type: String, required: true},
         reduceMotion: {type: Boolean, default: false},
     },
     {_id: false},

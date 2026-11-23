@@ -25,8 +25,10 @@ the map is `docs/MAP.md`.
   to its top rows. `lib/chat/culture-brain` is the culture brain's twin for `getCultureBrain`
   (see culture).
 - `components/chat/ChatWidget` mounts the one launcher — the robot, aria-label "Open Aero-AI
-  Assistant", the QA's handle — and, on `/topics` pages only while the panel is closed, its speech
-  bubble `components/chat/RobotTipBubble`. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the
+  Assistant", the QA's handle; a disc 48px across below md and 56px from md (### shell has why), in
+  `--brand-strong` with the look's `--glow` (`qa-chat` reads both) — and, on `/topics` pages only
+  while the panel is closed, its speech bubble `components/chat/RobotTipBubble`, whose place and
+  tail follow the disc's size. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the
   lead tip first, the rest in the day's order, none twice in a browser session —
   `lib/chat/robot-tips`, sessionStorage `aero-robot:shown`, never an `aero-chat:` key); a tip the
   reader is on — the pointer resting on it, focus inside it — is not taken away
@@ -34,8 +36,9 @@ the map is `docs/MAP.md`.
   holds; "Try it" prefills the composer through `lib/chat/ask.askAdvisor` and sends nothing, so a
   tip's prompt is chat input and held to the advice tier like a chip. The robot moves by CSS keyframes only
   (`.robot-bob`, `.robot-eyes`, `.robot-antenna`, `.robot-tip-in` in `app/globals.css`), each
-  listed in both reduced-motion guards; brutalist stops the loops by name because the zeroed tokens
-  do not stop a keyframe. No SMIL, no WAAPI: the sweep's STILL css and the guards stop only CSS.
+  listed in both reduced-motion guards, which stop the loops by name because a zeroed token does
+  not stop a keyframe timed in seconds. No SMIL, no WAAPI: the sweep's STILL css and the guards
+  stop only CSS.
 - The panel's usage caption is `lib/chat/usage` (pure: the three windows as {used, limit, left,
   resetsAt}, the window that refuses next, and the caption's clauses) over
   `lib/chat/usage-store.readChatUsage`, served by `app/api/chat/usage/route.ts` and read by

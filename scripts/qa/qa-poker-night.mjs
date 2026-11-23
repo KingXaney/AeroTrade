@@ -73,12 +73,12 @@
 // colours LOOKS_CSS gives them, read off a drawn back and suit) and never B's, without a request,
 // and survive a reload; A's avatar from the builder reaches every screen's seat within 5 s; the
 // host's Look section sends seven scenes and a felt to three tables within 5 s each, kept for the
-// host's next tables, and every open seat is filled with the felt. At hand 2's first turn a brutalist visitor's felt stays a stadium while its
-// plate pulse and the scene's twinkle stop by name, and A's emulated reduced motion stops the
-// twinkle and keeps the hand's chip flights still. After the night, the lobby's My look saves a
-// name, the builder's avatar, a card back and the tables' scene, mirrored into the browser with
-// none of its own look left over the account's, and the next Quick start opens with them from the
-// account alone.
+// host's next tables, and every open seat is filled with the felt. At hand 2's first turn a visitor
+// whose theme cookie asks for reduced motion sees the plate's pulse and the scene's twinkle stopped
+// by name, and A's emulated reduced motion stops the twinkle and keeps the hand's chip flights
+// still. After the night, the lobby's My look saves a name, the builder's avatar, a card back and
+// the tables' scene, mirrored into the browser with none of its own look left over the account's,
+// and the next Quick start opens with them from the account alone.
 // The night's awards (P7): once the host ends the night, the summary's awards are the ones
 // lib/poker-night/awards works out again from the stored ledger and throws (Tomato magnet exactly
 // when a tomato landed), the same on a guest's phone; Copy summary adds a line per award; the
@@ -1395,14 +1395,12 @@ const lookOnAll = (pages, ok, timeout = 5000) => Promise.all(pages.map(async (pa
     }
     return null;
 }));
-// What moves on a page: the style, the felt's corner, and the animation each loop runs — the plate
-// on the clock (.pn-pulse) and the scene's ambient parts (.pn-ambient).
+// What moves on a page: the theme's motion choice as <html> carries it, and the animation each
+// loop runs — the plate on the clock (.pn-pulse) and the scene's ambient parts (.pn-ambient).
 const motionOf = (page) => page.evaluate(() => {
     const names = (sel) => [...document.querySelectorAll(sel)].map((el) => getComputedStyle(el).animationName);
-    const felt = document.querySelector('.pn-felt');
     return {
-        style: document.documentElement.dataset.style ?? null,
-        feltRadius: felt ? parseFloat(getComputedStyle(felt).borderTopLeftRadius) : null,
+        motion: document.documentElement.getAttribute('data-motion'),
         pulses: names('.pn-pulse'),
         ambient: names('.pn-scene .pn-ambient'),
     };
@@ -2536,29 +2534,31 @@ const tableInBrowser = async () => {
         await hp.waitForSelector('[data-pn-drawer="host"]', {state: 'detached', timeout: 10000}).catch(() => {});
     };
     // Hand 2's first turn (P5): the deep-space scene twinkles and the plate on the clock pulses. A
-    // visitor whose theme is brutalist sees the felt's stadium still round and both loops stopped
-    // by name; on A's screen they run until A's browser asks for reduced motion (emulateMedia),
-    // which stops the twinkle there and keeps every chip flight of the hand still from then on.
-    let styled = false;
+    // visitor whose theme cookie asks for reduced motion (v2:<palette>:1, lib/theme/resolve.ts —
+    // the table's route group has no account to sync it with, so the root layout's read of the
+    // cookie is all there is) sees both loops stopped by name; on A's screen they run until A's
+    // browser asks for reduced motion (emulateMedia), which stops the twinkle there and keeps
+    // every chip flight of the hand still from then on.
+    let motionChecked = false;
     let reducedA = false;
-    const styleChecks = async () => {
-        const VB = await uiPlayer('uiBrutalist');
-        await VB.context.addCookies([{name: 'aero-theme', value: 'v1:nord:brutalist:0', domain: new URL(BASE).hostname, path: '/'}]);
-        await VB.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
-        await VB.page.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
+    const motionChecks = async () => {
+        const VR = await uiPlayer('uiReducedByCookie');
+        await VR.context.addCookies([{name: 'aero-theme', value: 'v2:nord:1', domain: new URL(BASE).hostname, path: '/'}]);
+        await VR.page.goto(`${BASE}/play/${code}`, {waitUntil: 'load', timeout: 120000});
+        await VR.page.waitForSelector('[data-pn-ready="true"]', {timeout: 30000}).catch(() => {});
         // Every screen with hand 2's first turn drawn (a page polls between hands only every 4 s).
-        await Promise.all([VB, A, B].map((p) => p.page.waitForSelector('[data-pn-hand="2"] .pn-pulse', {state: 'attached', timeout: 15000}).catch(() => {})));
-        const [brut, plain] = await Promise.all([motionOf(VB.page), motionOf(A.page)]);
-        check('a brutalist screen keeps the felt\'s stadium round (rounded-full spared from its square corners)', brut.style === 'brutalist' && brut.feltRadius > 100
-            && plain.feltRadius > 100, JSON.stringify({brutalist: brut.feltRadius, default: plain.feltRadius}));
-        check('…and stops the loops by name: the plate on the clock (.pn-pulse) and the scene\'s twinkle (.pn-ambient) have animation-name none, while they run on a default screen',
-            brut.pulses.length > 0 && brut.pulses.every((n) => n === 'none') && brut.ambient.length > 0 && brut.ambient.every((n) => n === 'none')
+        await Promise.all([VR, A, B].map((p) => p.page.waitForSelector('[data-pn-hand="2"] .pn-pulse', {state: 'attached', timeout: 15000}).catch(() => {})));
+        const [cookied, plain] = await Promise.all([motionOf(VR.page), motionOf(A.page)]);
+        check('a visitor whose theme cookie asks for reduced motion opens the table with it: <html data-motion="reduced">, where a default screen says auto',
+            cookied.motion === 'reduced' && plain.motion === 'auto', JSON.stringify({cookie: cookied.motion, default: plain.motion}));
+        check('…and its loops are stopped by name: the plate on the clock (.pn-pulse) and the scene\'s twinkle (.pn-ambient) have animation-name none, while they run on a default screen',
+            cookied.pulses.length > 0 && cookied.pulses.every((n) => n === 'none') && cookied.ambient.length > 0 && cookied.ambient.every((n) => n === 'none')
             && plain.pulses.some((n) => n === 'pn-pulse') && plain.ambient.length > 0 && plain.ambient.every((n) => n === 'pn-ambient-twinkle'),
-            JSON.stringify({brutalist: {pulses: brut.pulses, ambient: [...new Set(brut.ambient)]}, default: {pulses: plain.pulses, ambient: [...new Set(plain.ambient)]}}));
-        await uiWording(VB.page, 'the table in brutalist');
-        await uiShot(VB.page, '17-brutalist-1440');
-        await VB.context.close();
-        ui.splice(ui.indexOf(VB), 1);
+            JSON.stringify({cookie: {pulses: cookied.pulses, ambient: [...new Set(cookied.ambient)]}, default: {pulses: plain.pulses, ambient: [...new Set(plain.ambient)]}}));
+        await uiWording(VR.page, 'the table with motion reduced by the theme cookie');
+        await uiShot(VR.page, '17-reduced-by-cookie-1440');
+        await VR.context.close();
+        ui.splice(ui.indexOf(VR), 1);
         // The other seats' face-down cards, dealt: in A's own back on A's screen, the default on B's.
         const backsOf = (page) => page.evaluate(() => [...document.querySelectorAll('[data-seat]:not([data-me]) [data-card="back"] .pn-card-back')]
             .map((el) => getComputedStyle(el).backgroundColor));
@@ -2586,9 +2586,9 @@ const tableInBrowser = async () => {
     doc = await playByClicks(2, {
         choose: (p) => (p === H ? 'fold' : p === A && !raised ? 'raise-twice' : 'call'),
         before: async (p) => {
-            if (!styled) {
-                styled = true;
-                await styleChecks();
+            if (!motionChecked) {
+                motionChecked = true;
+                await motionChecks();
             }
             if (p === B) await bankOnTurn();
         },
@@ -2620,7 +2620,7 @@ const tableInBrowser = async () => {
         check('…and once A\'s browser no longer asks, the twinkle runs again', again.ambient.length > 0 && again.ambient.every((n) => n === 'pn-ambient-twinkle'),
             JSON.stringify([...new Set(again.ambient)]));
     } else {
-        check('hand 2\'s style checks ran', false, 'no turn reached them');
+        check('hand 2\'s motion checks ran', false, 'no turn reached them');
     }
     check('…and C, removed during it, is off the table once it ends, cashed out as removed', !doc.state.seats.some((s) => s?.pid === C.pid)
         && doc.state.ledger.find((l) => l.pid === C.pid)?.events.some((e) => LEDGER_KINDS[e[1]] === 'removed') && conservation(doc.state).ok);

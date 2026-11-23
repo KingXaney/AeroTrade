@@ -49,7 +49,7 @@ const GamesPage = async () => {
                     <SectionHeading id="games-archive-heading">{ARCHIVE_COPY.title}</SectionHeading>
                     <p className="text-sm text-fg-soft" data-archive-count={solved}>{ARCHIVE_COPY.hubLine(solved, archive.length)}</p>
                     <p className="mt-2 text-xs leading-relaxed text-fg-muted">{ARCHIVE_COPY.hubLead}</p>
-                    <div className="mt-auto pt-5">
+                    <div className="mt-auto pt-4">
                         <Link href="/games/puzzles" className={actionButton({variant: 'secondary', size: 'md'})}>{GAMES_COPY.archiveLink}</Link>
                     </div>
                 </Panel>
@@ -74,9 +74,11 @@ const GamesPage = async () => {
                           stats={[recordStat(MARKET_COPY.recordLabel, market.record, MARKET_COPY.signed)]} href="/games/market-making" cta={ARITHMETIC_COPY.play}/>
                 <GameCard id="correlation" title={CORRELATION_COPY.cardTitle} body={CORRELATION_COPY.cardBody}
                           stats={[recordStat(CORRELATION_COPY.recordLabel, correlation.record, (n) => (n / 1000).toFixed(3))]} href="/games/correlation" cta={ARITHMETIC_COPY.play}/>
-                {/* A table for friends, not a score: no records. */}
+                {/* A table for friends, not a score: no records — and so a short card, which keeps its
+                    own height beside the outside links rather than stretching to theirs with its
+                    button far under its sentence. */}
                 <GameCard id="poker-night" title={POKER_NIGHT_COPY.cardTitle} body={POKER_NIGHT_COPY.cardBody} stats={[]} href="/poker-night"
-                          cta={POKER_NIGHT_COPY.cardCta}/>
+                          cta={POKER_NIGHT_COPY.cardCta} className="lg:self-start"/>
                 <OutsideLinks/>
             </div>
         </div>
