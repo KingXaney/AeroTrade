@@ -25,7 +25,9 @@ const HistoryPage = async () => {
         <div className="space-y-4">
             <PageTitle title="Activity" subtitle="Your trades across every account, and what you have added to your watchlist" />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* items-start: each panel keeps its own height. Stretched to their row, fifty trades left
+                the watchlist beside them a box three screens tall with its rows at the top. */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 {/* Removals are not recorded (the watchlist model hard-deletes), so the list
                     beside this is honest about being "by date added", not a timeline. */}
                 <Panel className="lg:col-span-2">

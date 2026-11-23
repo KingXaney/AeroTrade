@@ -225,6 +225,23 @@ try {
     const historyText = await historyTrades().innerText();
     check('…and counts only this epoch\'s fills', /Showing the latest 50 of 54 trades/.test(historyText),
         historyText.match(/Showing[^\n]*/)?.[0] ?? historyText.replace(/\s+/g, ' ').slice(-160));
+    // Side by side from lg, each panel keeps its own height (items-start): the watchlist's one row
+    // beside fifty trades is not a box stretched three screens tall with its row at the top.
+    const historyPanels = await page.evaluate(() => {
+        const panel = (name) => [...document.querySelectorAll('section.glass-panel')].find((s) => name.test(s.querySelector('h2')?.textContent ?? ''));
+        const trades = panel(/^\s*Trades\s*$/i);
+        const watch = panel(/watchlist, by date added/i);
+        if (!trades || !watch) return null;
+        const box = watch.getBoundingClientRect();
+        const style = getComputedStyle(watch);
+        const inner = box.bottom - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth);
+        return {trades: Math.round(trades.getBoundingClientRect().height), watchlist: Math.round(box.height),
+            besides: Math.abs(box.top - trades.getBoundingClientRect().top) <= 1,
+            under: +(inner - watch.lastElementChild.getBoundingClientRect().bottom).toFixed(1)};
+    });
+    check('…and the watchlist beside them keeps its own height, its last row at its foot, not the trades\' list\'s',
+        historyPanels !== null && historyPanels.besides && historyPanels.under <= 1 && historyPanels.watchlist * 4 < historyPanels.trades,
+        JSON.stringify(historyPanels));
     await db.collection('papertrades').deleteMany({_id: {$in: Object.values(filler.insertedIds)}});
 
     // --- watchlist + stock page affordances --------------------------------------------
