@@ -26,7 +26,7 @@ const ArchivePuzzlePage = async ({params}: Props) => {
     if (!view) notFound();
 
     return (
-        <div className="max-w-3xl space-y-4" data-puzzle-page="archive">
+        <div className="mx-auto max-w-3xl space-y-4" data-puzzle-page="archive">
             <Link href="/games/puzzles" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.title}</Link>
             <PageTitle
                 title={view.puzzle.title}

@@ -19,7 +19,7 @@ const PuzzlePage = async () => {
     const view = await getTodaysPuzzle(userId);
 
     return (
-        <div className="max-w-3xl space-y-4" data-puzzle-page="daily">
+        <div className="mx-auto max-w-3xl space-y-4" data-puzzle-page="daily">
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             {view ? (
                 <>
