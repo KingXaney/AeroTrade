@@ -203,6 +203,72 @@ const until = async (page, fn, ms) => {
         await page.locator('header button.search-text kbd').count() === 1);
     check('no /search route link anywhere', await page.locator('a[href="/search"]').count() === 0);
 
+    // --- the rail: from lg a column that does not scroll sideways, so nothing fades; on a phone a row
+    // of chips that scrolls itself, kept on the current topic and fading at an end with more ---
+    // (hooks/useCurrentInTrack.) From lg the rail's topics reach 4px past each of its sides, room for
+    // a row's focus ring; a fade read from that reach cut the ring's sides off, faded the pills' right
+    // ends and the current row's tint, on a rail with nothing more to scroll to.
+    const railRow = 'nav[aria-label="Your topics"] > div';
+    const railReading = () => page.evaluate((sel) => {
+        const row = document.querySelector(sel);
+        if (!row) return null;
+        const box = row.getBoundingClientRect();
+        const style = getComputedStyle(row);
+        const current = row.querySelector('a[aria-current="page"]')?.getBoundingClientRect() ?? null;
+        // A topic's name is its link's second span (after the colour dot): whole up to two lines from lg.
+        const names = [...row.querySelectorAll('a[href^="/topics/"] > span:nth-of-type(2)')];
+        return {
+            fade: row.dataset.edgeFade ?? null, mask: style.maskImage || style.webkitMaskImage, overflowX: style.overflowX,
+            scrollLeft: Math.round(row.scrollLeft), reach: row.scrollWidth - row.clientWidth,
+            current: current ? {left: +(current.left - box.left).toFixed(1), right: +(box.right - current.right).toFixed(1)} : null,
+            cut: names.filter((n) => n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1).map((n) => n.textContent),
+            names: names.length,
+        };
+    }, railRow);
+    // Geopolitics holds the hundred seeded articles: a page long enough to scroll the rail to its stop.
+    await page.goto(`${BASE}/topics/geopolitics`, {waitUntil: 'load'});
+    await page.waitForSelector(railRow, {timeout: 30000});
+    await page.waitForTimeout(500);
+    const deskRail = await railReading();
+    check('from lg the rail does not scroll sideways and fades nowhere: no mark, no mask over its pills, its tint or a focus ring',
+        deskRail !== null && deskRail.overflowX === 'visible' && deskRail.fade === null && deskRail.mask === 'none', JSON.stringify(deskRail));
+    check('…and shows every topic\'s name whole', deskRail !== null && deskRail.names >= 6 && deskRail.cut.length === 0, JSON.stringify(deskRail));
+    // The rail sticks where the content starts (--sticky-top, the content wrapper's top padding), under the bar.
+    const stuck = await page.evaluate(async () => {
+        const room = document.documentElement.scrollHeight - window.innerHeight;
+        window.scrollTo(0, 600);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const rail = document.querySelector('nav[aria-label="Your topics"]').parentElement.getBoundingClientRect();
+        const top = parseFloat(getComputedStyle(document.querySelector('[data-app-content]')).paddingTop);
+        return {room, scrolled: Math.round(window.scrollY), rail: +rail.top.toFixed(1), top};
+    });
+    check('…and, scrolled 600px down a long topic, sticks where the content starts, under the bar',
+        stuck.room >= 600 && stuck.scrolled === 600 && Math.abs(stuck.rail - stuck.top) <= 1, JSON.stringify(stuck));
+    await page.evaluate(() => window.scrollTo(0, 0));
+    // The last topic on the rail, so on a phone the row has to scroll to it.
+    const lastTopic = await page.$$eval(railSel, (as) => as.at(-1)?.getAttribute('href') ?? null);
+    await page.setViewportSize({width: 390, height: 844});
+    await page.goto(`${BASE}${lastTopic}`, {waitUntil: 'load'});
+    await page.waitForSelector(`${railRow}[data-edge-fade]`, {timeout: 30000}).catch(() => {});
+    const phoneRail = await railReading();
+    check('on a phone the rail is a row of chips that scrolls itself, kept on the current topic with a fade\'s room beside it, its start fading',
+        phoneRail !== null && phoneRail.overflowX === 'auto' && phoneRail.reach > 0 && phoneRail.scrollLeft > 0
+        && phoneRail.current !== null && phoneRail.current.left >= 23.5 && phoneRail.current.right >= 23.5
+        && ['start', 'both'].includes(phoneRail.fade) && phoneRail.mask !== 'none', JSON.stringify({lastTopic, phoneRail}));
+    // The panel clips what overflows it (.glass-panel), so the row itself is what reaches its far end.
+    const farEnd = await page.evaluate(async (sel) => {
+        const row = document.querySelector(sel);
+        row.scrollLeft = row.scrollWidth;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        const box = row.getBoundingClientRect();
+        const last = row.lastElementChild.getBoundingClientRect();
+        return {fade: row.dataset.edgeFade ?? null, last: row.lastElementChild.textContent.trim(),
+            inside: last.left >= box.left - 0.5 && last.right <= box.right + 0.5};
+    }, railRow);
+    check('…whose far end, New topic, is reached by scrolling the row, where the start alone then fades',
+        farEnd.inside && /New topic/.test(farEnd.last) && farEnd.fade === 'start', JSON.stringify(farEnd));
+    await page.setViewportSize({width: 1440, height: 900});
+
     // --- dashboard: topics-first default + widgets ---
     await page.goto(`${BASE}/dashboard`, {waitUntil: 'load'});
     await page.waitForTimeout(2500);

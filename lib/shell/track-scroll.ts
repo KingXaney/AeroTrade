@@ -28,10 +28,23 @@ export const scrollToShow = ({start, end, scrollLeft, width, inset = 0}: TrackSp
 
 export type EdgeFade = 'start' | 'end' | 'both' | null;
 
+// How wide the fade at an end is, in rem: app/globals.css draws data-edge-fade this wide (the test
+// holds the two equal), and the hook keeps this much of the row in sight beside the current tab, so
+// the current one is never under the fade. In rem on both sides, since the root size is the
+// reader's own browser's.
+export const EDGE_FADE_REM = 1.5;
+
+// What a row's computed overflow-x is when the row scrolls sideways.
+const SCROLLS = new Set(['auto', 'scroll']);
+
 // The ends of a row that scrolls sideways with more of it to scroll to: where it fades
 // (data-edge-fade in app/globals.css), so a row cut at the screen's edge reads as one that goes on.
-// A row that fits fades nowhere, and a pixel of rounding is not more.
-export const edgeFade = ({scrollLeft, width, scrollWidth}: {scrollLeft: number; width: number; scrollWidth: number}): EdgeFade => {
+// A row that fits fades nowhere, and a pixel of rounding is not more. Nor does a box that does not
+// scroll sideways (its overflow visible, hidden or clipped), however far its content reaches: from
+// lg the topics' rail is such a column, its topics drawn 4px past its sides as room for a focus
+// ring, and a fade read from that reach cut the ring's sides off on a rail with nothing to scroll to.
+export const edgeFade = ({scrollLeft, width, scrollWidth, overflowX}: {scrollLeft: number; width: number; scrollWidth: number; overflowX: string}): EdgeFade => {
+    if (!SCROLLS.has(overflowX)) return null;
     const before = scrollLeft > 1;
     const after = scrollLeft + width < scrollWidth - 1;
     if (before && after) return 'both';

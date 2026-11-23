@@ -27,7 +27,8 @@ the map is `docs/MAP.md`.
   the window under the bar, All topics and New topic in sight above and below, so the rail, which
   sticks, never hides its last ones (the cap is 16). On a phone it is a row of chips that is its own
   scroller — the panel clips (`.glass-panel`) — kept on the current topic, its ends fading where there
-  are more (`hooks/useCurrentInTrack`).
+  are more (`hooks/useCurrentInTrack`). From lg nothing fades: the rail does not scroll sideways, and
+  its topics reach 4px past its sides only as room for a row's focus ring, which a fade cut off.
 - What "new" means on every topic badge is `lib/topics/config.unseenFloor`: articles published
   after the reader last opened the topic, counting back at most `UNSEEN_WINDOW_HOURS` (24, the
   daily email's window), counted to `UNSEEN_COUNT_CAP` + 1 at most and printed through

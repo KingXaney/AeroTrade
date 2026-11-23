@@ -79,4 +79,8 @@ the map is `docs/MAP.md`.
   at once on load, gliding there on a change unless motion is reduced — and names the ends of the
   row with more to scroll to in `data-edge-fade`, where the row fades out (`app/globals.css`), so a
   tab cut at the screen's edge reads as a row that goes on; the sums are `lib/shell/track-scroll`
-  (`scrollToShow`, `edgeFade`).
+  (`scrollToShow`, `edgeFade`). Only a row that scrolls sideways is marked: a box whose overflow
+  shows (a track from md, the topics' rail from lg) never is, however far a child is drawn past its
+  sides. The fade is `EDGE_FADE_REM` wide and the hook keeps that much of the row beside the current
+  tab, both in rem, so a reader's own browser size moves them alike (`track-scroll`'s test holds
+  the stylesheet to it).
