@@ -401,6 +401,15 @@ html[data-mode="light"] {
     overflow-x: hidden;
     position: relative;
   }
+  /* A heading's lines are balanced, so none leaves one word alone on its last line ("work." under
+     the front page's headline); a paragraph's last line is kept from being a lone word too. Neither
+     adds a line. A browser that reads neither wraps as before. */
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
 }
 
 /* ═══════════════════════════════════════
