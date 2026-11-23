@@ -119,8 +119,10 @@ const Home = async ({searchParams}: HomeProps) => {
                 )}
             />
 
+            {/* The reader's accounts are the page's headline panel: a band of light crosses it as it
+                arrives (Panel's sheen, one per view). */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Panel id="home-accounts" aria-labelledby="home-accounts-heading">
+                <Panel id="home-accounts" aria-labelledby="home-accounts-heading" sheen>
                     {/* A panel's header row (its heading, a link or a count) sits as far above the
                         body as a SectionHeading alone does (its md spacing), in every box here. */}
                     <div className="mb-3 flex items-center justify-between gap-3">
