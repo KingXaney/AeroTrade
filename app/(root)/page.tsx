@@ -121,7 +121,9 @@ const Home = async ({searchParams}: HomeProps) => {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Panel id="home-accounts" aria-labelledby="home-accounts-heading">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                    {/* A panel's header row (its heading, a link or a count) sits as far above the
+                        body as a SectionHeading alone does (its md spacing), in every box here. */}
+                    <div className="mb-3 flex items-center justify-between gap-3">
                         <SectionHeading id="home-accounts-heading" spacing="none">{HOME_COPY.accountsHeading}</SectionHeading>
                         <Link href="/portfolio" className="label-type text-xs text-brand hover:underline">{HOME_COPY.portfolioLink} →</Link>
                     </div>
@@ -129,7 +131,7 @@ const Home = async ({searchParams}: HomeProps) => {
                 </Panel>
 
                 <Panel id="home-next-step" aria-labelledby="home-step-heading" className="flex flex-col">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
                         <SectionHeading id="home-step-heading" spacing="none">{HOME_COPY.nextStepHeading}</SectionHeading>
                         {step.progress && <MicroLabel>{step.progress}</MicroLabel>}
                     </div>
@@ -190,7 +192,7 @@ const Home = async ({searchParams}: HomeProps) => {
                     </Panel>
                 ) : view.hasBriefs ? (
                     <Panel id="home-briefing" aria-labelledby="home-briefing-heading">
-                        <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="mb-3 flex items-center justify-between gap-3">
                             <SectionHeading id="home-briefing-heading" spacing="none">{HOME_COPY.briefingHeading}</SectionHeading>
                             <Link href="/news" className="label-type text-xs text-brand hover:underline">{HOME_COPY.newsLink} →</Link>
                         </div>
@@ -226,7 +228,7 @@ const Home = async ({searchParams}: HomeProps) => {
 
 const LearnBox = ({userId, owner}: {userId: string; owner: boolean}) => (
     <>
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
             <SectionHeading id="home-learn-heading" spacing="none">{HOME_COPY.learnHeading}</SectionHeading>
             <Link href="/glossary" className="label-type text-xs text-brand hover:underline">{HOME_COPY.learnLink} →</Link>
         </div>
