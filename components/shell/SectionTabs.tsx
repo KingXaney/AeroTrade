@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {cn} from "@/lib/utils";
+import {useCurrentInTrack} from "@/hooks/useCurrentInTrack";
 import {NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges, type NavSection} from "@/lib/shell/navigation";
 
 // The pages of the section the reader is in, as links above the page: News has Headlines and
@@ -12,14 +13,17 @@ import {NAV_SECTIONS, isActiveNav, sectionFor, type NavBadges, type NavSection} 
 // market scan on /trade).
 //
 // The tabs are pills in the tab track a page's own views share (components/primitives/Tabs),
-// at the column's left, the current one lifted (.tab-track and .lifted in app/globals.css).
+// at the column's left, the current one lifted (.tab-track and .lifted in app/globals.css). On a
+// phone the track is one row that scrolls sideways, the current tab kept in sight, and under a
+// coarse pointer each tab is a 44px target.
 const SectionTabs = ({badges = {}, sections = NAV_SECTIONS}: {badges?: NavBadges; sections?: readonly NavSection[]}) => {
     const pathname = usePathname();
+    const track = useCurrentInTrack<HTMLElement>(pathname);
     const section = sectionFor(pathname, sections);
     if (!section || section.pages.length < 2) return null;
 
     return (
-        <nav aria-label={`${section.label} pages`} data-section-tabs={section.id} className="tab-track mb-3">
+        <nav ref={track} aria-label={`${section.label} pages`} data-section-tabs={section.id} className="tab-track mb-3">
             {section.pages.map((page) => {
                 const active = isActiveNav(pathname, page.href);
                 const count = page.badge ? (badges[page.badge] ?? 0) : 0;
@@ -29,7 +33,7 @@ const SectionTabs = ({badges = {}, sections = NAV_SECTIONS}: {badges?: NavBadges
                         href={page.href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                            'control-type inline-flex items-center gap-2 rounded-full px-3.5 py-(--tab-pad-y) text-xs transition-colors',
+                            'control-type inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-(--tab-pad-y) text-xs transition-colors pointer-coarse:min-h-11',
                             active ? 'lifted text-fg' : 'text-fg-soft hover:bg-surface-3 hover:text-fg',
                         )}
                     >

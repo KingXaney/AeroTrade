@@ -159,17 +159,56 @@ describe("the look's density tokens (app/globals.css)", () => {
     });
 
     // One track for a section's pages and for a page's views, a class in the components layer that
-    // both carry (never a rule on the tablist role), each tab as tall as --tab-pad-y makes it.
+    // both carry (never a rule on the tablist role), each tab as tall as --tab-pad-y makes it. On
+    // a phone it is one row that scrolls sideways with no bar drawn, its tabs never shrinking or
+    // wrapping, the current one kept in sight; under a coarse pointer each tab is a 44px target.
     it('draws both kinds of tabs in one track, their height from --tab-pad-y', () => {
         const track = rules.filter((rule) => rule.selector === '.tab-track');
-        expect(track.length).toBe(1);
-        expect(track[0].context).toEqual(['@layer components']);
+        for (const rule of track) expect(rule.context[0]).toBe('@layer components');
+        expect(track.filter((rule) => rule.context.length === 1).length).toBe(1);
         expect(rules.filter((rule) => /\[role=["']?tab/.test(rule.selector)).map((rule) => rule.selector)).toEqual([]);
         for (const file of ['components/shell/SectionTabs.tsx', 'components/primitives/Tabs.tsx']) {
             const text = read(file);
             expect(text, file).toMatch(/\btab-track\b/);
             expect(text, file).toContain('py-(--tab-pad-y)');
+            expect(text, file).toMatch(/\bshrink-0\b/);
+            expect(text, file).toMatch(/\bwhitespace-nowrap\b/);
+            expect(text, file).toMatch(/(^|[\s'"])(pointer-coarse:)?min-h-11\b/);
+            expect(text, file).toMatch(/\buseCurrentInTrack(<\w+>)?\(/);
         }
+    });
+
+    it('makes the tab track one sideways-scrolling row on a phone', () => {
+        const phone = '@media (width < 48rem)';
+        const scrolling = rules.filter((rule) => rule.selector === '.tab-track' && rule.context.join(' ') === `@layer components ${phone}`);
+        expect(scrolling.length).toBe(1);
+        expect(valuesOf(scrolling[0], 'flex-wrap')).toEqual(['nowrap']);
+        expect(valuesOf(scrolling[0], 'overflow-x')).toEqual(['auto']);
+        expect(valuesOf(scrolling[0], 'scrollbar-width')).toEqual(['none']);
+        const bar = rules.filter((rule) => rule.selector === '.tab-track::-webkit-scrollbar');
+        expect(bar.map((rule) => rule.context.join(' '))).toEqual([`@layer components ${phone}`]);
+        expect(valuesOf(bar[0], 'display')).toEqual(['none']);
+        // A section's tabs never wrap from md: the row only scrolls where it would.
+        expect(rules.filter((rule) => rule.selector === '.tab-track' && rule.context.length === 1)
+            .flatMap((rule) => valuesOf(rule, 'overflow-x'))).toEqual([]);
+    });
+
+    // A row that is a link (or a button) is pressed by a thumb on a phone, whatever padding its
+    // call site asked for: a 44px target under a coarse pointer, in the components layer, so a
+    // call site may still say otherwise.
+    it('keeps a row that is a link a 44px target under a coarse pointer', () => {
+        const pressed = rules.filter((rule) => /\.row-card\b/.test(rule.selector) && valuesOf(rule, 'min-height').length > 0);
+        expect(pressed.map((rule) => [rule.selector, rule.context.join(' ')])).toEqual([[':is(a, button).row-card', '@layer components @media (pointer: coarse)']]);
+        expect(valuesOf(pressed[0], 'min-height')).toEqual(['2.75rem']);
+    });
+
+    // The bar's search is a pill from md and a circle --search-h across below it, never an oval.
+    it('draws the search as a circle on a phone', () => {
+        const trigger = read('components/shell/SearchCommand.tsx').match(/className="(search-text [^"]*)"/)?.[1] ?? '';
+        const classes = trigger.split(/\s+/);
+        expect(classes).toEqual(expect.arrayContaining(['size-(--search-h)', 'rounded-full', 'md:w-full']));
+        // No height or width below md other than the circle's.
+        expect(classes.filter((name) => /^(h|w|min-w|min-h|px)-/.test(name))).toEqual([]);
     });
 
     // Every page title is the shared one's size: PageTitle draws its h1 with the class it exports.

@@ -435,6 +435,11 @@ html[data-mode="light"] {
     border-radius: var(--card-radius);
     padding: var(--row-pad-y) var(--row-pad-x);
   }
+  /* A row that is a link or a button is pressed by a thumb on a touch screen: a 44px target,
+     whatever padding its call site asked for (px-3 py-2 draws 36px). */
+  @media (pointer: coarse) {
+    :is(a, button).row-card { min-height: 2.75rem; }
+  }
 
   /* The lab's unit bodies (components/lab/LabMarkdown): markdown with KaTeX maths and fenced
      code, read for twenty minutes at a time. Tokens only; KaTeX's own stylesheet sets the maths. */
@@ -531,6 +536,18 @@ html[data-mode="light"] {
     padding: 0.1875rem;
     border-radius: 9999px;
     background: color-mix(in srgb, var(--fg) 5%, transparent);
+  }
+  /* On a phone the track is one row that scrolls sideways, no bar drawn: its tabs never shrink or
+     wrap (their own shrink-0), and the current one is kept in sight (hooks/useCurrentInTrack).
+     From md the row fits, and the track is no scroller, which would clip the lifted tab's shadow. */
+  @media (width < 48rem) {
+    .tab-track {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .tab-track::-webkit-scrollbar { display: none; }
   }
 }
 
@@ -2127,7 +2144,10 @@ body::before {
    Both zero the motion tokens, which makes everything timed on them a cut. An animation timed in
    literal seconds is out of a token's reach, so each one is stopped here by name, in both lists
    (lib/theme/__tests__/motion-guards.test.ts reads this file and finds any that is not) — all but
-   the spinners, which keep turning by a decision written down in that test (SPINNERS). */
+   the spinners, which keep turning by a decision written down in that test (SPINNERS). So are
+   the sheets' and dialogs' slides and fades (components/primitives/Sheet, components/ui/dialog),
+   which tw-animate-css times with its own duration utilities, by their data-slot: stopped, a
+   sheet or a dialog is there at once, and gone at once (Radix unmounts what runs no animation). */
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-fast: 0ms; --motion-base: 0ms; }
   .glass-panel, details[open] > :not(summary) { animation: none !important; }
@@ -2137,12 +2157,13 @@ body::before {
   .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce,
   .pn-award-in,
   .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in,
+  [data-slot="sheet-overlay"], [data-slot="sheet-content"], [data-slot="dialog-overlay"], [data-slot="dialog-content"],
   .glass-panel, .news-item, .yellow-btn, .search-btn {
     animation: none !important;
     transition: none !important;
   }
 }
-html[data-motion="reduced"] :is(.typing-dot, .animate-pulse, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
+html[data-motion="reduced"] :is(.typing-dot, .animate-pulse, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, [data-slot="sheet-overlay"], [data-slot="sheet-content"], [data-slot="dialog-overlay"], [data-slot="dialog-content"], .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
   animation: none !important;
   transition: none !important;
 }

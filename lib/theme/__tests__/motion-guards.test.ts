@@ -214,9 +214,14 @@ describe('the motion guards in app/globals.css', () => {
     // The chat's typing dots: declared in this file, so the reader below finds them too; pinned here
     // by name, as the robot's loops are.
     const CHAT = ['.typing-dot'];
-    // Tailwind's pulse (a skeleton, the market-open dot, the streak's ring): a utility at the call
-    // sites, so nothing in this file declares it for the reader below.
-    const ELSEWHERE = ['.animate-pulse'];
+    // Tailwind's pulse (a placeholder, the market-open dot, the streak's ring), and the sheets' and
+    // dialogs' slides and fades (tw-animate-css's animate-in/out timed by its own duration utilities,
+    // components/primitives/Sheet and components/ui/dialog, stopped by their data-slot): utilities at
+    // the call sites, so nothing in this file declares them for the reader below. (Those slides'
+    // data-open:/data-closed: variants match no attribute Radix writes — it writes data-state — so
+    // today nothing slides; the guards hold them still the day it does.)
+    const SLIDES = ['[data-slot="sheet-overlay"]', '[data-slot="sheet-content"]', '[data-slot="dialog-overlay"]', '[data-slot="dialog-content"]'];
+    const ELSEWHERE = ['.animate-pulse', ...SLIDES];
     const STOPPED = ['.robot-bob', '.robot-eyes', '.robot-antenna', '.robot-mascot', '.robot-tip-in', ...CHAT, ...ELSEWHERE, ...POKER_NIGHT, ...AGENT_WORLD];
     // The spinners, which keep turning under both guards, by decision: a spinner stands for work
     // under way (a search, a save), and its turning is what says so; stopped, it is a still arc that
