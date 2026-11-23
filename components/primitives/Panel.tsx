@@ -37,6 +37,9 @@ type Props = {
     // For a panel that is itself a link or a button. Renders data-interactive, which
     // globals.css hovers — a `hover:border-*` utility would lose to the unlayered rule.
     interactive?: boolean;
+    // For a page's headline panel, one per view: a band of light crosses it once as it arrives
+    // (.fx-sheen, an empty element prepended to the panel, which clips it).
+    sheen?: boolean;
     id?: string;
     className?: string;
     // Measured values only (a drag ghost's pixel width). Never frame properties — see above.
@@ -49,8 +52,9 @@ type Props = {
     children: ReactNode;
 };
 
-const Panel = ({as: Tag = 'section', pad = 5, interactive, className, children, ...rest}: Props) => (
+const Panel = ({as: Tag = 'section', pad = 5, interactive, sheen, className, children, ...rest}: Props) => (
     <Tag className={cn('glass-panel', PAD[pad], className)} {...(interactive ? {'data-interactive': ''} : {})} {...rest}>
+        {sheen && <span className="fx-sheen" aria-hidden="true" />}
         {children}
     </Tag>
 );

@@ -600,6 +600,57 @@ html[data-mode="light"] {
   from { opacity: 0; transform: translateY(6px); }
 }
 
+/* The look's motion vocabulary: small motions, each a class of its own name moving a real element
+   (no pseudo-element animates, which a guard naming the class would not reach), unlayered like
+   panel-in, and stopped by name in both motion guards at the foot of this file, whatever it is
+   timed on (lib/theme/__tests__/motion-guards.test.ts finds every @keyframes fx-* and holds it to
+   both). Each rests in its own static style, which is all a guard's `animation: none` leaves. */
+
+/* A halo breathes round "now", one per view (the market-open dot, components/stocks/MarketStatus):
+   a soft glow in the element's own colour grows out of it and fades, then a pause; at rest there is
+   no halo. currentColor itself, because Chrome animates a color-mix() over currentColor in one jump
+   rather than a fade. A loop in literal seconds. */
+.fx-beacon { animation: fx-beacon 2.4s ease-out infinite; }
+@keyframes fx-beacon {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70%, 100% { box-shadow: 0 0 0.5rem 0.375rem transparent; }
+}
+
+/* A sweep over a placeholder (components/primitives/Skeleton): a soft band of the ink, as wide as
+   the element, across its own fill, left to right, again and again. The image is twice the
+   element's width and the band its middle half, so at either end of the sweep — and at rest — the
+   band lies wholly past an edge. */
+.fx-shimmer {
+  background-image: linear-gradient(90deg, transparent 25%, color-mix(in srgb, var(--fg) 9%, transparent) 50%, transparent 75%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: -50% 0;
+  animation: fx-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes fx-shimmer {
+  from { background-position: 150% 0; }
+}
+
+/* One band of light crosses a headline panel once as it arrives, after the panel's own rise
+   (Panel's `sheen`: an empty span prepended to the panel, which clips it). A transform on the motion
+   token, behind the panel's content (-1 in the panel's isolated stack); it starts past the near edge
+   and rests past the far one, off the surface. The margin and border are said because a panel's
+   space-y or divide-y would otherwise reach it, the panel's first child. */
+.fx-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  margin: 0;
+  border: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--brand) 14%, transparent) 50%, transparent 65%);
+  transform: translateX(110%);
+  animation: fx-sheen calc(var(--motion-base) * 6) ease-in-out var(--motion-base) both;
+}
+@keyframes fx-sheen {
+  from { transform: translateX(-110%); }
+}
+
 /* Floating chrome. Unlayered like .glass-panel, and for the same reason turned around: the
    shadcn surfaces carry bg-popover, shadow-md and ring-1 as utilities, which would beat a
    layered rule — so the frame is set here, whole, and a utility beside it does nothing. */
@@ -2157,13 +2208,14 @@ body::before {
   .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce,
   .pn-award-in,
   .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in,
+  .fx-beacon, .fx-shimmer, .fx-sheen,
   [data-slot="sheet-overlay"], [data-slot="sheet-content"], [data-slot="dialog-overlay"], [data-slot="dialog-content"],
   .glass-panel, .news-item, .yellow-btn, .search-btn {
     animation: none !important;
     transition: none !important;
   }
 }
-html[data-motion="reduced"] :is(.typing-dot, .animate-pulse, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, [data-slot="sheet-overlay"], [data-slot="sheet-content"], [data-slot="dialog-overlay"], [data-slot="dialog-content"], .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
+html[data-motion="reduced"] :is(.typing-dot, .animate-pulse, .robot-bob, .robot-eyes, .robot-antenna, .robot-mascot, .robot-tip-in, .fx-beacon, .fx-shimmer, .fx-sheen, [data-slot="sheet-overlay"], [data-slot="sheet-content"], [data-slot="dialog-overlay"], [data-slot="dialog-content"], .glass-panel, .news-item, .yellow-btn, .search-btn, .pn-deal, .pn-flip, .pn-chip-slide, .pn-chip-land, .pn-sweep, .pn-fold, .pn-fold-turn, .pn-dim, .pn-win-lift, .pn-win-glow, .pn-banner-drop, .pn-chip-stream, .pn-pot-out, .pn-seat-in, .pn-tag-pop, .pn-win-pop, .pn-pulse, .pn-confetti, .pn-turn-ring, .pn-ambient, .pn-emote-rise, .pn-phrase-in, .pn-throw-x, .pn-throw-y, .pn-splat, .pn-petals, .pn-fizz, .pn-bounce, .pn-ambient-twinkle, .pn-ambient-drift, .pn-ambient-flicker, .pn-ambient-waves, .pn-scene-fade, .pn-award-in, .aw-working, .ao-bubble-in, .ao-lamp, .ao-confetti, .ao-stamp-in, .ao-line-in) {
   animation: none !important;
   transition: none !important;
 }
