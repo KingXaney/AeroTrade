@@ -296,9 +296,11 @@ const MomentumTerrain = ({initial, eyebrow = true, heading, size = 'hero', child
                 // The heading's line, with the strip's Expand button where Home's panels keep their
                 // header link and in their words' style. A toggle that carries its own state, so not
                 // an ActionButton (TopicComposer's "Advanced" is the same kind of button). It stays
-                // on this line in both sizes, so it never moves from under the pointer or the focus
-                // that pressed it, and on a touch screen it is a 44px target.
-                <div className="mb-3 flex items-center justify-between gap-3">
+                // where it is in both sizes, so it never moves from under the pointer or the focus
+                // that pressed it, and on a touch screen it is a 44px target. On a phone it sits under
+                // the heading, at its left: at the line's end it met the corner the assistant's robot
+                // floats in, on Home's first screen.
+                <div className="mb-3 flex flex-col items-start gap-1 md:flex-row md:items-center md:justify-between md:gap-3">
                     {heading}
                     {size === 'strip' && (
                         <button
@@ -307,7 +309,7 @@ const MomentumTerrain = ({initial, eyebrow = true, heading, size = 'hero', child
                             aria-controls={hostId}
                             aria-label={expanded ? TERRAIN_COPY.collapseName : TERRAIN_COPY.expandName}
                             data-terrain-expand
-                            className="label-type ml-auto inline-flex shrink-0 items-center gap-1.5 text-xs text-brand hover:underline pointer-coarse:min-h-11"
+                            className="label-type inline-flex shrink-0 items-center gap-1.5 text-xs text-brand hover:underline pointer-coarse:min-h-11 md:ml-auto"
                             onClick={() => setExpanded(!expanded)}
                         >
                             {expanded ? <Minimize2 className="size-3.5" aria-hidden="true"/> : <Maximize2 className="size-3.5" aria-hidden="true"/>}

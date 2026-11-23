@@ -38,9 +38,10 @@ const RobotTipBubble = ({tip, onTry, onDismiss, onAttention, ref}: RobotTipBubbl
             onBlur={(e: FocusEvent<HTMLDivElement>) => {
                 if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onAttention('focus', false);
             }}
-            // 12px above the 56px disc at its corner (bottom-5/right-5, bottom-6/right-6 from sm);
-            // the tail's centre sits 28px in from the right edge, under the disc's centre.
-            className="chrome-surface robot-tip-in fixed bottom-22 right-5 z-[80] w-max max-w-64 rounded-xl p-3 sm:bottom-23 sm:right-6"
+            // 12px above the disc at its corner (bottom-5/right-5, bottom-6/right-6 from sm): the
+            // disc is 48px below md and 56px from it, and the tail's centre sits half the disc in
+            // from the right edge, under the disc's centre.
+            className="chrome-surface robot-tip-in fixed bottom-20 right-5 z-[80] w-max max-w-64 rounded-xl p-3 sm:bottom-21 sm:right-6 md:bottom-23"
         >
             <p role="status" className="text-sm leading-snug text-fg">{tip.text}</p>
             <div className="mt-2 flex items-center justify-end gap-1.5">
@@ -51,7 +52,7 @@ const RobotTipBubble = ({tip, onTry, onDismiss, onAttention, ref}: RobotTipBubbl
                     <X className="size-4"/>
                 </button>
             </div>
-            <span aria-hidden="true" className="chrome-tail absolute -bottom-1.5 right-5.5 size-3 rotate-45"/>
+            <span aria-hidden="true" className="chrome-tail absolute -bottom-1.5 right-4.5 size-3 rotate-45 md:right-5.5"/>
         </div>
     );
 };

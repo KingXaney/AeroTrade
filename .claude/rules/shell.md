@@ -64,8 +64,9 @@ the map is `docs/MAP.md`.
   sit on its middle line however tall the bar is drawn, and the account button's `-mr-2` puts
   its edge as far from the right as the logo is from the left. The assistant's launcher is not in the bar:
   `components/chat/ChatWidget` floats the robot (`components/chat/RobotMascot`) fixed bottom-right
-  at every width, over the page, and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`)
-  ends in `--content-pb` so it never covers a page's last panel.
+  at every width, over the page — 48px below md, so a phone's first screen keeps its own links clear
+  of it, and 56px from md — and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`) ends
+  in `--content-pb`, room for its size and offset, so it never covers a page's last panel.
 - How much room the frame takes is the density tokens on `:root` in `app/globals.css` (`--header-h`,
   `--rail-w`, `--rail-tile`, `--search-h`, `--content-pt`/`-px`/`-pb`/`-max`, `--sticky-top`), each
   declared once (`lib/theme/__tests__/density.test.ts`), read by the frame's rules in the

@@ -34,10 +34,11 @@ the map is `docs/MAP.md`.
   under both. On a band (a canvas at least `lib/landing/terrain-view.STRIP_MIN_ASPECT` times as wide
   as it is tall) the scene's Angle preset looks from lower down (`STRIP_ANGLE`), so the turning
   surface fills the band rather than a third of it; the panel, the hero and a phone's 2:1 strip keep
-  the preset's own height. Its Expand button (`data-terrain-expand`, `aria-expanded`, on the heading's line so
-  it never moves) swaps the strip for the `panel` size in place and back: state alone — no
-  navigation, no fetch, the same canvas and scene, nothing animated — and `data-terrain-size`
-  names the size drawn. In the strip the tooltip drops below a pointer in the canvas's top half and
+  the preset's own height. Its Expand button (`data-terrain-expand`, `aria-expanded`) ends the
+  heading's line from md and sits under the heading on a phone, out of the corner the assistant's
+  robot floats in; either way it never moves, and it swaps the strip for the `panel` size in place
+  and back: state alone — no navigation, no fetch, the same canvas and scene, nothing animated — and
+  `data-terrain-size` names the size drawn. In the strip the tooltip drops below a pointer in the canvas's top half and
   is held inside the band, and the slice gives the hovered session a line of its own (`stacked`), so
   a hover moves nothing. The page reads `lib/landing/surface-store.getMomentumSurface` on the server
   beside `getHomeView` and hands the surface in as `initial`, so the section exists only when there
