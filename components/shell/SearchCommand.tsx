@@ -167,10 +167,12 @@ export default function SearchCommand({
                 // Was a bare <span onClick> — Tab skipped it and screen readers announced
                 // it as inert text. The ⌘K hint is the only place the shortcut is advertised.
                 // A pill --search-h tall from md, and a circle of that size below it. The border
-                // is transparent, kept for forced-colours mode, which draws it.
+                // is transparent, kept for forced-colours mode, which draws it. Under a coarse
+                // pointer a transparent circle 44px across (::before, size-11, centred on the
+                // button) answers a thumb, the circle drawn as it is.
                 <button type="button" onClick={() => setOpen(true)} aria-label={label}
                         onPointerEnter={preloadGlossary} onFocus={preloadGlossary} onTouchStart={preloadGlossary}
-                        className="search-text inline-flex size-(--search-h) shrink-0 items-center justify-center gap-2 rounded-full border border-transparent bg-fg/6 text-sm transition-colors md:w-full md:max-w-md md:shrink md:justify-start md:px-3">
+                        className="search-text relative inline-flex size-(--search-h) shrink-0 items-center justify-center gap-2 rounded-full border border-transparent bg-fg/6 text-sm transition-colors pointer-coarse:before:absolute pointer-coarse:before:left-1/2 pointer-coarse:before:top-1/2 pointer-coarse:before:size-11 pointer-coarse:before:-translate-1/2 pointer-coarse:before:rounded-full md:w-full md:max-w-md md:shrink md:justify-start md:px-3">
                     <Search className="size-4 opacity-70 shrink-0" aria-hidden="true"/>
                     <span className="hidden md:inline flex-1 truncate text-left text-fg-muted">{label}</span>
                     <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-line-strong/40 text-fg-muted font-mono">⌘K</kbd>

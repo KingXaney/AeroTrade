@@ -58,7 +58,8 @@ the map is `docs/MAP.md`.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
   also finds pages, `searchPages`), the account menu. From md the trigger sits in the bar's true
   middle (`.header-bar` in `app/globals.css`: two equal side columns, the middle narrowing so each
-  side keeps 12rem); below md it is an icon beside the account menu. The landing page's header
+  side keeps 12rem); below md it is an icon beside the account menu, a circle `--search-h` across
+  that a coarse pointer presses 44px across (a transparent `::before` round it). The landing page's header
   keeps the plain `.header-wrapper`. The bar's row fills the bar
   (`.header-wrapper` height 100%, the grid's row centred), so the logo, the search and the avatar
   sit on its middle line however tall the bar is drawn, and the account button's `-mr-2` puts
@@ -66,7 +67,8 @@ the map is `docs/MAP.md`.
   `components/chat/ChatWidget` floats the robot (`components/chat/RobotMascot`) fixed bottom-right
   at every width, over the page — 48px below md, so a phone's first screen keeps its own links clear
   of it, and 56px from md — and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`) ends
-  in `--content-pb`, room for its size and offset, so it never covers a page's last panel.
+  in `--content-pb`, room for its size, its offset and 0.75rem of air, so it never covers a page's
+  last panel nor meets it as a hover grows it (with no air its top sat on the panel's edge).
 - How much room the frame takes is the density tokens on `:root` in `app/globals.css` (`--header-h`,
   `--rail-w`, `--rail-tile`, `--search-h`, `--content-pt`/`-px`/`-pb`/`-max`, `--sticky-top`), each
   declared once (`lib/theme/__tests__/density.test.ts`), read by the frame's rules in the

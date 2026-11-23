@@ -11,8 +11,9 @@
 // none of the owner's pages: each sends them Home, the routes answer 401, and nothing on their own
 // pages leads there. The frame is held by computed style to its density tokens (app/globals.css):
 // the bar, the rail and its tiles, where the content starts and how wide its column is, the titles,
-// the tab track at the column's left, a grid's gap, the rows' padding and a game page's own column;
-// on a phone the round search, the content's sides and one row of tabs.
+// the tab track at the column's left, a grid's gap, the rows' padding, a game page's own column and
+// the room the launcher keeps at a page's foot; on a phone the round search (a thumb's 44px under a
+// coarse pointer), the content's sides and one row of tabs.
 // Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -269,6 +270,29 @@ try {
         near(home.gap, 4 * T['--spacing']) && near(home.columnGap, 4 * T['--spacing']) && near(home.rowGap, 4 * T['--spacing']),
         `${JSON.stringify(home)} — ${tokens('--spacing')}`);
 
+    // The launcher floats over the content's foot, and the content keeps --content-pb of room for it:
+    // scrolled to the end of a page that scrolls (the glossary, long for every reader), the robot
+    // stands clear of where the column ends — its last panel — with air between them even as a hover
+    // grows it (scale 1.05). At 1280 and 1024 the column reaches under the launcher's corner (from
+    // about 1368 px the two no longer meet); below md the robot is smaller and lower.
+    const feet = {};
+    for (const [width, height] of [[1280, 800], [1024, 768]]) {
+        await page.setViewportSize({width, height});
+        await page.goto(`${BASE}/glossary`, {waitUntil: 'load'});
+        await page.locator('button[aria-label="Open Aero-AI Assistant"]').waitFor({timeout: 30000}).catch(() => {});
+        feet[width] = await page.evaluate(async () => {
+            window.scrollTo(0, document.documentElement.scrollHeight);
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const launcher = document.querySelector('button[aria-label="Open Aero-AI Assistant"]').getBoundingClientRect();
+            const column = document.querySelector('[data-app-content]').firstElementChild.getBoundingClientRect();
+            return {under: column.right > launcher.left, air: +(launcher.top - column.bottom).toFixed(1),
+                launcher: [Math.round(launcher.left), Math.round(launcher.top), Math.round(launcher.width)]};
+        });
+    }
+    check('scrolled to a page\'s end, the robot stands clear of where the column ends, with air between them (--content-pb)',
+        Object.values(feet).every((foot) => foot.under && foot.air >= 8), JSON.stringify(feet));
+    await page.setViewportSize({width: 1440, height: 900});
+
     // The palette listens for ⌘K from an effect, so a press before Home has hydrated is lost —
     // on a cold dev server that is seconds after 'load'. Wait for the network to settle first.
     await page.goto(`${BASE}/`, {waitUntil: 'networkidle'});
@@ -410,6 +434,28 @@ try {
         && near(phoneFrame.bar, T['--header-h']), `${JSON.stringify(phoneFrame)} — ${tokens('--search-h', '--header-h')}`);
     check('…and the content keeps --content-px from both edges', phoneFrame.sides.every((side) => near(side, T['--content-px'])),
         `${JSON.stringify(phoneFrame.sides)} — ${tokens('--content-px')}`);
+    // A phone is pressed by a thumb: under a coarse pointer the circle, still drawn --search-h across,
+    // answers a press 44px across (a transparent circle round it, 4px past its edge), and no wider:
+    // a press 2.5px past the drawn edge reaches it, one 6px past does not.
+    const touch = await browser.newContext({viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+    await touch.addCookies(await page.context().cookies());
+    const thumb = await touch.newPage();
+    await thumb.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
+    await thumb.locator('header button.search-text').waitFor({timeout: 30000}).catch(() => {});
+    const pressable = await thumb.evaluate(() => {
+        const search = document.querySelector('header button.search-text');
+        const b = search.getBoundingClientRect();
+        const cx = b.left + b.width / 2;
+        const cy = b.top + b.height / 2;
+        const hits = (x, y) => document.elementFromPoint(x, y)?.closest('button.search-text') === search;
+        return {coarse: matchMedia('(pointer: coarse)').matches, circle: [+b.width.toFixed(1), +b.height.toFixed(1)],
+            ring: [hits(b.left - 2.5, cy), hits(b.right + 2.5, cy), hits(cx, b.top - 2.5), hits(cx, b.bottom + 2.5)],
+            beyond: [hits(b.left - 6, cy), hits(b.right + 6, cy), hits(cx, b.top - 6), hits(cx, b.bottom + 6)]};
+    });
+    check('…a circle a thumb can press: 44px across under a coarse pointer, though it draws --search-h',
+        pressable.coarse && near(pressable.circle[0], T['--search-h']) && near(pressable.circle[1], T['--search-h'])
+        && pressable.ring.every(Boolean) && !pressable.beyond.some(Boolean), `${JSON.stringify(pressable)} — ${tokens('--search-h')}`);
+    await touch.close();
     check('Activity is a tab on the page, without opening anything', await page.locator('[data-section-tabs] a[href="/history"]:visible').count() === 1);
     const before = await page.locator('a[href="/news"]:visible').count();
     check('news has no visible link before opening the drawer', before === 0, String(before));
