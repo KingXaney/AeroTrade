@@ -387,6 +387,13 @@ html[data-mode="light"] {
   * {
     @apply border-border outline-ring/50;
   }
+  /* Anything scrolled to — a fragment in the address, Next's own scroll on a navigation, a field
+     taking the focus — stops where the content starts, under the fixed bar: one padding on the
+     root scroller instead of a margin on every anchor. A panel that scrolls itself (poker night's
+     Hands drawer) keeps a margin of its own. */
+  html {
+    scroll-padding-top: var(--sticky-top);
+  }
   body {
     background-color: var(--bg);
     color: var(--fg);

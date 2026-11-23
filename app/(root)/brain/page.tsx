@@ -88,7 +88,7 @@ const NarrativesView = async ({userId, entity}: {userId: string; entity?: string
 
             {/* Evidence drill-down for ?entity= */}
             {entity && evidence && (
-                <Panel id="evidence" className="scroll-mt-24">
+                <Panel id="evidence">
                     <SectionHeading>
                         Evidence
                     </SectionHeading>

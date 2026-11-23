@@ -75,7 +75,7 @@ const UnitPanel = ({today}: {today: LabView['today']}) => (
 );
 
 const ReviewPanel = ({view}: {view: LabView}) => (
-    <Panel id="lab-review" aria-labelledby="lab-review-heading" pad={4} className="h-full scroll-mt-24">
+    <Panel id="lab-review" aria-labelledby="lab-review-heading" pad={4} className="h-full">
         <div className="mb-2 flex items-center justify-between gap-3">
             <SectionHeading id="lab-review-heading" spacing="none">{LAB_COPY.reviewHeading}</SectionHeading>
             <MicroLabel data-lab-review-due={view.review.summary.due}>{LAB_COPY.reviewDue(view.review.summary.due)}</MicroLabel>
@@ -92,7 +92,7 @@ const ReviewPanel = ({view}: {view: LabView}) => (
 // under its badge; the fold outlives the page's refresh after an answer, since `open` is the
 // element's own, never a prop. Not h-full: a folded card is never stretched to a neighbour.
 const ProblemPanel = ({problem}: {problem: NonNullable<LabView['problem']>}) => (
-    <Panel id="lab-problem" aria-labelledby="lab-problem-heading" pad={4} className="scroll-mt-24">
+    <Panel id="lab-problem" aria-labelledby="lab-problem-heading" pad={4}>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
             <SectionHeading id="lab-problem-heading" spacing="none">{LAB_COPY.problemHeading}</SectionHeading>
             <MicroLabel>{problem.unitTitle} · {LAB_COPY.kinds[problem.kind]}</MicroLabel>
@@ -124,9 +124,9 @@ const ProblemPanel = ({problem}: {problem: NonNullable<LabView['problem']>}) => 
 
 // The day's papers on Today: the digest with a link to the Papers view, else three papers a field.
 const PapersToday = ({papers}: {papers: NonNullable<LabView['papers']>}) => papers.digest ? (
-    <DigestPanel id="lab-digest" digest={papers.digest} day={papers.day} hrefPrefix="/learn?view=papers#paper-" more={{href: '/learn?view=papers', label: LAB_COPY.allPapers}} className="h-full scroll-mt-24"/>
+    <DigestPanel id="lab-digest" digest={papers.digest} day={papers.day} hrefPrefix="/learn?view=papers#paper-" more={{href: '/learn?view=papers', label: LAB_COPY.allPapers}} className="h-full"/>
 ) : (
-    <Panel id="lab-papers-today" aria-labelledby="lab-papers-today-heading" pad={4} className="h-full scroll-mt-24">
+    <Panel id="lab-papers-today" aria-labelledby="lab-papers-today-heading" pad={4} className="h-full">
         <div className="mb-2 flex items-center justify-between gap-3">
             <SectionHeading id="lab-papers-today-heading" spacing="none">{LAB_COPY.todayPapersHeading}</SectionHeading>
             <Link href="/learn?view=papers" className="label-type text-xs text-brand hover:underline">{LAB_COPY.allPapers}</Link>

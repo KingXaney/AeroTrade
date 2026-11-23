@@ -63,7 +63,7 @@ const BrandsView = async ({brandId}: {brandId: string | null}) => {
 
             {/* Evidence drill-down for ?brand= */}
             {view.evidence && (
-                <Panel id="evidence" className="scroll-mt-24">
+                <Panel id="evidence">
                     <SectionHeading>{CULTURE_COPY.evidenceHeading}</SectionHeading>
                     <BrandEvidence brand={view.evidence.brand} items={view.evidence.items} days={view.evidence.days} />
                 </Panel>

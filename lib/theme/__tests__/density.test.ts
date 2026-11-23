@@ -93,9 +93,7 @@ describe("the look's density tokens (app/globals.css)", () => {
     // A token no rule and no class reads is a size nothing has; one read under a misspelt name
     // is a size that silently resolves to nothing, which this cannot catch, but a token left
     // unread after a rename shows here.
-    // NOTE: --sticky-top is left out until the next commit, which moves the anchors and the
-    // sticky panels onto it.
-    it.each(DENSITY.filter((token) => token !== '--sticky-top'))('%s is read by the stylesheet or by a class at a call site', (token) => {
+    it.each(DENSITY)('%s is read by the stylesheet or by a class at a call site', (token) => {
         const inSheet = css.split(`var(${token})`).length - 1;
         // A utility that reads a variable: pt-(--content-pt), or with its type, text-(length:--title-size).
         const atCallSites = sourceText.filter(({text}) => text.includes(`(${token})`) || text.includes(`:${token})`)).length;
@@ -114,6 +112,17 @@ describe("the look's density tokens (app/globals.css)", () => {
         expect(value('--content-pt')).toMatch(/^calc\(var\(--header-h\) \+ [\d.]+rem\)$/);
         expect(reaches('--content-pt', '--header-h')).toBe(true);
         expect(reaches('--sticky-top', '--header-h')).toBe(true);
+    });
+
+    // Every anchor the page scrolls to — a fragment in the address, Next's own scroll on a
+    // navigation, a field that takes the focus — lands under the bar, not behind it: the root
+    // scroller's padding, once, for every target (Next's Link docs: "Scroll offset with sticky
+    // headers"), instead of a margin on each.
+    it('lands every anchor where the content starts', () => {
+        const scrolled = rules.filter((rule) => valuesOf(rule, 'scroll-padding-top').length > 0);
+        expect(scrolled.map((rule) => rule.selector)).toEqual(['html']);
+        expect(valuesOf(scrolled[0], 'scroll-padding-top')).toEqual(['var(--sticky-top)']);
+        expect(scrolled[0].context).toEqual(['@layer base']);
     });
 
     // The reader's own browser size is the root size: every rem in the app, and every size the
@@ -214,9 +223,7 @@ describe("the header's offsets in app/ and components/", () => {
 
     // Poker night's table has a top bar of its own: its Hands drawer scrolls inside itself and keeps
     // its own margin, which it hands the guide.
-    // NOTE: skipped until the next commit, which moves the anchors and the sticky panels to
-    // the tokens (html's scroll padding and --sticky-top).
-    it.skip('leaves anchors and sticky panels to the tokens, but in poker night\'s drawer', () => {
+    it('leaves anchors and sticky panels to the tokens, but in poker night\'s drawer', () => {
         const drawer = ['components/poker-night/HandsDrawer.tsx'];
         expect(offenders('top', 24, drawer)).toEqual([]);
         expect(offenders('scroll-mt', 24, drawer)).toEqual([]);

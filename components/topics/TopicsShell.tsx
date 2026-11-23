@@ -43,7 +43,7 @@ const TopicsShell = ({overview, activeSlug, stayOnSave, children}: Props) => {
                 <PageTitle title="Topics" subtitle="Everything you follow, from every source we read" />
                 {!activeSlug && <NewsSeenMarker />}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                    <div className="lg:col-span-3 lg:sticky lg:top-24 xl:col-span-2">
+                    <div className="lg:col-span-3 lg:sticky lg:top-(--sticky-top) xl:col-span-2">
                         <TopicRail topics={overview.topics} activeSlug={activeSlug} unseenTotal={overview.unseenTotal}
                                    onNewTopic={() => ui.openComposer('create')} />
                     </div>

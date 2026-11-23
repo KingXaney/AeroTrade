@@ -28,7 +28,7 @@ const TimeInMarket = ({view, path}: {view: TimeInMarketRead; path: string}) => {
     const lines = view.chart.lines.map((line) => ({key: line.key, label: TIM_COPY.wayLabel[line.key], tone: WAY_TONE[line.key], values: line.values}));
 
     return (
-        <section id="time-in-market" aria-labelledby="time-in-market-heading" className="space-y-3 scroll-mt-24">
+        <section id="time-in-market" aria-labelledby="time-in-market-heading" className="space-y-3">
             <Panel id="time-in-market-panel">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                     <SectionHeading id="time-in-market-heading" spacing="none">{TIM_COPY.heading}</SectionHeading>
