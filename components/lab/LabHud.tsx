@@ -204,7 +204,7 @@ const LabHud = ({initialLayout, bodies, availableIds, startInEditMode}: Props) =
                         })}
                     </div>
                 </SortableContext>
-                {/* Portalled: a backdrop-filter ancestor (glass styles) would otherwise become the overlay's containing block. */}
+                {/* Portalled: an ancestor with a backdrop-filter or a transform would otherwise become the overlay's containing block. */}
                 {mounted && createPortal(
                     <DragOverlay dropAnimation={null}>
                         {activeId && active ? <DragGhost def={shellDef(activeId)} span={active.span} width={activeWidth}/> : null}

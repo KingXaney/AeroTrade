@@ -181,7 +181,6 @@ const ChatPanel = ({userId, owner, onClose, initialMessages, onMessagesChange, i
 
     return (
         <div
-            data-chat-window
             className="fixed bottom-5 right-5 z-[80] flex max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] flex-col rounded-xl sm:bottom-6 sm:right-6 overflow-hidden chrome-surface"
             role="dialog"
             aria-label="AeroTrade assistant"

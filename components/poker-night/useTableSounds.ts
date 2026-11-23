@@ -2,8 +2,8 @@
 
 // The table's sounds, wired to its animations (P6): every animation the table schedules
 // (components/poker-night/anim) makes its sound at its own moment on the same timeline —
-// lib/poker-night/sounds.soundCues — on the style's motion token, so a zeroed token (brutalist,
-// reduced motion) plays them at once as it shows the moves at once. The viewer's turn chimes as it
+// lib/poker-night/sounds.soundCues — on the motion token, so a zeroed token (either reduced-motion
+// guard) plays them at once as it shows the moves at once. The viewer's turn chimes as it
 // starts (and, on a phone with buzz on, vibrates once). The page's one audio context is made and
 // woken by a gesture in the room (sound-player.stayUnlocked) — every kind a browser counts as one:
 // a touch's pointerup and touchend (a touch's pointerdown is not one, and iOS starts Web Audio only
@@ -23,7 +23,7 @@ import {cueDelayMs, soundCues} from "@/lib/poker-night/sounds";
 const KEPT = 512;
 const BUZZ_MS = 30;
 
-// The style's motion unit now: --motion-base, read off the room (a guard may zero it).
+// The motion unit now: --motion-base, read off the room (a guard may zero it).
 const unitMs = (): number => {
     const el = document.querySelector('.pn-room') ?? document.documentElement;
     const raw = getComputedStyle(el).getPropertyValue('--motion-base');

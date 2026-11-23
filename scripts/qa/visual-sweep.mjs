@@ -26,7 +26,7 @@ import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
 import {createJiti} from 'jiti';
 import {mkdirSync} from 'node:fs';
-import {BASE, HOME_URL, MONGO, PASSWORD, REPO_ROOT, hydrated, note, outDir, ownerEmail, signUp} from './lib.mjs';
+import {BASE, HOME_URL, MONGO, PASSWORD, REPO_ROOT, hydrated, note, outDir, ownerEmail} from './lib.mjs';
 import {STUB_PORT as TIINGO_PORT} from './tiingo-series.mjs';
 
 // A sweep's theme is a palette, set through the cookie the root layout reads — written here by
@@ -146,19 +146,17 @@ const ACCOUNT = {tag: 'Sweep', email: 'qa-sweep@example.com'};
 const OWNER_ACCOUNT = {tag: 'Sweep owner', email: ownerEmail('sweep')};
 
 // Signs the account up — or in, when a sweep earlier in this harness already made it, as the
-// suites that share the lab's owner do.
+// suites that share the lab's owner do. Either way the fields are filled on the form warmForm
+// opened and React hydrated, never on a fresh load of it (lib.mjs's signUp loads the page again
+// and types at once). The name is the one signUp gives an account ("QA <tag>").
 const enter = ({tag, email}) => async (page) => {
     const mongo = new MongoClient(MONGO, {serverSelectionTimeoutMS: 5000});
     const known = await mongo.connect()
         .then(() => mongo.db().collection('user').findOne({email}))
         .catch(() => null)   // no database to ask (QA_BASE_URL points elsewhere): try the sign-up
         .finally(() => mongo.close().catch(() => {}));
-    if (!known) {
-        await warmForm(page, '/sign-up');
-        await signUp(page, tag, {email});
-        return;
-    }
-    await warmForm(page, '/sign-in');
+    await warmForm(page, known ? '/sign-in' : '/sign-up');
+    if (!known) await page.fill('#fullName', `QA ${tag}`);
     await page.fill('#email', email);
     await page.fill('#password', PASSWORD);
     await page.click('button[type="submit"]');

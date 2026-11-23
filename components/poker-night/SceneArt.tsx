@@ -7,8 +7,8 @@
 // The pieces sit at the edges of the scene (app/globals.css .pn-art-*), sized in container units of
 // the layer they are drawn in, so the same art fits the full-screen table and a picker's small
 // preview. What moves is the scene's ambient loop — twinkle, drift, flicker, waves — as CSS keyframes
-// on the classes .pn-ambient and .pn-ambient-<loop> (in both motion guards; brutalist stops
-// .pn-ambient by name). `still` draws the art without them (a preview among many).
+// on the classes .pn-ambient and .pn-ambient-<loop> (both motion guards stop each by name).
+// `still` draws the art without them (a preview among many).
 
 import type {ReactNode} from "react";
 import type {AmbientId, SceneArtId} from "@/lib/poker-night/looks";

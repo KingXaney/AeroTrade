@@ -26,8 +26,8 @@ const WatchlistTable = ({watchlist}: WatchlistTableProps) => {
                 <div className="text-right">Actions</div>
             </div>
 
-            {/* Asset Rows — the theme's own surface, so every visual style frames them. The
-                symbol, company and action links navigate; the row itself does not. */}
+            {/* Asset Rows — each a Panel, the look's own framed surface. The symbol, company and
+                action links navigate; the row itself does not. */}
             {watchlist.map((row) => (
                 <Panel
                     as="div"

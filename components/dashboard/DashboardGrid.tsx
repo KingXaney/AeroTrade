@@ -192,7 +192,7 @@ const DashboardGrid = ({initialLayout, bodies, availableIds, headerActions, star
                         })}
                     </div>
                 </SortableContext>
-                {/* Portalled: a backdrop-filter ancestor (glass styles) would otherwise become the overlay's containing block. */}
+                {/* Portalled: an ancestor with a backdrop-filter or a transform would otherwise become the overlay's containing block. */}
                 {mounted && createPortal(
                     <DragOverlay dropAnimation={null}>
                         {activeDef && activeSpan ? <DragGhost def={activeDef} span={activeSpan} width={activeWidth} /> : null}

@@ -3,7 +3,7 @@ import Panel from "@/components/primitives/Panel";
 import StatTile from "@/components/primitives/StatTile";
 
 // Three tiles about one series — a title, one line of detail, then three measurements —
-// framed as a <Panel>, so it follows the visual style like every other surface (never a
+// framed as a <Panel>, so it takes the look's frame like every other surface (never a
 // hand-rolled glass-panel copy). "Time in the market" lays three of them side by side, one per
 // way of owning SPY; nothing here colours a value by how it compares with the others.
 // Server-safe and client-safe: no hooks, no server imports.

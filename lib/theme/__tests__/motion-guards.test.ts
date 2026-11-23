@@ -8,7 +8,8 @@ import {fileURLToPath} from 'node:url';
 // html[data-motion="reduced"]. A class missing from either list would move under "Reduce motion";
 // this pins each one there. Both guards also zero the motion tokens, which turns everything timed
 // on them into a cut and stops nothing timed in literal seconds — so every animation timed that
-// way is found by reading the stylesheet, and held to both lists by name. Poker night's
+// way is found by reading the stylesheet, and held to both lists by name (the spinners alone are
+// left turning, a decision written down at SPINNERS below). Poker night's
 // table (components/poker-night) animates the same way — CSS keyframes on lib/poker-night/
 // choreography's timeline — and every one of its classes is pinned beside the robot's. (A winner's
 // stack counting up is formatted text a timer steps on the same --motion-base, CountUp, not a
@@ -97,13 +98,44 @@ const durationOf = (animation: string): string | undefined =>
     splitTop(animation.replace(/\s+/g, ' '), ' ')
         .find((token) => LITERAL_TIME.test(token) || (/^(calc|var|min|max|clamp)\(/.test(token) && token !== 'var(--motion-ease)'));
 
-// The times a rule's animations run for that no motion token carries: the guards' zeroed tokens
-// do not reach them. (An animation written through @apply, or by a utility at a call site, is
-// not in this file to be read: STOPPED below names those by hand.)
+// A duration the guards' zeroed tokens cut to nothing: the token itself, or the token times
+// factors with no unit of their own — calc(var(--motion-base) * 1.4), calc(var(--motion-base) *
+// var(--pn-dur, 2)), whose factor CSS can only read as a number. Anything else that names the token
+// can carry a time past it — calc(var(--motion-base) + 1s), max(var(--motion-base), 600ms) — and
+// still moves under both guards, so it counts as literal time.
+const MOTION_TOKEN = /^var\(--motion-(fast|base)\)$/;
+const UNITLESS = /^(-?(\d+\.?\d*|\.\d+)|var\(--[\w-]+(, ?-?(\d+\.?\d*|\.\d+))?\))$/;
+const onMotionToken = (time: string): boolean => {
+    const value = time.replace(/\s+/g, ' ').trim();
+    if (MOTION_TOKEN.test(value)) return true;
+    const product = value.match(/^calc\((.*)\)$/)?.[1];
+    if (product === undefined) return false;
+    const factors = splitTop(product, '*');
+    return factors.some((factor) => MOTION_TOKEN.test(factor)) && factors.every((factor) => MOTION_TOKEN.test(factor) || UNITLESS.test(factor));
+};
+
+// The animations a rule takes through @apply: Tailwind's animate-* utilities (spin, ping, pulse,
+// bounce, tw-animate-css's enter and exit) each run for a time of their own, which no motion token
+// carries. Each is named for the utility it stands for, '@apply animate-spin', with any variant
+// (motion-safe:, hover:) or important mark left off.
+const appliedAnimations = (rule: Rule): string[] =>
+    splitTop(rule.body, ';')
+        .filter((statement) => /^@apply\s/.test(statement))
+        .flatMap((statement) => statement.split(/\s+/).slice(1))
+        .map((utility) => (utility.split(':').pop() ?? '').replace(/^!|!$/g, ''))
+        .filter((utility) => utility.startsWith('animate-') && utility !== 'animate-none')
+        .map((utility) => `@apply ${utility}`);
+
+// The times a rule's animations run for that the guards' zeroed tokens do not cut, those taken
+// through @apply among them. (A utility written at a call site is not in this file to be read:
+// STOPPED below names those by hand, and SPINNERS the ones left turning.)
 const literalTimes = (rule: Rule): string[] => [
-    ...valuesOf(rule, 'animation').flatMap((value) => splitTop(value, ',').map(durationOf)),
-    ...valuesOf(rule, 'animation-duration').flatMap((value) => splitTop(value, ',')),
-].filter((time): time is string => time !== undefined && !/var\(--motion-(fast|base)\)/.test(time));
+    ...[
+        ...valuesOf(rule, 'animation').flatMap((value) => splitTop(value, ',').map(durationOf)),
+        ...valuesOf(rule, 'animation-duration').flatMap((value) => splitTop(value, ',')),
+    ].filter((time): time is string => time !== undefined && !onMotionToken(time)),
+    ...appliedAnimations(rule),
+];
 
 // The names a guard can stop a selector's element by: the classes of the compound it ends on
 // (.pn-ambient-twinkle:nth-child(3n) is stopped as .pn-ambient-twinkle), each with the
@@ -179,10 +211,19 @@ describe('the motion guards in app/globals.css', () => {
     ];
     // The trading agent world's floor (components/agent-world/StageStrip): a working role's dot.
     const AGENT_WORLD = ['.aw-working', '.ao-bubble-in', '.ao-lamp', '.ao-confetti', '.ao-stamp-in', '.ao-line-in'];
-    // The chat's typing dots, and Tailwind's pulse (a skeleton, the market-open dot, the streak's
-    // ring): a utility at the call sites, so nothing in this file declares it for the reader below.
-    const ELSEWHERE = ['.typing-dot', '.animate-pulse'];
-    const STOPPED = ['.robot-bob', '.robot-eyes', '.robot-antenna', '.robot-mascot', '.robot-tip-in', ...ELSEWHERE, ...POKER_NIGHT, ...AGENT_WORLD];
+    // The chat's typing dots: declared in this file, so the reader below finds them too; pinned here
+    // by name, as the robot's loops are.
+    const CHAT = ['.typing-dot'];
+    // Tailwind's pulse (a skeleton, the market-open dot, the streak's ring): a utility at the call
+    // sites, so nothing in this file declares it for the reader below.
+    const ELSEWHERE = ['.animate-pulse'];
+    const STOPPED = ['.robot-bob', '.robot-eyes', '.robot-antenna', '.robot-mascot', '.robot-tip-in', ...CHAT, ...ELSEWHERE, ...POKER_NIGHT, ...AGENT_WORLD];
+    // The spinners, which keep turning under both guards, by decision: a spinner stands for work
+    // under way (a search, a save), and its turning is what says so; stopped, it is a still arc that
+    // reads as done, or as broken. Each is Tailwind's spin: .search-loader takes it through @apply
+    // (the reader finds it, and lets it turn because it is listed here), and the call sites write
+    // .animate-spin on a Loader2 icon. Only a spinner belongs on this list.
+    const SPINNERS = ['.search-loader', '.animate-spin'];
 
     it('declares the agent world\'s working pulse, a loop in literal seconds', () => {
         expect(css).toContain('@keyframes aw-working {');
@@ -226,9 +267,10 @@ describe('the motion guards in app/globals.css', () => {
 
         const timed = rules.filter((rule) => !inMediaGuard(rule) && !underToggle(rule) && literalTimes(rule).length > 0);
         const found = timed.map((rule) => rule.selector);
-        // It found the loops this file is known to hold; a reader that found nothing would pass everything.
+        // It found the loops this file is known to hold, the spinner taken through @apply among
+        // them; a reader that found nothing would pass everything.
         expect(found).toEqual(expect.arrayContaining([
-            '.typing-dot', '.robot-bob', '.aw-working', '.ao-confetti', '.pn-pulse', '.pn-petals', '.pn-throw-x', '.pn-ambient-twinkle:nth-child(3n+2)',
+            '.typing-dot', '.robot-bob', '.aw-working', '.ao-confetti', '.pn-pulse', '.pn-petals', '.pn-throw-x', '.pn-ambient-twinkle:nth-child(3n+2)', '.search-loader',
         ]));
         // …and nothing timed on the motion token, which the guards' zeroed tokens already cut.
         for (const onToken of ['.glass-panel', '.pn-deal', '.pn-scene-fade', '.robot-tip-in']) expect(found).not.toContain(onToken);
@@ -236,11 +278,31 @@ describe('the motion guards in app/globals.css', () => {
         for (const rule of timed) {
             for (const selector of splitTop(rule.selector, ',')) {
                 const names = stopNames(selector);
-                const why = `${selector} animates for ${literalTimes(rule).join(', ')}, which no motion token carries: name ${names.join(' or ') || 'a class of its own'} in both motion guards`;
+                if (names.some((name) => SPINNERS.includes(name))) {
+                    // Listed as a spinner, so it is left turning — as long as turning is all it does.
+                    expect(literalTimes(rule), `${selector} is on the spinners' list, so its one animation is Tailwind's spin`).toEqual(['@apply animate-spin']);
+                    continue;
+                }
+                const why = `${selector} animates for ${literalTimes(rule).join(', ')}, which the guards' zeroed motion tokens do not cut: name ${names.join(' or ') || 'a class of its own'} in both motion guards`;
                 expect(names.some((name) => mediaStopped.includes(name)), why).toBe(true);
                 expect(names.some((name) => toggleStopped.includes(name)), why).toBe(true);
             }
         }
+    });
+
+    // The reader's own blind spots, each a rule written to fall into one: a duration that names the
+    // token but carries a time past it, and an animation taken through @apply.
+    it('reads a time beside the motion token, and an animate-* utility taken through @apply, as literal time', () => {
+        const [sum, max, scaled, applied] = readRules(withoutComments(`
+            .a { animation: a calc(var(--motion-base) + 1s) var(--motion-ease) both; }
+            .b { animation-duration: max(var(--motion-base), 600ms); }
+            .c { animation: c calc(var(--motion-base) * var(--pn-dur, 2)) var(--motion-ease) calc(var(--motion-base) * var(--pn-at, 0)) both; }
+            .d { @apply absolute size-4 motion-safe:animate-spin; color: var(--brand); }
+        `));
+        expect(literalTimes(sum)).toEqual(['calc(var(--motion-base) + 1s)']);
+        expect(literalTimes(max)).toEqual(['max(var(--motion-base), 600ms)']);
+        expect(literalTimes(scaled)).toEqual([]);
+        expect(literalTimes(applied)).toEqual(['@apply animate-spin']);
     });
 
     it('zeroes both motion tokens under either guard, so everything timed on them is a cut', () => {

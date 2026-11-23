@@ -390,6 +390,6 @@ export const soundCues = (anims: readonly CueAnim[]): Cue[] => {
     return out;
 };
 
-// A cue's wait in ms, on the style's motion token (a zeroed token — brutalist, reduced motion —
+// A cue's wait in ms, on the motion token (a zeroed token — under either reduced-motion guard —
 // plays every cue at once, as the animations do).
 export const cueDelayMs = (cue: Pick<Cue, 'at'>, unitMs: number = UNIT_MS): number => Math.max(0, Math.round(cue.at * unitMs));

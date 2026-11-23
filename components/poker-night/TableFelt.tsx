@@ -4,8 +4,8 @@
 // straddles the rail), in the host's felt (LOOKS_CSS, [data-pn-felt] — on the room and on the felt
 // itself) with its betting line printed on it; before the first hand, the table's name printed faintly
 // where the pot goes, and the game it deals under it. When the host picks another felt the cloth fades in anew (.pn-scene-fade, on
-// the motion token); which felt was before is worked out during render. rounded-full keeps the
-// stadium in brutalist, whose square corners spare that class alone.
+// the motion token); which felt was before is worked out during render. rounded-full makes the
+// stadium.
 
 import {useState} from "react";
 import {useRoom} from "@/components/poker-night/room-controller";

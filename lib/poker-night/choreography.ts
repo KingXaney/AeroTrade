@@ -10,11 +10,11 @@
 // then): a batch that would run past it plays faster, every time in proportion. Pure and
 // client-safe.
 //
-// Times are in units of the style's motion token (--motion-base, UNIT_MS at its default): a
-// component sets an element's animation-delay to calc(var(--motion-base) * at) and its duration the
-// same way, so a style that zeroes the token (brutalist) and both reduced-motion guards play every
-// step at once — straight to the final state, which is the element's static style. The element's
-// lifetime is a JS timer (`until`), never animationend, which a stopped animation never fires.
+// Times are in units of the motion token (--motion-base, UNIT_MS at its default): a component
+// sets an element's animation-delay to calc(var(--motion-base) * at) and its duration the same
+// way, so both reduced-motion guards, which zero the token, play every step at once — straight to
+// the final state, which is the element's static style. The element's lifetime is a JS timer
+// (`until`), never animationend, which a stopped animation never fires.
 
 import type {TableEvent} from '@/lib/poker-night/events';
 

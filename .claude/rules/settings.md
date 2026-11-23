@@ -27,8 +27,9 @@ the map is `docs/MAP.md`.
   and no other, and `lib/theme/resolve.isThemeInput` — what
   `lib/actions/appearance.actions.setAppearance` accepts — checks the same two: the `style` that
   a document saved before the one look still holds, or a tab opened before it still posts, is
-  ignored, never an error. No migration removes the stored field (a reader's next save replaces
-  the sub-document without it).
+  ignored, never an error. No migration removes the stored field, and a save sets the two fields
+  by path and leaves a stored style where it is: it is the record of that reader's choice for a
+  rollback, and what an older build reads while a preview shares production's database.
 - The theme cookie is written `v2:<palette>:<0|1>`. `lib/theme/resolve.decodeThemeCookie` is
   whole-value and reads two shapes: that one, and `v1:<palette>:<style>:<0|1>` where the style is
   one of the five ids v1 ever wrote (a private list there, dated: a cookie lives a year from its

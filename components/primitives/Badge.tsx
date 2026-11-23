@@ -4,10 +4,9 @@ import {cn} from "@/lib/utils";
 // Chips, tags and count pills — 24 hand-rolled spellings before this.
 //
 // `shape` carries typography as well as radius, which is what stops it from being a
-// cosmetic prop: a `tag` holds a word (uppercase, tracked), a `pill` holds a number
-// (tabular, untracked). `pill` uses the literal rounded-full because that is the named
-// exception in the brutalist radius kill switch (globals.css), so counts stay round
-// there while tags correctly square off.
+// cosmetic prop: a `tag` holds a word (the look's label type, on the control radius), a
+// `pill` holds a number (mono, tabular, untracked). `pill` uses rounded-full so a count
+// stays round.
 
 type Tone = 'neutral' | 'brand' | 'positive' | 'negative' | 'warning';
 type Variant = 'soft' | 'solid' | 'outline';

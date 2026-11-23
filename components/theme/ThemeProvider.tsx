@@ -12,14 +12,11 @@ const PREVIEW_DELAY_MS = 60;
 // Crossing the gutter between two chips must never flash the committed theme in between.
 const CANCEL_DELAY_MS = 150;
 
+// What an embed that cannot read CSS variables is handed (components/stocks/TradingViewWidget):
+// the palette's mode and its page colour.
 type ThemeTokens = {
     mode: PaletteMode;
     surface0: string;
-    brand: string;
-    positive: string;
-    negative: string;
-    fgMuted: string;
-    reduceMotion: boolean;
 };
 
 type ThemeContextValue = {
@@ -50,18 +47,10 @@ const applyToDocument = (theme: Theme) => {
     el.style.colorScheme = mode;
 };
 
-const tokensFor = (theme: Theme): ThemeTokens => {
-    const t = PALETTES[theme.palette].tokens;
-    return {
-        mode: modeOfTheme(theme),
-        surface0: t.surface0,
-        brand: t.brand,
-        positive: t.positive,
-        negative: t.negative,
-        fgMuted: t.fgMuted,
-        reduceMotion: theme.reduceMotion,
-    };
-};
+const tokensFor = (theme: Theme): ThemeTokens => ({
+    mode: modeOfTheme(theme),
+    surface0: PALETTES[theme.palette].tokens.surface0,
+});
 
 const ThemeProvider = ({initial, children}: {initial: Theme; children: ReactNode}) => {
     const router = useRouter();
@@ -168,7 +157,7 @@ export const useTheme = (): ThemeContextValue => {
     return ctx;
 };
 
-// Colours for canvas/SVG/embeds that cannot read CSS variables. Tracks the
+// The mode and page colour for an embed that cannot read CSS variables. Tracks the
 // committed theme only, so previews never re-embed TradingView widgets.
 export const useThemeTokens = (): ThemeTokens => useTheme().tokens;
 

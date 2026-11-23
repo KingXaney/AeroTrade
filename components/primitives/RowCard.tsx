@@ -2,12 +2,12 @@ import type {CSSProperties, ReactNode} from "react";
 import {cn} from "@/lib/utils";
 
 // One row inside a panel: a friend, a trade, a holding, a setting with its switch, a job
-// stamp. A small bordered tile whose fill, border and radius are the active style's card
-// tokens (.row-card in app/globals.css).
+// stamp. A small bordered tile whose fill, border and radius are the look's card tokens
+// (--card-*, read by .row-card in app/globals.css).
 //
-// RowCard vs Panel: a Panel is a top-level framed surface and follows the visual style
-// axis (.glass-panel: blur, shadow, the panel radius). A RowCard sits *inside* a Panel
-// and stays flat in every style, so a list of twenty rows is not twenty glass cards.
+// RowCard vs Panel: a Panel is a top-level framed surface (.glass-panel: the look's tint,
+// layered shadow and panel radius). A RowCard sits *inside* a Panel and stays flat, so a
+// list of twenty rows is not twenty framed cards.
 // Never nest a Panel in a Panel; reach for RowCard instead.
 //
 //   plain    — the default row

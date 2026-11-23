@@ -5,9 +5,6 @@ import {cn} from "@/lib/utils";
 // RouteLoading and RouteError wrote `tracking-tight` while most pages did not, so the
 // title visibly reflowed the moment the real page replaced its skeleton. tracking-tight
 // wins because the two shared files already had it and they are what define the reflow.
-//
-// (In the brutalist style globals.css forces letter-spacing on all headings, so the
-// reflow was invisible there and visible in the other four — worth knowing during QA.)
 
 type Props = {
     title: string;
@@ -26,7 +23,7 @@ const PageTitle = ({title, subtitle, note, actions, id, className}: Props) => {
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-fg mb-1" id={id}>
                 {title}
             </h1>
-            {subtitle && <p className="text-sm text-fg-muted" data-page-subtitle>{subtitle}</p>}
+            {subtitle && <p className="text-sm text-fg-muted">{subtitle}</p>}
             {note && <p className="font-mono text-[11px] text-fg-muted mt-1">{note}</p>}
         </div>
     );

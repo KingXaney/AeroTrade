@@ -1818,6 +1818,8 @@ details[open] > :not(summary) { animation: disclosure-in var(--motion-base) var(
   .search-input::placeholder {
     color: var(--fg-muted);
   }
+  /* A spinner, left turning under both motion guards: its turning is what says the search is
+     under way (lib/theme/__tests__/motion-guards.test.ts, SPINNERS). */
   .search-loader {
     @apply absolute right-12 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin;
     color: var(--brand-strong);
@@ -2080,7 +2082,8 @@ body::before {
 /* ─── motion guards: OS setting or the in-app toggle (html[data-motion="reduced"]) ───
    Both zero the motion tokens, which makes everything timed on them a cut. An animation timed in
    literal seconds is out of a token's reach, so each one is stopped here by name, in both lists
-   (lib/theme/__tests__/motion-guards.test.ts reads this file and finds any that is not). */
+   (lib/theme/__tests__/motion-guards.test.ts reads this file and finds any that is not) — all but
+   the spinners, which keep turning by a decision written down in that test (SPINNERS). */
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-fast: 0ms; --motion-base: 0ms; }
   .glass-panel, details[open] > :not(summary) { animation: none !important; }

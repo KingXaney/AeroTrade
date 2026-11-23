@@ -3,12 +3,14 @@
 // ticket's hand-rolled input shows a focus ring, and TradingView embeds keep the light scheme their
 // documents use under a dark palette, and a theme cookie written before the app kept one look
 // (v1, with a style in it) still gives a page that never syncs the cookie its palette and its
-// motion choice. Also the not-found pages: an unmatched URL gets the global 404, a notFound()
+// motion choice, and a save sets the palette and the motion choice and leaves a style saved before
+// then where it is. Also the not-found pages: an unmatched URL gets the global 404, a notFound()
 // inside the app keeps the header, and a symbol no strategy watches renders keyless with no
 // stock panels.
 // Run: npm run qa -- styles   (the harness: README.md)
 import {chromium} from 'playwright';
-import {BASE, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
+import {MongoClient} from 'mongodb';
+import {BASE, MONGO, check, outDir, ownerEmail, signUp, summary} from './lib.mjs';
 
 const OUT = outDir('styles');
 
@@ -19,7 +21,7 @@ const shot = (n) => page.screenshot({path: `${OUT}${n}.png`, fullPage: true});
 try {
     // --- sign up ---------------------------------------------------------------
     // The owner (lib/lab/owner.ts), so the sweep reaches /brain and /strategies too.
-    await signUp(page, 'Foundations', {email: ownerEmail('styles')});
+    const email = await signUp(page, 'Foundations', {email: ownerEmail('styles')});
     check('sign-up lands in the app', page.url().endsWith('/dashboard'), page.url());
 
     // --- the warning token actually resolves (both globals.css edits landed) ----
@@ -147,6 +149,45 @@ try {
         JSON.stringify(kept));
     await signIn.screenshot({path: `${OUT}05-sign-in-v1-cookie.png`});
     await visitor.close();
+
+    // --- a save sets two fields, and leaves a style saved before the one look alone -----------
+    // No migration removes the style a saved theme held until the app kept one look: it is the
+    // record of that reader's choice for a rollback, and what a build from before the one look
+    // reads while a preview of this one shares its database. So a save sets the palette and the
+    // motion choice by path (lib/actions/appearance.actions.ts): the first makes the saved theme,
+    // and a later one changes the palette with the stored style still beside it. The account has
+    // saved nothing yet and its cookie says Nord (above), so the first click is another palette.
+    const mongo = new MongoClient(MONGO, {serverSelectionTimeoutMS: 5000});
+    await mongo.connect();
+    try {
+        const prefs = mongo.db().collection('userpreferences');
+        const userId = String((await mongo.db().collection('user').findOne({email}))?._id ?? '');
+        const appearance = async () => (await prefs.findOne({userId}))?.appearance ?? null;
+        // The save is the click's server action; the document says when it has landed.
+        const savedAs = async (palette) => {
+            const until = Date.now() + 20000;
+            let saved = await appearance();
+            while (saved?.palette !== palette && Date.now() < until) {
+                await page.waitForTimeout(250);
+                saved = await appearance();
+            }
+            return saved;
+        };
+        const chip = (name) => page.getByRole('radiogroup', {name: 'Colour palette'}).getByRole('radio', {name});
+        await page.setViewportSize({width: 1440, height: 900});
+        await page.goto(`${BASE}/settings?tab=appearance`, {waitUntil: 'load'});
+        await chip(/^Dracula/).click();
+        const first = await savedAs('dracula');
+        check('a first save makes the saved theme: the palette and the motion choice, nothing else',
+            first?.palette === 'dracula' && first?.reduceMotion === false && Object.keys(first).sort().join(',') === 'palette,reduceMotion', JSON.stringify(first));
+        await prefs.updateOne({userId}, {$set: {'appearance.style': 'soft'}});
+        await chip(/^Nord/).click();
+        const second = await savedAs('nord');
+        check('a later save changes the palette and leaves the style stored before the one look where it is',
+            second?.palette === 'nord' && second?.reduceMotion === false && second?.style === 'soft', JSON.stringify(second));
+    } finally {
+        await mongo.close().catch(() => {});
+    }
 } catch (err) {
     check(`threw: ${err.message}`, false);
     await shot('99-error').catch(() => {});

@@ -20,7 +20,10 @@ export const setAppearance = async (input: unknown): Promise<AppearanceResult> =
     const theme = resolveTheme(input);
     try {
         await connectToDatabase();
-        await upsertPreferences(userId, {appearance: theme, updatedAt: new Date()});
+        // The two fields by path, never the whole sub-document: a `style` saved before the one
+        // look stays where it is, the record of that reader's choice if this is rolled back — and
+        // what a build from before it reads while a preview of this one shares its database.
+        await upsertPreferences(userId, {$set: {'appearance.palette': theme.palette, 'appearance.reduceMotion': theme.reduceMotion, updatedAt: new Date()}});
         await setThemeCookie(theme);
         return {success: true, theme};
     } catch (e) {
