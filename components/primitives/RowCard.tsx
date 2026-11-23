@@ -16,12 +16,13 @@ import {cn} from "@/lib/utils";
 //
 // `interactive` is for a row that is itself a link or a button (hover lifts the border).
 // A Link, an <a> or a component that takes its own className (SafeMarkdown) uses the
-// same recipe through `rowCard(...)`. `className` goes through tailwind-merge, so a
-// call site may override the padding (`px-3 py-2`) or add layout (flex, grid, gap).
+// same recipe through `rowCard(...)`. The padding is the row tokens' (.row-card, in the
+// components layer), so a call site that asks for its own (`px-3 py-2`) gets it; `className`
+// may add layout too (flex, grid, gap).
 
 export type RowTone = 'plain' | 'brand' | 'selected';
 
-const BASE = 'row-card px-4 py-3';
+const BASE = 'row-card';
 
 const TONE: Record<RowTone, string> = {
     plain: '',

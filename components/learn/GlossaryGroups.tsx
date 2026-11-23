@@ -26,7 +26,7 @@ const GlossaryGroups = ({owner}: {owner: boolean}) => (
                     {group.keys.map((key) => {
                         const entry = GLOSSARY[key];
                         return (
-                            <div key={key} id={key} className="scroll-mt-24 min-w-0" data-learn-entry={key}>
+                            <div key={key} id={key} className="min-w-0" data-learn-entry={key}>
                                 <dt className="font-heading text-xs font-semibold text-fg">{entry.term}</dt>
                                 <dd className="text-xs text-fg-muted leading-relaxed">
                                     {entry.long}

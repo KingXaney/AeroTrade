@@ -29,8 +29,10 @@ const HomeAccounts = ({accounts}: {accounts: Accounts}) => {
                               className={rowCard({interactive: true, className: 'flex items-center justify-between gap-3'})}>
                             <span className="min-w-0">
                                 <span className="block truncate font-heading text-sm font-semibold text-fg">{row.name}</span>
+                                {/* The cash and its amount are one piece: a narrow row breaks before
+                                    "Cash", never between the word and the figure. */}
                                 <span className="block text-xs text-fg-muted">
-                                    {HOME_COPY.holdings(row.holdings)} · {HOME_COPY.cash} {formatPrice(row.cash)}
+                                    {HOME_COPY.holdings(row.holdings)} · <span className="whitespace-nowrap">{HOME_COPY.cash} {formatPrice(row.cash)}</span>
                                 </span>
                             </span>
                             <span className="shrink-0 text-right font-mono">

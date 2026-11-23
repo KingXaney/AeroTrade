@@ -22,17 +22,17 @@ const FriendsPage = async () => {
     ]);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <PageTitle title="Friends & Competition" subtitle="Connect with friends and see who's the best trader" />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Left: leaderboard (the competition) */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-4">
                     <Leaderboard entries={leaderboard} />
                 </div>
 
                 {/* Right: connections */}
-                <div className="lg:col-span-1 space-y-6">
+                <div className="lg:col-span-1 space-y-4">
                     <AddFriend />
                     <FriendRequests requests={requests} />
                     <SentRequests requests={sent} />

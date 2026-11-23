@@ -79,9 +79,10 @@ const PortfolioPage = async ({searchParams}: PortfolioPageProps) => {
                 </div>
             </div>
 
-            {/* The account's numbers come first: what it is worth, what it returned, what is in it. */}
+            {/* The account's numbers come first: what it is worth, what it returned, what is in it.
+                The page's headline panel: a band of light crosses it as it arrives. */}
             <AccountRegion activeId={account.id}>
-                <AccountSummary portfolio={portfolio} income={analytics?.income} definitions />
+                <AccountSummary portfolio={portfolio} income={analytics?.income} definitions sheen />
             </AccountRegion>
 
             {/* Which account wins — all accounts side by side */}

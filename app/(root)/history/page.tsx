@@ -25,22 +25,24 @@ const HistoryPage = async () => {
         <div className="space-y-4">
             <PageTitle title="Activity" subtitle="Your trades across every account, and what you have added to your watchlist" />
 
+            {/* items-start: each panel keeps its own height. Stretched to their row, fifty trades left
+                the watchlist beside them a box three screens tall with its rows at the top. */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 {/* Removals are not recorded (the watchlist model hard-deletes), so the list
                     beside this is honest about being "by date added", not a timeline. */}
-                <Panel pad={6} className="lg:col-span-2">
+                <Panel className="lg:col-span-2">
                     <SectionHeading size="xs">
                         Trades
                     </SectionHeading>
                     {recent ? (
                         <TradeHistory trades={recent.trades} totalCount={recent.total} />
                     ) : (
-                        <p className="text-sm text-fg-muted p-4">Your trades could not be loaded right now — try again in a few minutes.</p>
+                        <p className="text-sm text-fg-muted py-4">Your trades could not be loaded right now — try again in a few minutes.</p>
                     )}
                 </Panel>
 
                 {/* Watchlist, by date added */}
-                <Panel pad={6} className="lg:col-span-1">
+                <Panel className="lg:col-span-1">
                     <SectionHeading size="xs">
                         On your watchlist, by date added
                     </SectionHeading>
@@ -52,7 +54,7 @@ const HistoryPage = async () => {
                             Nothing yet. Add a stock to your watchlist and it appears here with the date you added it.
                         </p>
                     ) : (
-                        <ol className="relative space-y-5 border-l border-brand/15 pl-5">
+                        <ol className="relative space-y-4 border-l border-brand/15 pl-5">
                             {items.map((item) => (
                                 <li key={item.symbol} className="relative">
                                     <span className="absolute -left-[1.4rem] top-1 w-2.5 h-2.5 rounded-full bg-brand" />

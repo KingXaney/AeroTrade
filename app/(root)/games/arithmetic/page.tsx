@@ -41,7 +41,7 @@ const ArithmeticPage = async ({searchParams}: Props) => {
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             <PageTitle title={ARITHMETIC_COPY.title} subtitle={ARITHMETIC_COPY.subtitle}/>
             <Tabs tabs={TABS} active={mode} label={ARITHMETIC_COPY.modeLabel}/>
-            <Panel pad={6}>
+            <Panel>
                 <ArithmeticGame key={`${mode}:${focus.join(',')}`} mode={mode} summary={summary} focus={focus}/>
             </Panel>
             {mode !== 'interview' && <SkillPanel view={view}/>}

@@ -25,8 +25,11 @@ Part 3 of 3: the rest is `.claude/rules/poker-night.md` and `.claude/rules/poker
   PLO's section draws `PLO_EXAMPLE`, one hand on one board, the five that play lifted).
   `hands-guide.test` holds every example to the evaluator. `components/poker-night/HandsGuide` draws it with no hooks, so the lobby's Hands
   tab renders it on the server and `components/poker-night/HandsDrawer` at the table (the menu's
-  Hands, the H key, any viewer). Each definition is the glossary's own short, quoted under its
-  `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, `omaha`, `pot-limit`, in the `poker-night` group), and
+  Hands, the H key, any viewer). A game's anchor takes its scroll margin from the caller
+  (`scrollMargin`): none in the lobby, where the page's scroll padding lands it under the bar; the
+  drawer, which scrolls inside itself out of that padding's reach, passes `scroll-mt-24`, the one
+  offset `lib/theme/__tests__/density.test.ts` allows. Each definition is the glossary's own short,
+  quoted under its `<Term>` (`hand-rankings`, `kicker`, `texas-holdem`, `omaha`, `pot-limit`, in the `poker-night` group), and
   `HANDS_COPY` says only what they do not: the copy test rejects a run of five words shared with
   them. The lobby is two views (`?tab=play|hands`, `components/primitives/Tabs` at `size="md"`); the
   Hands tab reads nothing and shows with the kill switch on, and `[data-poker-night-lobby]` marks

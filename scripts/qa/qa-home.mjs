@@ -2,8 +2,10 @@
 // first name, sees its account's value, its topics and the first first-week step as the one
 // thing to do next; the step moves on as soon as the row behind it exists; the widget dashboard
 // is its own page under the same rail section; an old /?customize=1 link still opens the
-// dashboard's edit mode; and the momentum terrain has no panel until there is a surface to draw
-// (qa-landing checks the panel once there is one). Then poker night on Home: the chip always, the
+// dashboard's edit mode; the reader's own figures come first, read by geometry (the total on the
+// first screen; the accounts above the topics at a desktop's width and on a phone); and the momentum
+// terrain is not drawn until there is a surface to draw (qa-landing checks the strip once there is
+// one). Then poker night on Home: the chip always, the
 // panel only once there is a table to go back to (Rejoin while seated, Open after leaving the seat)
 // or a friend's to join, at three phone sizes and on the side, and the lobby's "You are seated at …".
 // Run: npm run qa -- home   (the harness: README.md)
@@ -33,10 +35,10 @@ try {
     check('the account total is the starting balance', (await page.locator('[data-home-total]').innerText()) === '$100,000.00', await page.locator('[data-home-total]').innerText());
     check('…with one row for the account, linking into /portfolio',
         await page.locator('#home-accounts ul a[href^="/portfolio?account="]').count() === 1);
-    // The momentum terrain is a panel only when there is a surface to draw: no SPY history yet
-    // (and the Tiingo stand-in down), so Home shows no box for it (invariant 8). qa-landing, which
-    // runs after this suite, checks the panel once there is one.
-    check('no terrain panel before there is a surface to draw',
+    // The momentum terrain is drawn only when there is a surface to draw: no SPY history yet (and
+    // the Tiingo stand-in down), so Home shows no section for it (invariant 8). qa-landing, which
+    // runs after this suite, checks the strip once there is one.
+    check('no terrain strip before there is a surface to draw',
         await page.locator('[data-home-terrain]').count() === 0 && await page.locator('[data-terrain]').count() === 0);
     const stepText = (await page.locator('#home-next-step').innerText()).replace(/\s+/g, ' ');
     // This reader is not the owner (lib/lab/owner.ts), so the strategy and Navigator steps are not theirs.
@@ -47,6 +49,22 @@ try {
     check('a box with nothing to say is not drawn', await page.locator('#home-briefing').count() === 0);
     check('numbers come before prose: the total sits above the fold',
         ((await page.locator('[data-home-total]').boundingBox())?.y ?? 9999) < 400);
+    // The order is the reader's own figures first (home.md), read by where the sections are drawn,
+    // never by their place among the page's children. Read once both are on the page: a streamed
+    // page sits hidden for a moment after 'load', and two empty boxes would be "in order".
+    const accountsAboveTopics = async () => {
+        await page.locator('#home-topics').waitFor({timeout: 30000}).catch(() => {});
+        return page.evaluate(() => {
+            const accounts = document.querySelector('#home-accounts')?.getBoundingClientRect();
+            const topics = document.querySelector('#home-topics')?.getBoundingClientRect();
+            return accounts && topics ? {
+                accountsBottom: Math.round(accounts.bottom + scrollY), topicsTop: Math.round(topics.top + scrollY),
+                above: accounts.height > 0 && topics.height > 0 && accounts.bottom <= topics.top + 0.5,
+            } : null;
+        });
+    };
+    const desktopOrder = await accountsAboveTopics();
+    check('the accounts sit above the topics', desktopOrder?.above === true, JSON.stringify(desktopOrder));
     await shot('01-new-account');
 
     // --- the rail section and the dashboard ------------------------------------------
@@ -87,6 +105,8 @@ try {
     await page.goto(`${BASE}/`, {waitUntil: 'load'});
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check('Home fits a phone without sideways scroll', overflow <= 1, String(overflow));
+    const phoneOrder = await accountsAboveTopics();
+    check('…the accounts still above the topics', phoneOrder?.above === true, JSON.stringify(phoneOrder));
     await shot('03-phone');
 
     // --- poker night on Home, and the lobby's resume card (poker night modes P3) -----------

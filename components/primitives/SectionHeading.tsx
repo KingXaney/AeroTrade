@@ -17,7 +17,8 @@ type Props = {
     children: ReactNode;
 };
 
-const SPACING = {none: '', sm: 'mb-3', md: 'mb-4'} as const;
+// The look is compact: the gap under a heading is a step under its name (md, the default, 12px).
+const SPACING = {none: '', sm: 'mb-2', md: 'mb-3'} as const;
 
 const SectionHeading = ({as: Tag = 'h2', size = 'sm', spacing = 'md', id, className, children}: Props) => (
     <Tag

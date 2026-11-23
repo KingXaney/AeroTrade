@@ -20,7 +20,7 @@ const CorrelationPage = async () => {
         <div className="mx-auto max-w-3xl space-y-4" data-game-page="correlation">
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             <PageTitle title={CORRELATION_COPY.title} subtitle={CORRELATION_COPY.subtitle}/>
-            <Panel pad={6}>
+            <Panel>
                 <CorrelationGame summary={summary}/>
                 <WhatTheseMean id="correlation-terms" keys={['correlation']}/>
             </Panel>

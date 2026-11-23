@@ -1,7 +1,9 @@
 'use client';
 
 import {useState, type ReactNode} from "react";
+import {cn} from "@/lib/utils";
 import {SWITCH_COPY} from "@/lib/learn/copy/portfolio";
+import {pageTitleClass} from "@/components/primitives/PageTitle";
 import {useAccountSwitch} from "@/components/trading/accounts/useSwitchAccount";
 
 // The /portfolio heading: the account's name, the line that says how its holdings are valued,
@@ -29,7 +31,7 @@ const AccountHeading = ({accounts, activeId, summaryLine, children}: {
 
     return (
         <div>
-            <h1 className="text-2xl font-semibold text-fg mb-1 font-heading" data-account-heading={shownId}>
+            <h1 className={cn(pageTitleClass, 'mb-1')} data-account-heading={shownId}>
                 {name}
             </h1>
             {pending

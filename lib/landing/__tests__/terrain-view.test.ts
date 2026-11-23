@@ -10,6 +10,8 @@ import {
     rowOfLookback,
     formatSigma,
     slicePath,
+    STRIP_ANGLE,
+    STRIP_MIN_ASPECT,
     TERRAIN_STOPS,
     type TerrainScale,
 } from '@/lib/landing/terrain-view';
@@ -84,6 +86,20 @@ describe('camera and motion', () => {
             expect(position).toHaveLength(3);
             expect(position[1]).toBeGreaterThan(0);
         }
+    });
+
+    // The strip looks over the Angle preset's corner, from lower down: the same turn round the
+    // surface, a lower elevation, and only on a band wider than a phone's 2:1 strip.
+    it('looks at Home\'s strip from over the Angle preset\'s corner, lower down', () => {
+        const [ax, ay, az] = CAMERA_PRESETS.angle;
+        const [sx, sy, sz] = STRIP_ANGLE;
+        expect(Math.atan2(sx, sz)).toBeCloseTo(Math.atan2(ax, az), 12);
+        const elevation = (x: number, y: number, z: number) => (Math.atan2(y, Math.hypot(x, z)) * 180) / Math.PI;
+        expect(elevation(ax, ay, az)).toBeGreaterThan(30);
+        expect(elevation(sx, sy, sz)).toBeGreaterThan(12);
+        expect(elevation(sx, sy, sz)).toBeLessThan(25);
+        expect(STRIP_MIN_ASPECT).toBeGreaterThan(2);
+        expect(STRIP_MIN_ASPECT).toBeLessThan(583 / 220);
     });
 
     it('eases from 0 to 1, through the middle, never going back', () => {

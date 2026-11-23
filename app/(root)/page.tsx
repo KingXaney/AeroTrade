@@ -31,9 +31,10 @@ import WidgetSkeleton from "@/components/primitives/Skeleton";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import RowCard from "@/components/primitives/RowCard";
 import PageTitle from "@/components/primitives/PageTitle";
-import Panel from "@/components/primitives/Panel";
+import Panel, {panelPad} from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
+import {cn} from "@/lib/utils";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Home"};
@@ -77,14 +78,15 @@ const PokerNightChipAsync = async ({userId}: {userId: string}) => (
     <PokerNightChip rejoin={homeChipOf(await readHomePokerNight(userId))}/>
 );
 
-// Home: who you are, where the market is, the year's momentum terrain, what you own, what
-// changed in what you follow, one thing to look at next and, when there is one, a poker night
-// table to go back to. Nothing here is a setting. The widget grid this page used to be is
-// /dashboard.
+// Home: who you are and where the market is; what you own beside one thing to look at next; the
+// year's momentum terrain; what changed in what you follow; the first week or a lesson; and, when
+// there is one, a poker night table to go back to. The reader's own figures come first. Nothing
+// here is a setting. The widget grid this page used to be is /dashboard.
 //
-// The terrain is the landing page's (components/landing/MomentumTerrain), read here on the server
-// through the same store, so its section exists only when there is a surface to draw and the client
-// draws it at once; the definitions beneath it keep their Ask links, since the chat is mounted.
+// The terrain is the landing page's (components/landing/MomentumTerrain) drawn as a strip, read
+// here on the server through the same store, so its section exists only when there is a surface to
+// draw and the client draws it at once; its Expand button swaps the strip for the full panel in
+// place. The definitions beneath it keep their Ask links, since the chat is mounted.
 const Home = async ({searchParams}: HomeProps) => {
     const user = await getSessionUser();
     if (!user) redirect('/sign-in');
@@ -118,22 +120,13 @@ const Home = async ({searchParams}: HomeProps) => {
                 )}
             />
 
-            {/* Frameless, like the landing hero: the canvas is transparent, so the surface sits on
-                the page's own background rather than in a panel's lighter box. */}
-            {terrain && (
-                <section id="home-terrain" aria-labelledby="home-terrain-heading" className="py-2" data-home-terrain>
-                    <SectionHeading id="home-terrain-heading">{TERRAIN_COPY.eyebrow}</SectionHeading>
-                    <MomentumTerrain initial={terrain} eyebrow={false} size="panel">
-                        <WhatTheseMean keys={TERRAIN_TERMS}>
-                            <p className="text-xs leading-relaxed text-fg-muted" data-terrain-method>{TERRAIN_COPY.method}</p>
-                        </WhatTheseMean>
-                    </MomentumTerrain>
-                </section>
-            )}
-
+            {/* The reader's accounts are the page's headline panel: a band of light crosses it as it
+                arrives (Panel's sheen, one per view). */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Panel id="home-accounts" aria-labelledby="home-accounts-heading">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                <Panel id="home-accounts" aria-labelledby="home-accounts-heading" sheen>
+                    {/* A panel's header row (its heading, a link or a count) sits as far above the
+                        body as a SectionHeading alone does (its md spacing), in every box here. */}
+                    <div className="mb-3 flex items-center justify-between gap-3">
                         <SectionHeading id="home-accounts-heading" spacing="none">{HOME_COPY.accountsHeading}</SectionHeading>
                         <Link href="/portfolio" className="label-type text-xs text-brand hover:underline">{HOME_COPY.portfolioLink} →</Link>
                     </div>
@@ -141,17 +134,39 @@ const Home = async ({searchParams}: HomeProps) => {
                 </Panel>
 
                 <Panel id="home-next-step" aria-labelledby="home-step-heading" className="flex flex-col">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
                         <SectionHeading id="home-step-heading" spacing="none">{HOME_COPY.nextStepHeading}</SectionHeading>
                         {step.progress && <MicroLabel>{step.progress}</MicroLabel>}
                     </div>
                     <h3 className="font-heading text-xl font-semibold text-fg">{step.title}</h3>
                     <p className="mt-2 text-sm leading-relaxed text-fg-soft">{step.body}</p>
-                    <div className="mt-auto pt-5">
+                    <div className="mt-auto pt-4">
                         <Link href={step.href} className={actionButton({size: 'md'})} data-home-step>{step.cta}</Link>
                     </div>
                 </Panel>
             </div>
+
+            {/* A strip under the reader's own figures, frameless like the landing hero: the canvas is
+                transparent, so the surface sits on the page's own background rather than in a
+                panel's lighter box. It is inset as a panel's content is — a default Panel's padding
+                and its 1px border, unseen — so its heading, controls and reading start where the
+                panels' above and below it do. The heading shares its line with the strip's Expand
+                button. */}
+            {terrain && (
+                <section id="home-terrain" aria-labelledby="home-terrain-heading" data-home-terrain
+                         className={cn(panelPad(5), 'border-x border-transparent py-0')}>
+                    <MomentumTerrain
+                        initial={terrain}
+                        eyebrow={false}
+                        size="strip"
+                        heading={<SectionHeading id="home-terrain-heading" spacing="none">{TERRAIN_COPY.eyebrow}</SectionHeading>}
+                    >
+                        <WhatTheseMean keys={TERRAIN_TERMS}>
+                            <p className="text-xs leading-relaxed text-fg-muted" data-terrain-method>{TERRAIN_COPY.method}</p>
+                        </WhatTheseMean>
+                    </MomentumTerrain>
+                </section>
+            )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Panel id="home-topics" aria-labelledby="home-topics-heading">
@@ -184,7 +199,7 @@ const Home = async ({searchParams}: HomeProps) => {
                     </Panel>
                 ) : view.hasBriefs ? (
                     <Panel id="home-briefing" aria-labelledby="home-briefing-heading">
-                        <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="mb-3 flex items-center justify-between gap-3">
                             <SectionHeading id="home-briefing-heading" spacing="none">{HOME_COPY.briefingHeading}</SectionHeading>
                             <Link href="/news" className="label-type text-xs text-brand hover:underline">{HOME_COPY.newsLink} →</Link>
                         </div>
@@ -220,7 +235,7 @@ const Home = async ({searchParams}: HomeProps) => {
 
 const LearnBox = ({userId, owner}: {userId: string; owner: boolean}) => (
     <>
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
             <SectionHeading id="home-learn-heading" spacing="none">{HOME_COPY.learnHeading}</SectionHeading>
             <Link href="/glossary" className="label-type text-xs text-brand hover:underline">{HOME_COPY.learnLink} →</Link>
         </div>

@@ -91,8 +91,9 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                 {/* The wrapper is what sticks: .glass-panel sets position itself, so `sticky` on the Panel
-                    lost to it and its `top` pushed the nav 96px down the page instead. */}
-                <div className="lg:col-span-3 lg:sticky lg:top-24">
+                    lost to it and its `top` pushed the nav 96px down the page instead. It stops where
+                    the content starts (--sticky-top), under the bar. */}
+                <div className="lg:col-span-3 lg:sticky lg:top-(--sticky-top)">
                 <Panel as="nav" pad={2} aria-label="Settings sections">
                     {visible.map((s) => (
                         <Link key={s.id} href={hrefOf(s.id)} replace scroll={false}
@@ -100,7 +101,7 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
                               data-settings-tab={s.id}
                               className={cn(
                                   'control-type flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs transition-colors',
-                                  s.id === active ? 'bg-brand/10 text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
+                                  s.id === active ? 'lifted text-brand' : 'text-fg-soft hover:text-fg hover:bg-surface-3',
                               )}>
                             <span className="material-symbols-outlined text-base" aria-hidden="true">{s.icon}</span>
                             {s.label}
@@ -110,7 +111,7 @@ const SettingsPage = async ({searchParams}: SettingsPageProps) => {
                 </div>
 
                 <div className="lg:col-span-9">
-                    <Panel id={section.id} className="scroll-mt-24">
+                    <Panel id={section.id}>
                         <SectionHeading>{section.label}</SectionHeading>
                         <Section id={active} user={user}/>
                     </Panel>

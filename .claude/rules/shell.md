@@ -58,11 +58,35 @@ the map is `docs/MAP.md`.
 - The header repeats no section: logo, the one `components/shell/SearchCommand` trigger (which
   also finds pages, `searchPages`), the account menu. From md the trigger sits in the bar's true
   middle (`.header-bar` in `app/globals.css`: two equal side columns, the middle narrowing so each
-  side keeps 12rem); below md it is an icon beside the account menu. The landing page's header
+  side keeps 12rem); below md it is an icon beside the account menu, a circle `--search-h` across
+  that a coarse pointer presses 44px across (a transparent `::before` round it). The landing page's header
   keeps the plain `.header-wrapper`. The bar's row fills the bar
   (`.header-wrapper` height 100%, the grid's row centred), so the logo, the search and the avatar
   sit on its middle line however tall the bar is drawn, and the account button's `-mr-2` puts
   its edge as far from the right as the logo is from the left. The assistant's launcher is not in the bar:
   `components/chat/ChatWidget` floats the robot (`components/chat/RobotMascot`) fixed bottom-right
-  at every width, over the page, and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`)
-  ends in `pb-24` so it never covers a page's last panel.
+  at every width, over the page — 48px below md, so a phone's first screen keeps its own links clear
+  of it, and 56px from md — and the `(root)` layout's content wrapper (`app/(root)/layout.tsx`) ends
+  in `--content-pb`, room for its size, its offset and 0.75rem of air, so it never covers a page's
+  last panel nor meets it as a hover grows it (with no air its top sat on the panel's edge).
+- How much room the frame takes is the density tokens on `:root` in `app/globals.css` (`--header-h`,
+  `--rail-w`, `--rail-tile`, `--search-h`, `--content-pt`/`-px`/`-pb`/`-max`, `--sticky-top`), each
+  declared once (`lib/theme/__tests__/density.test.ts`), read by the frame's rules in the
+  components layer (so a class at a call site still wins) and by the shell's own classes: the
+  content wrapper in `app/(root)/layout.tsx` (one column of `--content-max` holding a section's tabs
+  and the page), the rail's tiles (`--rail-tile`, the current one `.lifted`), the search
+  (`--search-h`) and the drawer's head (`components/shell/MobileNav`, `h-(--header-h)`). No rule
+  reaches into a page or sizes a component that says its own size; `qa-shell` holds each element
+  to its token by computed style. An anchor and a sticky panel stop at `--sticky-top`, through
+  `html { scroll-padding-top }` and `lg:top-(--sticky-top)`, never an offset of their own (only
+  poker night's Hands drawer, which scrolls inside itself, keeps a scroll margin).
+- On a phone a tab track (`.tab-track`: `components/shell/SectionTabs`, `components/primitives/Tabs`)
+  is one row that scrolls sideways. `hooks/useCurrentInTrack` keeps its current tab in sight — placed
+  at once on load, gliding there on a change unless motion is reduced — and names the ends of the
+  row with more to scroll to in `data-edge-fade`, where the row fades out (`app/globals.css`), so a
+  tab cut at the screen's edge reads as a row that goes on; the sums are `lib/shell/track-scroll`
+  (`scrollToShow`, `edgeFade`). Only a row that scrolls sideways is marked: a box whose overflow
+  shows (a track from md, the topics' rail from lg) never is, however far a child is drawn past its
+  sides. The fade is `EDGE_FADE_REM` wide and the hook keeps that much of the row beside the current
+  tab, both in rem, so a reader's own browser size moves them alike (`track-scroll`'s test holds
+  the stylesheet to it).

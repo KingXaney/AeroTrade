@@ -198,9 +198,10 @@ const STILL = `
   [data-robot-tip], nextjs-portal { display: none !important; }
 `;
 
-// A route's loading skeleton, a streamed widget's placeholder and a 3D scene's pending layer are
-// all a pulsing div hidden from a screen reader (components/primitives/Skeleton).
-const SKELETON = 'div.animate-pulse[aria-hidden="true"]';
+// A route's loading skeleton and a streamed widget's placeholder are the Skeleton primitive
+// (components/primitives/Skeleton: [data-skeleton], its lines shimmering), and a 3D scene's
+// pending layer and the other hand-made placeholders a pulsing div, each hidden from a screen reader.
+const SKELETON = '[data-skeleton][aria-hidden="true"], div.animate-pulse[aria-hidden="true"]';
 
 // Opens a page and waits until it has stopped changing: the terrain's first frame, the solver's
 // answer, the network quiet, no skeleton left, the fonts in.

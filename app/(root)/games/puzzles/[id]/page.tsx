@@ -32,7 +32,7 @@ const ArchivePuzzlePage = async ({params}: Props) => {
                 title={view.puzzle.title}
                 subtitle={`${PUZZLE_COPY.number(view.puzzle.number)} · ${PUZZLE_CATEGORY_LABEL[view.puzzle.category]} · ${PUZZLE_DIFFICULTY_LABEL[view.puzzle.difficulty]}`}
             />
-            <Panel pad={6}>
+            <Panel>
                 <PuzzleSolver key={view.puzzle.id} puzzle={view.puzzle} daily={false} initial={view.progress}/>
             </Panel>
             <p className="text-xs leading-relaxed text-fg-muted">{PUZZLE_COPY.archiveRule}</p>

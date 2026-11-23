@@ -330,9 +330,10 @@ try {
     await page.locator('#strategy-simulated-trades > details > summary').click();
 
     // The editorial requirement, asserted: once a strategy has numbers, the chart is near
-    // the top of the page instead of below ~800px of static explanation.
-    const perfBox = await page.locator('#strategy-performance').boundingBox();
-    check('numbers come before prose', perfBox !== null && perfBox.y < 900, `chart at y=${Math.round(perfBox?.y ?? -1)}`);
+    // the top of the page instead of below ~800px of static explanation. Its place in the page, not
+    // in the window: the disclosures opened and closed above have scrolled it.
+    const perfTop = await page.locator('#strategy-performance').evaluate((el) => el.getBoundingClientRect().top + window.scrollY).catch(() => null);
+    check('numbers come before prose', perfTop !== null && perfTop < 900, `chart at y=${Math.round(perfTop ?? -1)} in the page`);
     const explainerEl = page.locator('#strategy-explainer');
     check('the explainer is a native disclosure',
         (await explainerEl.evaluate((el) => el.querySelector('details')?.tagName)) === 'DETAILS');

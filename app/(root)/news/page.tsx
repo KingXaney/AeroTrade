@@ -41,7 +41,7 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
     const nothing = !view.briefing && view.topics.length === 0 && view.holdings.length === 0 && view.lead.length === 0;
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-4">
             <PageTitle title="News" subtitle={<span id="news-feed-summary">{describeNewsFeed(prefs)}</span>}
                        actions={<NewsFeedEditor initial={prefs} startOpen={edit === '1'} />} />
             <NewsSeenMarker />
@@ -72,7 +72,7 @@ const NewsPage = async ({searchParams}: NewsPageProps) => {
                                 </div>
                                 <div className="divide-y divide-line-strong/20">
                                     {view.topics.map((topic) => (
-                                        <section key={topic.slug} className="py-5 first:pt-0 last:pb-0" data-news-topic={topic.slug}>
+                                        <section key={topic.slug} className="py-4 first:pt-0 last:pb-0" data-news-topic={topic.slug}>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="size-2 shrink-0 rounded-full" style={{background: topic.color ?? 'var(--brand)'}} aria-hidden="true" />
                                                 <Link href={`/topics/${topic.slug}`} className="font-heading text-base font-semibold text-fg transition-colors hover:text-brand">
