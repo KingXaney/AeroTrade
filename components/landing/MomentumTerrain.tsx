@@ -426,7 +426,9 @@ const MomentumTerrain = ({initial, eyebrow = true, heading, size = 'hero', child
                             {surface.source === 'tiingo' && (
                                 <>
                                     {' · '}
-                                    <a href={TERRAIN_COPY.tiingoHref} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                                    {/* One piece: in the strip's narrow column "Data" once ended a line
+                                        with "via Tiingo" under it. */}
+                                    <a href={TERRAIN_COPY.tiingoHref} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-brand hover:underline">
                                         {TERRAIN_COPY.tiingoCredit}
                                     </a>
                                 </>

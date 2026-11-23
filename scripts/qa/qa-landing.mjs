@@ -315,6 +315,11 @@ try {
         && homeLayout.strip.top >= homeLayout.accounts.bottom && homeLayout.strip.bottom <= homeLayout.topics.top, JSON.stringify(homeLayout));
     check('…its canvas a band no taller than 240 px',
         homeLayout.canvas !== null && homeLayout.canvas.height > 0 && homeLayout.canvas.height <= 240, JSON.stringify(homeLayout.canvas));
+    // The source line ends on the Tiingo credit, a link that keeps its words together on one line —
+    // the strip's reading column is narrow, and "Data" once ended a line with "via Tiingo" under it.
+    const creditLines = () => homeTerrain.locator('[data-terrain-updated] a').evaluate((a) => a.getClientRects().length).catch(() => 0);
+    const creditDesk = await creditLines();
+    check('…its source line\'s Tiingo credit in one piece, on one line', creditDesk === 1, String(creditDesk));
     await page.waitForTimeout(300);
     await shot('07-home');
 
@@ -397,6 +402,22 @@ try {
     });
     check('…and on a phone Home keeps the strip with nothing sideways, its band still no taller than 240 px',
         phoneHome.overflow <= 1 && phoneHome.canvas !== null && phoneHome.canvas[1] > 0 && phoneHome.canvas[1] <= 240, JSON.stringify(phoneHome));
+    const creditPhone = await creditLines();
+    check('…its Tiingo credit still in one piece', creditPhone === 1, String(creditPhone));
+    // On a phone Expand sits under the heading at its left, out of the corner the robot floats in
+    // (it met the robot at the heading line's end): the two columns stay apart, at 390 and at 375.
+    const expandClear = {};
+    for (const width of [390, 375]) {
+        if (width !== 390) await page.setViewportSize({width, height: 812});
+        await page.locator('button[aria-label="Open Aero-AI Assistant"]').waitFor({timeout: 15000}).catch(() => {});
+        expandClear[width] = await page.evaluate(() => {
+            const expand = document.querySelector('[data-home-terrain] [data-terrain-expand]')?.getBoundingClientRect();
+            const robot = document.querySelector('button[aria-label="Open Aero-AI Assistant"]')?.getBoundingClientRect();
+            return expand && robot ? +(robot.left - expand.right).toFixed(1) : null;
+        });
+    }
+    check('…and its Expand button keeps out of the robot\'s corner, 24 px or more to the left of it, at 390 and 375',
+        Object.values(expandClear).every((gap) => gap !== null && gap >= 24), JSON.stringify(expandClear));
     await page.setViewportSize({width: 1440, height: 900});
 
     // --- reduced motion: no rotation, no intro, still drawn ---------------------------------
