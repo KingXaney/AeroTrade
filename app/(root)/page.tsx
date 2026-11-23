@@ -31,9 +31,10 @@ import WidgetSkeleton from "@/components/primitives/Skeleton";
 import MicroLabel from "@/components/primitives/MicroLabel";
 import RowCard from "@/components/primitives/RowCard";
 import PageTitle from "@/components/primitives/PageTitle";
-import Panel from "@/components/primitives/Panel";
+import Panel, {panelPad} from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import {actionButton} from "@/components/primitives/ActionButton";
+import {cn} from "@/lib/utils";
 
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Home"};
@@ -147,9 +148,13 @@ const Home = async ({searchParams}: HomeProps) => {
 
             {/* A strip under the reader's own figures, frameless like the landing hero: the canvas is
                 transparent, so the surface sits on the page's own background rather than in a
-                panel's lighter box. The heading shares its line with the strip's Expand button. */}
+                panel's lighter box. It is inset as a panel's content is — a default Panel's padding
+                and its 1px border, unseen — so its heading, controls and reading start where the
+                panels' above and below it do. The heading shares its line with the strip's Expand
+                button. */}
             {terrain && (
-                <section id="home-terrain" aria-labelledby="home-terrain-heading" data-home-terrain>
+                <section id="home-terrain" aria-labelledby="home-terrain-heading" data-home-terrain
+                         className={cn(panelPad(5), 'border-x border-transparent py-0')}>
                     <MomentumTerrain
                         initial={terrain}
                         eyebrow={false}

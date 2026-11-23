@@ -26,10 +26,15 @@ the map is `docs/MAP.md`.
   night. Each section keeps its rule: a box with nothing to say is not drawn.
 - The terrain is the landing page's (`components/landing/MomentumTerrain`) at `size="strip"`, under
   the section's own heading (handed in as `heading`, no eyebrow), frameless like the landing hero so
-  the transparent canvas sits on the page background, not in a panel's box. From lg the strip is
+  the transparent canvas sits on the page background, not in a panel's box, and inset as a panel's
+  content is (a default Panel's padding, `panelPad(5)`, and its 1px border, unseen), so its heading,
+  controls and reading start where the panels' above and below it do. From lg the strip is
   one row — the canvas 220px tall with its controls on the left, the slice, legend, caption and
   source on the right — stacked under lg (the canvas 2:1, at most 220px), its one `WhatTheseMean`
-  under both. Its Expand button (`data-terrain-expand`, `aria-expanded`, on the heading's line so
+  under both. On a band (a canvas at least `lib/landing/terrain-view.STRIP_MIN_ASPECT` times as wide
+  as it is tall) the scene's Angle preset looks from lower down (`STRIP_ANGLE`), so the turning
+  surface fills the band rather than a third of it; the panel, the hero and a phone's 2:1 strip keep
+  the preset's own height. Its Expand button (`data-terrain-expand`, `aria-expanded`, on the heading's line so
   it never moves) swaps the strip for the `panel` size in place and back: state alone — no
   navigation, no fetch, the same canvas and scene, nothing animated — and `data-terrain-size`
   names the size drawn. In the strip the tooltip drops below a pointer in the canvas's top half and

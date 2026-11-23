@@ -35,7 +35,9 @@ import {cn} from "@/lib/utils";
 // navigation and no fetch, and the canvas keeps its scene, since every wrapper stays in the tree
 // (outside the strip they are display: contents, so the hero and the panel lay out exactly as
 // they always have) and the scene's ResizeObserver re-fits it to the new box. Nothing animates
-// the swap, so it is as instant under reduced motion as it is everywhere.
+// the swap, so it is as instant under reduced motion as it is everywhere. On the strip's band the
+// Angle preset looks from lower down (terrain-view's STRIP_ANGLE, the scene's `band`), so the
+// surface fills the band rather than a third of it; the panel and the hero keep the preset's own.
 //
 // Motion follows the OS setting and the in-app toggle (html[data-motion]): no auto-rotate, no
 // intro, presets and the flatten toggle jump. The colours are the --terrain-* and foreground
@@ -129,6 +131,7 @@ const MomentumTerrain = ({initial, eyebrow = true, heading, size = 'hero', child
     const markerRefs = useRef<(HTMLElement | null)[]>([]);
     const reducedRef = useRef(reduced);
     const coarseRef = useRef(coarse);
+    const stripRef = useRef(strip);
 
     // The data, when the page did not hand it in.
     useEffect(() => {
@@ -158,6 +161,12 @@ const MomentumTerrain = ({initial, eyebrow = true, heading, size = 'hero', child
     useEffect(() => {
         coarseRef.current = coarse;
     }, [coarse]);
+    // The strip swapped for the panel (Expand) and back: on the band the Angle preset looks from
+    // lower down, so the surface fills it; the panel keeps the preset's own height.
+    useEffect(() => {
+        stripRef.current = strip;
+        sceneRef.current?.setBand(strip);
+    }, [strip]);
 
     // The 3D scene, loaded on demand; a failure falls back to the flat drawing.
     useEffect(() => {
@@ -180,6 +189,7 @@ const MomentumTerrain = ({initial, eyebrow = true, heading, size = 'hero', child
                         onRotating: setRotating,
                         onZoom: setDistance,
                         markers: () => markerRefs.current,
+                        band: stripRef.current,
                     });
                     sceneRef.current = scene;
                 } catch (error) {

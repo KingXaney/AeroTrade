@@ -70,6 +70,16 @@ export const CAMERA_PRESETS = {
 export type CameraPreset = keyof typeof CAMERA_PRESETS;
 export const CAMERA_PRESET_IDS: readonly CameraPreset[] = ['angle', 'top', 'side'];
 
+// Home's strip is a band: from lg its canvas is 220px tall and about three times as wide (737px at
+// 1440, 583px at 1024), and so is a narrow window's below lg. Seen from the Angle preset's 35° the
+// whole turning surface fits a band by its height and covers a third of its width; seen from 17°
+// over the same corner it covers about half at rest and up to three quarters as it turns, and still
+// fits the narrowest band. The strip's Angle preset looks from here on a canvas at least
+// STRIP_MIN_ASPECT times as wide as it is tall (a phone's strip is 2:1, and a panel's framing suits
+// it); the hero and the panel keep CAMERA_PRESETS.
+export const STRIP_ANGLE = [6, 3.06, 8] as const;
+export const STRIP_MIN_ASPECT = 2.5;
+
 // Smoothstep: eases in and out, 0 → 1.
 export const easeInOut = (t: number): number => {
     const x = clamp(t, 0, 1);
