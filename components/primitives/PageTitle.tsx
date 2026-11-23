@@ -8,8 +8,10 @@ import {cn} from "@/lib/utils";
 //
 // `pageTitleClass` is that string, its size the look's --title-size (app/globals.css): a page
 // that draws its own h1 beside other things (an account's heading, a stock's) takes it too.
+// The size alone sets no line height, so it says its own, a heading's tight one: the body's
+// 1.5 would draw a 24px title 36px tall, and a title that wraps on a phone loosely.
 
-export const pageTitleClass = 'font-heading text-(length:--title-size) font-semibold tracking-tight text-fg';
+export const pageTitleClass = 'font-heading text-(length:--title-size) leading-tight font-semibold tracking-tight text-fg';
 
 type Props = {
     title: string;

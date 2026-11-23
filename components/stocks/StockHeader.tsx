@@ -45,7 +45,9 @@ const StockHeader = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                <div className="text-right">
+                {/* Right-aligned beside the name from sm; under it on a phone, it starts where the
+                    name does, so the change chip sits under the price's first figure. */}
+                <div className="sm:text-right">
                     <div className="text-2xl font-semibold text-fg font-mono">
                         {typeof currentPrice === 'number' ? formatPrice(currentPrice) : '—'}
                     </div>
