@@ -5,9 +5,9 @@
 // from there), chart-follows-ticker (and the dashboard quick-trade widget that must not navigate),
 // tables that label themselves below md, the account comparison (a layout saved with the old
 // 'strategy-comparison' id included), and /history's trade feed, which, like every trade read,
-// leaves out a row from before its account's inception. Also /watchlist's own add dialog (a stock
-// search answered by the Finnhub stand-in) and the brain's rows, which drill into their evidence
-// with valid markup.
+// leaves out a row from before its account's inception. Also /watchlist as one panel of flat rows
+// under a column header that sits over their cells, its own add dialog (a stock search answered by
+// the Finnhub stand-in), and the brain's rows, which drill into their evidence with valid markup.
 // No Finnhub key, so prices are unknown and the ticket's price-based paths stay open; the ticket's
 // getQuote is answered with a fixed price for the interest line.
 // Run: npm run qa -- trading   (the harness: README.md)
@@ -234,14 +234,35 @@ try {
     check('the watchlist header says Asset, with no crypto "Protocol" left in it',
         await page.getByText('Asset', {exact: true}).count() === 1 && await page.getByText(/Protocol/).count() === 0);
     // Only the symbol, company and action links navigate, so the row itself must not look
-    // clickable; and it is the look's own surface (.glass-panel), so the look's
-    // --panel-blur: none reaches it instead of a blur written inline.
+    // clickable.
     const watchRow = page.locator('a[aria-label="Trade AAPL"]').first().locator('xpath=ancestor::div[contains(@class, "md:grid-cols-")][1]');
-    const rowStyle = await watchRow.evaluate((el) => ({
-        cursor: getComputedStyle(el).cursor, blur: getComputedStyle(el).backdropFilter, panel: el.classList.contains('glass-panel'),
-    }));
-    check('a watchlist row has no pointer cursor of its own', rowStyle.cursor !== 'pointer', rowStyle.cursor);
-    check('a watchlist row is the look\'s own surface: a panel, with no blur written on it', rowStyle.panel && rowStyle.blur === 'none', JSON.stringify(rowStyle));
+    const rowCursor = await watchRow.evaluate((el) => getComputedStyle(el).cursor);
+    check('a watchlist row has no pointer cursor of its own', rowCursor !== 'pointer', rowCursor);
+    // The list is one panel of rows (components/stocks/WatchlistTable; a panel per row was twenty
+    // framed cards for twenty stocks): the look's own surface (.glass-panel, so the look's
+    // --panel-blur: none reaches it instead of a blur written inline), a flat .row-card per stock
+    // inside it, and the column header inset by a row's border and padding, over the rows' cells.
+    const watchPanel = await page.evaluate(() => {
+        const panels = [...document.querySelectorAll('[data-watchlist-table]')];
+        const panel = panels[0] ?? null;
+        const rows = [...document.querySelectorAll('[data-watchlist-row]')];
+        const edges = (els) => els.map((el) => { const r = el.getBoundingClientRect(); return [+r.left.toFixed(1), +r.right.toFixed(1)]; });
+        const aapl = document.querySelector('[data-watchlist-row="AAPL"]');
+        return {
+            panels: panels.length, surface: panel?.classList.contains('glass-panel') ?? false, blur: panel ? getComputedStyle(panel).backdropFilter : null,
+            rows: rows.length,
+            flat: rows.length > 0 && rows.every((row) => row.classList.contains('row-card') && !row.classList.contains('glass-panel')
+                && row.closest('[data-watchlist-table]') === panel && getComputedStyle(row).backdropFilter === 'none'),
+            header: panel ? edges([...panel.firstElementChild.children]) : [],
+            cells: aapl ? edges([...aapl.children].filter((cell) => getComputedStyle(cell).position !== 'absolute')) : [],
+        };
+    });
+    check('the watchlist is one panel of rows: the look\'s own surface with no blur written on it, a flat row per stock inside it',
+        watchPanel.panels === 1 && watchPanel.surface && watchPanel.blur === 'none' && watchPanel.flat, JSON.stringify(watchPanel));
+    check('…its column header over the rows\' cells, edge for edge',
+        watchPanel.header.length === 6 && watchPanel.cells.length === watchPanel.header.length
+        && watchPanel.header.every(([left, right], i) => Math.abs(left - watchPanel.cells[i][0]) <= 1 && Math.abs(right - watchPanel.cells[i][1]) <= 1),
+        JSON.stringify({header: watchPanel.header, cells: watchPanel.cells}));
     // The page's own add control (components/stocks/AddToWatchlist.tsx), with a list already
     // there, and from its box on by keyboard alone. A pick is a write and Enter runs the selected
     // row, so the dialog draws no row while its search is out. The stand-in lists two symbols no
