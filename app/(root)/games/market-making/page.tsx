@@ -17,10 +17,10 @@ const MarketMakingPage = async () => {
     const summary = await readGameSummary(userId, 'market-making', 'market-making');
 
     return (
-        <div className="mx-auto max-w-3xl space-y-4" data-game-page="market-making">
+        <div className="max-w-3xl space-y-4" data-game-page="market-making">
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             <PageTitle title={MARKET_COPY.title} subtitle={MARKET_COPY.subtitle}/>
-            <Panel pad={6}>
+            <Panel>
                 <MarketMakingGame summary={summary}/>
                 <WhatTheseMean id="market-making-terms" keys={['fair-value', 'bid-ask-spread', 'adverse-selection']}/>
             </Panel>

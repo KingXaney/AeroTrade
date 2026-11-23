@@ -50,7 +50,7 @@ const ReturnChart = ({series, accountName, band}: {series: PerfPoint[]; accountN
 
     if (!geometry) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-8 text-center">
                 <span className="material-symbols-outlined text-3xl text-fg-muted mb-2">monitoring</span>
                 <p className="text-sm text-fg-muted">
                     {PERFORMANCE_COPY.collecting}

@@ -5,6 +5,7 @@ import FollowTopicButton from "@/components/topics/FollowTopicButton";
 import TradeLink from "@/components/trading/TradeLink";
 import Panel from "@/components/primitives/Panel";
 import MicroLabel from "@/components/primitives/MicroLabel";
+import {pageTitleClass} from "@/components/primitives/PageTitle";
 
 type StockHeaderProps = {
     symbol: string;
@@ -26,10 +27,10 @@ const StockHeader = ({
     followedTopic = null,
 }: StockHeaderProps) => {
     return (
-        <Panel as="div" pad={6} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Panel as="div" className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <div className="flex items-baseline gap-3">
-                    <h1 className="text-3xl font-semibold text-fg font-heading">
+                    <h1 className={pageTitleClass}>
                         {symbol}
                     </h1>
                     {exchange && (

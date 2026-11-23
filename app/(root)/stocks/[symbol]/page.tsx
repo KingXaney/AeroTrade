@@ -87,7 +87,7 @@ const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) =
     const followedTopic = topics.find((t) => t.name.toLowerCase() === company.toLowerCase() || t.keywords.includes(symbol.toLowerCase()));
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <StockHeader
                 symbol={symbol}
                 company={company}

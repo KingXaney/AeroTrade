@@ -59,7 +59,7 @@ const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brain
     return (
         <div className="space-y-4">
             <PageTitle title="Topics" subtitle="Everything you follow, from every source we read" />
-            <Panel pad={8} className="md:p-12">
+            <Panel pad={8}>
                 <div className="max-w-2xl">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center bg-brand/10 mb-4">
                         <span className="material-symbols-outlined text-brand">interests</span>
@@ -71,7 +71,7 @@ const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brain
                     </p>
                 </div>
 
-                <div className="mt-6 space-y-5">
+                <div className="mt-4 space-y-4">
                     {OFFER_GROUPS.map((group) => {
                         const items = offers.filter((offer) => offer.group === group);
                         if (items.length === 0) return null;
@@ -84,7 +84,7 @@ const TopicsEmptyState = ({brainSuggestions, canRestoreDefaults = false}: {brain
                     })}
                 </div>
 
-                <div className="font-mono mt-6 flex flex-wrap items-center gap-2">
+                <div className="font-mono mt-4 flex flex-wrap items-center gap-2">
                     <ActionButton size="md" className="inline-flex items-center gap-2" onClick={followSelected} disabled={pending || selected.size === 0}>
                         {pending && <Loader2 className="size-3.5 animate-spin" />}
                         {TOPIC_PICKER_COPY.followSelected(selected.size)}

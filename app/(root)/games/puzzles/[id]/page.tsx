@@ -26,13 +26,13 @@ const ArchivePuzzlePage = async ({params}: Props) => {
     if (!view) notFound();
 
     return (
-        <div className="mx-auto max-w-3xl space-y-4" data-puzzle-page="archive">
+        <div className="max-w-3xl space-y-4" data-puzzle-page="archive">
             <Link href="/games/puzzles" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.title}</Link>
             <PageTitle
                 title={view.puzzle.title}
                 subtitle={`${PUZZLE_COPY.number(view.puzzle.number)} · ${PUZZLE_CATEGORY_LABEL[view.puzzle.category]} · ${PUZZLE_DIFFICULTY_LABEL[view.puzzle.difficulty]}`}
             />
-            <Panel pad={6}>
+            <Panel>
                 <PuzzleSolver key={view.puzzle.id} puzzle={view.puzzle} daily={false} initial={view.progress}/>
             </Panel>
             <p className="text-xs leading-relaxed text-fg-muted">{PUZZLE_COPY.archiveRule}</p>

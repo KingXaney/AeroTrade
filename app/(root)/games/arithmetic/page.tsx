@@ -37,11 +37,11 @@ const ArithmeticPage = async ({searchParams}: Props) => {
     const focus = mode === 'practice' ? (asked.length > 0 ? asked : view.weak.map((row) => row.cell)) : [];
 
     return (
-        <div className="mx-auto max-w-3xl space-y-4" data-arithmetic-page={mode}>
+        <div className="max-w-3xl space-y-4" data-arithmetic-page={mode}>
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             <PageTitle title={ARITHMETIC_COPY.title} subtitle={ARITHMETIC_COPY.subtitle}/>
             <Tabs tabs={TABS} active={mode} label={ARITHMETIC_COPY.modeLabel}/>
-            <Panel pad={6}>
+            <Panel>
                 <ArithmeticGame key={`${mode}:${focus.join(',')}`} mode={mode} summary={summary} focus={focus}/>
             </Panel>
             {mode !== 'interview' && <SkillPanel view={view}/>}

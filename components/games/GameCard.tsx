@@ -16,12 +16,12 @@ export const GameCardBody = ({body, stats, href, cta, aside}: Body) => (
     <>
         <p className="text-sm leading-relaxed text-fg-soft">{body}</p>
         {stats.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
                 {stats.map((stat) => <StatTile key={stat.label} label={stat.label} value={stat.value} hint={stat.hint}/>)}
             </div>
         )}
         {aside}
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-4">
             <Link href={href} className={actionButton({variant: 'secondary', size: 'md'})}>{cta}</Link>
         </div>
     </>

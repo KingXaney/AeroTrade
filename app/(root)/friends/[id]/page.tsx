@@ -8,6 +8,7 @@ import {getFriendProfile} from "@/lib/friends/store";
 import {unpricedLabel} from "@/lib/trading/analytics";
 import AccountSummary from "@/components/trading/portfolio/AccountSummary";
 import HoldingsTable from "@/components/trading/portfolio/HoldingsTable";
+import {pageTitleClass} from "@/components/primitives/PageTitle";
 import Panel from "@/components/primitives/Panel";
 import RowCard from "@/components/primitives/RowCard";
 import SectionHeading from "@/components/primitives/SectionHeading";
@@ -28,7 +29,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
     if (!profile) notFound();
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div className="flex items-center gap-3">
                 <Link href="/friends" className="text-fg-muted hover:text-brand transition-colors">
                     <span className="material-symbols-outlined">arrow_back</span>
@@ -38,7 +39,7 @@ const FriendProfilePage = async ({params}: FriendProfilePageProps) => {
                         {profile.name?.[0]?.toUpperCase() ?? '?'}
                     </div>
                     <div>
-                        <h1 className="text-2xl font-semibold text-fg tracking-tight font-heading">
+                        <h1 className={pageTitleClass}>
                             {profile.name}
                         </h1>
                         <p className="text-xs text-fg-muted font-mono">{profile.email}</p>

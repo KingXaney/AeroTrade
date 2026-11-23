@@ -13,15 +13,13 @@ import {WATCHLIST_COPY} from "@/lib/learn/copy/watchlist";
 // The browser tab's title; app/layout.tsx appends the app's name.
 export const metadata: Metadata = {title: "Watchlist"};
 
-// The same PageTitle as watchlist/loading.tsx, so the title does not reflow when the skeleton
-// is replaced. mb-6: Tailwind v4's space-y is a margin-bottom on each child, which PageTitle's
-// own mb-2 would override, so the class restates the page's space-y-6 gap.
+// The same PageTitle as watchlist/loading.tsx, under the same space-y-4, so neither the title
+// nor the panel under it moves when the skeleton is replaced.
 const header = (actions: ReactNode) => (
     <PageTitle
         title="Active Watchlist"
         subtitle="Quotes, market cap and P/E for the stocks you track"
         actions={actions}
-        className="mb-6"
     />
 );
 
@@ -59,10 +57,10 @@ const WatchlistPage = async () => {
     // A failed read is not an empty watchlist: say so instead of "No Assets Tracked".
     if (view.kind !== 'rows') {
         return (
-            <div className="space-y-6">
+            <div className="space-y-4">
                 {header(actions)}
                 {view.kind === 'empty' ? <WatchlistEmpty /> : (
-                    <Panel pad={6}>
+                    <Panel>
                         <p className="text-sm text-fg-muted">{WATCHLIST_COPY.unavailable}</p>
                     </Panel>
                 )}
@@ -71,7 +69,7 @@ const WatchlistPage = async () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {header(actions)}
             <WatchlistTable watchlist={view.rows} />
         </div>

@@ -86,8 +86,8 @@ const StreakHero = ({streak, extraTiles = [], headingId = 'streak-heading'}: Pro
     const labels = monthLabels(streak.weeks);
     const tone = toneOf(streak);
     return (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto]" data-streak-hero data-streak-tone={tone} data-streak-current={streak.current}>
-            <div className="min-w-0 space-y-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]" data-streak-hero data-streak-tone={tone} data-streak-current={streak.current}>
+            <div className="min-w-0 space-y-4">
                 <div className="flex items-center gap-4">
                     <span
                         aria-hidden="true"
@@ -107,7 +107,7 @@ const StreakHero = ({streak, extraTiles = [], headingId = 'streak-heading'}: Pro
                         </MicroLabel>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-x-8 gap-y-3">
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
                     <StatTile label={STREAK_COPY.longestLabel} value={String(streak.longest)} hint={STREAK_COPY.days(streak.longest)} />
                     <StatTile label={STREAK_COPY.activeLabel} value={String(streak.total)} hint={STREAK_COPY.activeDays(streak.total)} />
                     {extraTiles.map((tile) => <StatTile key={tile.label} label={tile.label} value={tile.value} hint={tile.hint} />)}

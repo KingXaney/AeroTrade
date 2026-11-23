@@ -19,7 +19,7 @@ const PuzzlePage = async () => {
     const view = await getTodaysPuzzle(userId);
 
     return (
-        <div className="mx-auto max-w-3xl space-y-4" data-puzzle-page="daily">
+        <div className="max-w-3xl space-y-4" data-puzzle-page="daily">
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             {view ? (
                 <>
@@ -28,7 +28,7 @@ const PuzzlePage = async () => {
                         subtitle={`${PUZZLE_COPY.number(view.puzzle.number)} · ${PUZZLE_CATEGORY_LABEL[view.puzzle.category]} · ${PUZZLE_DIFFICULTY_LABEL[view.puzzle.difficulty]}`}
                         actions={<StreakChip current={view.streak.current} todayDone={view.streak.todayDone} atRisk={view.streak.atRisk}/>}
                     />
-                    <Panel pad={6}>
+                    <Panel>
                         <PuzzleSolver key={`${view.puzzle.id}:${view.day}`} puzzle={view.puzzle} daily initial={view.progress}/>
                     </Panel>
                     <p className="text-xs leading-relaxed text-fg-muted">{PUZZLE_COPY.dailyRule}</p>

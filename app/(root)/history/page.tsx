@@ -28,7 +28,7 @@ const HistoryPage = async () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 {/* Removals are not recorded (the watchlist model hard-deletes), so the list
                     beside this is honest about being "by date added", not a timeline. */}
-                <Panel pad={6} className="lg:col-span-2">
+                <Panel className="lg:col-span-2">
                     <SectionHeading size="xs">
                         Trades
                     </SectionHeading>
@@ -40,7 +40,7 @@ const HistoryPage = async () => {
                 </Panel>
 
                 {/* Watchlist, by date added */}
-                <Panel pad={6} className="lg:col-span-1">
+                <Panel className="lg:col-span-1">
                     <SectionHeading size="xs">
                         On your watchlist, by date added
                     </SectionHeading>
@@ -52,7 +52,7 @@ const HistoryPage = async () => {
                             Nothing yet. Add a stock to your watchlist and it appears here with the date you added it.
                         </p>
                     ) : (
-                        <ol className="relative space-y-5 border-l border-brand/15 pl-5">
+                        <ol className="relative space-y-4 border-l border-brand/15 pl-5">
                             {items.map((item) => (
                                 <li key={item.symbol} className="relative">
                                     <span className="absolute -left-[1.4rem] top-1 w-2.5 h-2.5 rounded-full bg-brand" />

@@ -29,7 +29,7 @@ const IncomeActivity = ({activity}: {activity: IncomeView}) => {
 
     return (
         <div className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
                 <div data-testid="income-interest">
                     <MicroLabel as="div" className="mb-2">{INCOME_COPY.interestHeading}</MicroLabel>
                     <ul className="divide-y divide-line-strong/15">

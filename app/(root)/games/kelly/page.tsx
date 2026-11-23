@@ -17,10 +17,10 @@ const KellyPage = async () => {
     const summary = await readGameSummary(userId, 'kelly', 'kelly');
 
     return (
-        <div className="mx-auto max-w-3xl space-y-4" data-game-page="kelly">
+        <div className="max-w-3xl space-y-4" data-game-page="kelly">
             <Link href="/games" className="label-type text-xs text-brand hover:underline">← {ARCHIVE_COPY.back}</Link>
             <PageTitle title={KELLY_COPY.title} subtitle={KELLY_COPY.subtitle}/>
-            <Panel pad={6}>
+            <Panel>
                 <KellyGame summary={summary}/>
                 <WhatTheseMean id="kelly-terms" keys={['kelly-criterion']}/>
             </Panel>

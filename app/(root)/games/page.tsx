@@ -49,7 +49,7 @@ const GamesPage = async () => {
                     <SectionHeading id="games-archive-heading">{ARCHIVE_COPY.title}</SectionHeading>
                     <p className="text-sm text-fg-soft" data-archive-count={solved}>{ARCHIVE_COPY.hubLine(solved, archive.length)}</p>
                     <p className="mt-2 text-xs leading-relaxed text-fg-muted">{ARCHIVE_COPY.hubLead}</p>
-                    <div className="mt-auto pt-5">
+                    <div className="mt-auto pt-4">
                         <Link href="/games/puzzles" className={actionButton({variant: 'secondary', size: 'md'})}>{GAMES_COPY.archiveLink}</Link>
                     </div>
                 </Panel>
