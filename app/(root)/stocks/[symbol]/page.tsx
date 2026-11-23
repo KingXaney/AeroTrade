@@ -23,6 +23,7 @@ import {getBoardRowsForSymbol} from "@/lib/strategies/page-store";
 import {strategiesWatching} from "@/lib/strategies/universe";
 import {cn} from "@/lib/utils";
 import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 import Tabs from "@/components/primitives/Tabs";
 
 // The browser tab's title: the symbol, as typed in the address.
@@ -97,10 +98,11 @@ const StockDetailsPage = async ({params, searchParams}: StockDetailsPageProps) =
                 followedTopic={followedTopic ? {id: followedTopic.id, slug: followedTopic.slug} : null}
             />
 
-            {/* The chart, straight under the price */}
+            {/* The chart, straight under the price, under the heading every panel has, on the 28px
+                line the embed's own title took */}
             <Panel pad={4}>
+                <div className="mb-4 flex min-h-7 items-center justify-between"><SectionHeading as="h3" spacing="none">Advanced Chart</SectionHeading><span className="font-mono text-[10px] tracking-[0.02em] text-fg-muted">TRADINGVIEW</span></div>
                 <TradingViewWidget
-                    title="Advanced Chart"
                     scriptUrl={tvScript('advanced-chart')}
                     config={CANDLE_CHART_WIDGET_CONFIG(symbol)}
                     height={560}

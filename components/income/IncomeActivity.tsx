@@ -24,7 +24,7 @@ const RECEIPT = 'font-mono text-[11px] text-fg-muted leading-relaxed pb-2';
 
 const IncomeActivity = ({activity}: {activity: IncomeView}) => {
     if (activity.interestByMonth.length === 0 && activity.dividends.length === 0) {
-        return <EmptyState icon="savings" title={INCOME_COPY.emptyTitle} description={INCOME_COPY.emptyDescription} />;
+        return <EmptyState icon="savings" title={INCOME_COPY.emptyTitle} description={INCOME_COPY.emptyDescription} className="px-0" />;
     }
 
     return (

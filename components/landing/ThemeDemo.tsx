@@ -19,7 +19,8 @@ const ThemeDemo = ({label}: {label: string}) => {
     const shownPalette = active ?? theme.palette;
 
     return (
-        <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+        // Even rows of chips, two on a phone and three from sm, so none is left alone on a last row.
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label={label}>
             {SHOWN.map((id) => {
                 const on = shownPalette === id;
                 return (

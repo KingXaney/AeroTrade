@@ -25,7 +25,7 @@ const HistoryPage = async () => {
         <div className="space-y-4">
             <PageTitle title="Activity" subtitle="Your trades across every account, and what you have added to your watchlist" />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Removals are not recorded (the watchlist model hard-deletes), so the list
                     beside this is honest about being "by date added", not a timeline. */}
                 <Panel className="lg:col-span-2">
@@ -35,7 +35,7 @@ const HistoryPage = async () => {
                     {recent ? (
                         <TradeHistory trades={recent.trades} totalCount={recent.total} />
                     ) : (
-                        <p className="text-sm text-fg-muted p-4">Your trades could not be loaded right now — try again in a few minutes.</p>
+                        <p className="text-sm text-fg-muted py-4">Your trades could not be loaded right now — try again in a few minutes.</p>
                     )}
                 </Panel>
 

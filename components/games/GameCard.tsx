@@ -1,5 +1,6 @@
 import type {ReactNode} from "react";
 import Link from "next/link";
+import {cn} from "@/lib/utils";
 import Panel from "@/components/primitives/Panel";
 import SectionHeading from "@/components/primitives/SectionHeading";
 import StatTile from "@/components/primitives/StatTile";
@@ -27,9 +28,10 @@ export const GameCardBody = ({body, stats, href, cta, aside}: Body) => (
     </>
 );
 
-// One game on the hub: the card body in a Panel under the game's title.
-const GameCard = ({id, title, ...body}: Body & {id: string; title: string}) => (
-    <Panel id={`game-${id}`} aria-labelledby={`game-${id}-heading`} className="flex flex-col" data-game-card={id}>
+// One game on the hub: the card body in a Panel under the game's title. `className` is the hub's
+// layout for one card (a card shorter than its neighbour that does not stretch to it).
+const GameCard = ({id, title, className, ...body}: Body & {id: string; title: string; className?: string}) => (
+    <Panel id={`game-${id}`} aria-labelledby={`game-${id}-heading`} className={cn('flex flex-col', className)} data-game-card={id}>
         <SectionHeading id={`game-${id}-heading`}>{title}</SectionHeading>
         <GameCardBody {...body}/>
     </Panel>

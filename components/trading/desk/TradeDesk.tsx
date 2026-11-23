@@ -8,6 +8,7 @@ import type {PositionLike} from "@/lib/trading/order-math";
 import {TRADE_CHART_PLACE_CLASS, TRADE_CHART_WIDGET_CONFIG, TRADE_DESK_WIDE_QUERY, tradeChartHeight, tvScript} from "@/lib/stocks/tradingview";
 import {useDebounce} from "@/hooks/useDebounce";
 import Panel from "@/components/primitives/Panel";
+import SectionHeading from "@/components/primitives/SectionHeading";
 
 const URL_SYNC_DELAY_MS = 300;
 
@@ -74,10 +75,12 @@ const TradeDesk = ({chartSymbol, orderSymbol, cash, accountId, positions, queueN
                 <OrderPanel defaultSymbol={orderSymbol} cash={cash} accountId={accountId} positions={positions} onSymbolCommit={onSymbolCommit} queueNote={queueNote} apy={apy} />
             </div>
             <Panel pad={4} className="xl:col-span-2 xl:col-start-1 xl:row-start-1">
+                {/* The heading every panel has, as Order Entry's beside it, on the 28px line the
+                    embed's own title took, so the chart keeps its place. */}
+                <div className="mb-4 flex min-h-7 items-center justify-between"><SectionHeading as="h3" spacing="none">Advanced Chart</SectionHeading><span className="font-mono text-[10px] tracking-[0.02em] text-fg-muted">TRADINGVIEW</span></div>
                 {/* Keyed so a new symbol tears the embed down and rebuilds it. */}
                 <TradingViewWidget
                     key={symbol}
-                    title="Advanced Chart"
                     scriptUrl={tvScript('advanced-chart')}
                     config={TRADE_CHART_WIDGET_CONFIG(symbol)}
                     height={chartHeight}

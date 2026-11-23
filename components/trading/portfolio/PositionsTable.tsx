@@ -30,7 +30,7 @@ const PositionsTable = ({positions, accountId, lotNotes, closable}: {
 
     if (positions.length === 0) {
         return (
-            <p className="text-sm text-fg-muted p-4" data-testid="positions-empty">
+            <p className="text-sm text-fg-muted py-4" data-testid="positions-empty">
                 {HOLDINGS_COPY.empty}{' '}
                 <Link href="/trade" className="text-brand hover:underline">{HOLDINGS_COPY.toTradeDesk}</Link>
             </p>
