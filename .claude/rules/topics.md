@@ -21,6 +21,13 @@ the map is `docs/MAP.md`.
 - `lib/topics/feed-key` is the key both topics pages give `TopicFeed`, so a refresh with a new
   first page remounts it.
 - `lib/topics/rail.sortTopicsForRail` is the order of the /topics rail and the Topics widget.
+- The rail (`components/topics/TopicRail`) gives a topic two lines from lg — its name, whole up to two
+  lines, then the age of its newest article beside its count — since one line in a rail a sixth of
+  the column cut every name to a few letters. Its topics scroll inside it when they run taller than
+  the window under the bar, All topics and New topic in sight above and below, so the rail, which
+  sticks, never hides its last ones (the cap is 16). On a phone it is a row of chips that is its own
+  scroller — the panel clips (`.glass-panel`) — kept on the current topic, its ends fading where there
+  are more (`hooks/useCurrentInTrack`).
 - What "new" means on every topic badge is `lib/topics/config.unseenFloor`: articles published
   after the reader last opened the topic, counting back at most `UNSEEN_WINDOW_HOURS` (24, the
   daily email's window), counted to `UNSEEN_COUNT_CAP` + 1 at most and printed through
