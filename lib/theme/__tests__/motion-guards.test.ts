@@ -364,18 +364,27 @@ describe('the motion guards in app/globals.css', () => {
     // cascade layer beside panel-in (no utility beside it can undo it), stopped by name in both
     // guards whatever it is timed on (a one-shot on the motion token too: stopped, it shows its
     // rest at once rather than relying on a zeroed token), on a real element — no pseudo-element
-    // animates, which a guard naming the class would not reach — and used by a page or a
-    // component, since a class lands with its first user and none ships unused.
+    // animates, which a guard naming the class would not reach — and used where a page asks for it,
+    // since a class lands with its first user and none ships unused. A primitive that draws a class
+    // when asked (Panel's `sheen`) is not its user; the page that asks is. A class a pure module
+    // decides (the market dot's beacon, lib/stocks/market-dot) is used from there, under its test.
     describe('the motion vocabulary (@keyframes fx-*)', () => {
         const FX = [...new Set([...plain.matchAll(/@keyframes (fx-[\w-]+)/g)].map(([, name]) => name))];
         const layers = [...plain.matchAll(/@layer [\w-]+\s*\{/g)].map((m) => [m.index, closing(plain, m.index + m[0].length - 1)]);
         const layered = (rule: Rule): boolean => layers.some(([open, close]) => rule.at > open && rule.at < close);
         const animated = (rule: Rule): string[] => [...valuesOf(rule, 'animation'), ...valuesOf(rule, 'animation-name')];
         const root = fileURLToPath(new URL('../../..', import.meta.url));
-        const sources = ['app', 'components'].flatMap((dir) =>
+        const read = (file: string): string => readFileSync(`${root}${file}`, 'utf8');
+        // The primitives that draw a class of the vocabulary only when a page asks them to, and how a
+        // page asks: Panel draws .fx-sheen for its `sheen` prop.
+        const ASKED_OF: Record<string, Record<string, RegExp>> = {
+            'components/primitives/Panel.tsx': {'fx-sheen': /<\w+\b[^>]*?\ssheen(=\{[^}]*\})?(?=[\s/>])/},
+        };
+        const files = ['app', 'components', 'lib'].flatMap((dir) =>
             readdirSync(`${root}${dir}`, {recursive: true, encoding: 'utf8'})
-                .filter((file) => /\.tsx?$/.test(file))
-                .map((file) => readFileSync(`${root}${dir}/${file.replace(/\\/g, '/')}`, 'utf8')));
+                .map((file) => `${dir}/${file.replace(/\\/g, '/')}`)
+                .filter((file) => /\.tsx?$/.test(file) && !file.includes('__tests__') && !(file in ASKED_OF)));
+        const sources = files.map(read);
 
         it('finds the vocabulary in the file, and the guards\' list holds every one', () => {
             expect(FX).toEqual(expect.arrayContaining(['fx-beacon', 'fx-shimmer', 'fx-sheen']));
@@ -393,7 +402,30 @@ describe('the motion guards in app/globals.css', () => {
                 expect(animated(rule).join(' '), rule.selector).not.toContain(name);
             }
             const used = new RegExp(`(^|[\\s'"\`{(])${name}([\\s'"\`})]|$)`, 'm');
-            expect(sources.some((text) => used.test(text)), `nothing in app/ or components/ uses .${name}`).toBe(true);
+            const asked = Object.values(ASKED_OF).flatMap((classes) => (classes[name] ? [classes[name]] : []));
+            expect(sources.some((text) => used.test(text) || asked.some((asking) => asking.test(text))),
+                `nothing in app/, components/ or lib/ uses .${name} or asks a primitive for it`).toBe(true);
+        });
+
+        // The sheen is Panel's to draw and a page's to ask for, once a view: Home's accounts panel and
+        // /portfolio's account summary, which hands it to its Panel. Panel.tsx's own span is no user.
+        it('crosses the panels a page asks it of: Home\'s accounts and /portfolio\'s summary, once a view', () => {
+            const asks = (text: string): string[] => [...text.matchAll(/<(\w+)\b[^>]*?\ssheen(=\{[^}]*\})?(?=[\s/>])/g)].map(([, tag]) => tag);
+            expect(asks(read('app/(root)/page.tsx'))).toEqual(['Panel']);
+            expect(read('app/(root)/page.tsx')).toMatch(/<Panel id="home-accounts"[^>]*\ssheen(?=[\s/>])/);
+            expect(asks(read('app/(root)/portfolio/page.tsx'))).toEqual(['AccountSummary']);
+            expect(asks(read('components/trading/portfolio/AccountSummary.tsx'))).toEqual(['Panel']);
+            expect(read('components/trading/portfolio/AccountSummary.tsx')).toMatch(/<Panel\b[^>]*\ssheen=\{sheen\}/);
+            expect(read('components/primitives/Panel.tsx')).toMatch(/\{sheen && <span className="fx-sheen" aria-hidden="true" \/>\}/);
+        });
+
+        // The beacon breathes round the market dot while the session is open, and only then: the dot
+        // takes its class from lib/stocks/market-dot, whose test holds both states.
+        it('breathes round the market dot by the class the session gives it', () => {
+            const dot = read('components/stocks/MarketStatus.tsx');
+            expect(dot).toMatch(/marketDotClass\(status\)/);
+            expect(dot).not.toMatch(/fx-beacon/);
+            expect(read('lib/stocks/market-dot.ts')).toMatch(/fx-beacon/);
         });
 
         // The band crosses once as its panel arrives, on the motion token, and rests off the panel:

@@ -63,6 +63,27 @@ const valuesOf = (rule: Rule, property: string): string[] =>
         return colon > 0 && declaration.slice(0, colon).trim() === property ? [declaration.slice(colon + 1).trim()] : [];
     });
 
+// A selector list's own selectors: split at its commas, never at one inside :is(…) or :not(…).
+const selectorsOf = (selector: string): string[] => {
+    const parts: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < selector.length; i++) {
+        const ch = selector[i];
+        if (ch === '(' || ch === '[') depth++;
+        else if (ch === ')' || ch === ']') depth--;
+        else if (ch === ',' && depth === 0) {
+            parts.push(selector.slice(start, i).trim());
+            start = i + 1;
+        }
+    }
+    parts.push(selector.slice(start).trim());
+    return parts;
+};
+
+// A component's code without its comments, so a word in a sentence about a class is not the class.
+const codeOf = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/[^\n]*/g, '$1');
+
 const css = withoutComments(read('app/globals.css'));
 const rules = readRules(css);
 
@@ -126,11 +147,75 @@ describe("the look's density tokens (app/globals.css)", () => {
     });
 
     // The reader's own browser size is the root size: every rem in the app, and every size the
-    // poker table and the office measure their drawing by, is that one.
+    // poker table and the office measure their drawing by, is that one. A root rule is found inside a
+    // selector list too (html, body), and a size is found however it is said: by name, in the font
+    // shorthand (font: 400 17px/1.5 …), or as a text size applied with @apply.
     it('sets no root font size', () => {
-        const rootRules = rules.filter((rule) => /^(html|:root)(\[[^\]]*\])*$/.test(rule.selector));
+        const isRoot = (part: string): boolean => /^(html|:root)(\[[^\]]*\]|:[\w-]+(\([^)]*\))?)*$/.test(part);
+        expect(['html', ':root', 'html[data-palette="nord"]', ':root:not([data-theme="light"])'].every(isRoot)).toBe(true);
+        expect(['html body', 'html > body', 'body', '.html'].some(isRoot)).toBe(false);
+        const rootRules = rules.filter((rule) => selectorsOf(rule.selector).some(isRoot));
         expect(rootRules.length).toBeGreaterThan(0);
-        for (const rule of rootRules) expect(valuesOf(rule, 'font-size'), rule.selector).toEqual([]);
+        for (const rule of rootRules) {
+            expect(valuesOf(rule, 'font-size'), rule.selector).toEqual([]);
+            expect(valuesOf(rule, 'font'), rule.selector).toEqual([]);
+            expect(rule.body, rule.selector).not.toMatch(/@apply[^;]*(?<![\w-])(?:[\w-]+:)*text-(xs|sm|base|lg|\d*xl|\[[\d.]|\(length)/);
+        }
+    });
+
+    // A page's title is the shared one's size: PageTitle's h1, and the h1s a page writes by hand (an
+    // account's heading, a stock's name, a friend's, a strategy's) with the class PageTitle exports.
+    // The pages drawn in a frame of their own keep theirs: the auth pages, the front door, the 404,
+    // the office and poker night's table.
+    it('sizes every page title in the app by pageTitleClass, the hand-written ones too', () => {
+        const ownFrame = /^(app\/\((auth|reset|marketing)\)\/|app\/not-found\.tsx$|components\/(auth|poker-night|agent-world\/office)\/)/;
+        const h1s = sourceText.filter(({file}) => !ownFrame.test(file))
+            .flatMap(({file, text}) => [...codeOf(text).matchAll(/<h1\b[^>]*>/g)].map(([tag]) => ({file, tag})));
+        expect(h1s.map(({file}) => file)).toEqual(expect.arrayContaining([
+            'components/primitives/PageTitle.tsx', 'components/trading/accounts/AccountHeading.tsx', 'components/stocks/StockHeader.tsx',
+            'app/(root)/friends/[id]/page.tsx', 'app/(root)/strategies/[slug]/page.tsx',
+        ]));
+        expect(h1s.filter(({tag}) => !/\bpageTitleClass\b/.test(tag)).map(({file, tag}) => `${file}: ${tag}`)).toEqual([]);
+    });
+
+    // A panel that sticks stops where the content starts, under the bar: every class list in app/ and
+    // components/ that makes a box sticky gives it top-(--sticky-top) under the same variant, never an
+    // offset of its own (a top of 1rem once left the topics' rail 40px under the bar).
+    it('stops every sticky panel at --sticky-top', () => {
+        const sticky = /(?<![\w-])((?:[a-z0-9-]+:)*)sticky(?![\w-])/g;
+        const found = sourceText.flatMap(({file, text}) => codeOf(text).split('\n')
+            .flatMap((line) => [...line.matchAll(sticky)].map(([, variant]) => ({file, variant, line: line.trim()}))));
+        expect(found.map(({file}) => file)).toEqual(expect.arrayContaining(['components/topics/TopicsShell.tsx', 'app/(root)/settings/page.tsx']));
+        for (const {file, variant, line} of found) expect(line, file).toContain(`${variant}top-(--sticky-top)`);
+    });
+
+    // The drawer's head is as tall as the bar it opens under, and the front door's content starts
+    // where the app's does.
+    it('sizes the drawer\'s head and the front door\'s top by the tokens', () => {
+        expect(read('components/shell/MobileNav.tsx')).toMatch(/(^|[\s"'`])h-\(--header-h\)([\s"'`]|$)/m);
+        expect(read('app/(marketing)/welcome/page.tsx')).toMatch(/(^|[\s"'`])pt-\(--content-pt\)([\s"'`]|$)/m);
+    });
+
+    // .glass-panel and the floating chrome sit outside every cascade layer, where they beat a utility
+    // written beside them (invariant 7): in a layer, a rounded-* or a bg-* at the call site would win
+    // over the look's own radius and fill.
+    it('keeps .glass-panel and the floating chrome outside every cascade layer', () => {
+        for (const selector of ['.glass-panel', '.chrome-surface', '[data-slot="dialog-content"]', '[data-slot="popover-content"]']) {
+            const own = rules.filter((rule) => selectorsOf(rule.selector).includes(selector));
+            expect(own.length, selector).toBeGreaterThan(0);
+            for (const rule of own) expect(rule.context.filter((at) => at.startsWith('@layer')), `${selector} in ${rule.selector}`).toEqual([]);
+        }
+    });
+
+    // A heading's lines are balanced, and a paragraph kept from ending on one word, by the style alone
+    // (text-wrap-style): the text-wrap shorthand also sets the wrap mode back to wrap, so a heading in
+    // a parent that says nowrap (the search dialog's hidden title) broke one word a line.
+    it('balances headings and paragraphs with text-wrap-style, never the text-wrap shorthand', () => {
+        const heading = rules.filter((rule) => selectorsOf(rule.selector).join(',') === 'h1,h2,h3,h4,h5,h6');
+        const paragraph = rules.filter((rule) => rule.selector === 'p' && valuesOf(rule, 'text-wrap-style').length > 0);
+        expect(heading.flatMap((rule) => valuesOf(rule, 'text-wrap-style'))).toEqual(['balance']);
+        expect(paragraph.flatMap((rule) => valuesOf(rule, 'text-wrap-style'))).toEqual(['pretty']);
+        expect(rules.filter((rule) => valuesOf(rule, 'text-wrap').length > 0).map((rule) => rule.selector)).toEqual([]);
     });
 
     // In the utilities layer the frame's rules came after Tailwind's own utilities and beat a class

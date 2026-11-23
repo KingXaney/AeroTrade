@@ -13,7 +13,9 @@
 // the bar, the rail and its tiles, where the content starts and how wide its column is, the titles,
 // the tab track at the column's left, a grid's gap, the rows' padding, a game page's own column and
 // the room the launcher keeps at a page's foot; on a phone the round search (a thumb's 44px under a
-// coarse pointer), the content's sides and one row of tabs.
+// coarse pointer), the content's sides and one row of tabs, which keeps its current tab in sight and
+// fades at an end with more. Also the root size, read on its own (the browser's), one sheen a view
+// on a headline panel, and an anchor landing where the content starts.
 // Run: npm run qa -- shell   (the harness: README.md)
 import {chromium} from 'playwright';
 import {MongoClient} from 'mongodb';
@@ -184,6 +186,11 @@ try {
         '--spacing', '--container-3xl']);
     const leading = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--leading-tight')));
     const tokens = (...names) => names.map((name) => `${name} ${T[name]}`).join(', ');
+    // Every rem above is the root size, so a root rule (17px once) would move each token and the
+    // element it is compared with alike: the root is read on its own. The app sets none, so it is the
+    // reader's browser's, 16px in this one.
+    const rootSize = await page.evaluate(() => getComputedStyle(document.documentElement).fontSize);
+    check('the root size is the browser\'s own, 16px here: the app sets none', rootSize === '16px', rootSize);
     await page.goto(`${BASE}/portfolio`, {waitUntil: 'load'});
     const frame = await page.evaluate(() => {
         const box = (el) => el.getBoundingClientRect();
@@ -228,12 +235,16 @@ try {
     // A page's title — the shared PageTitle's and the hand-written ones (an account's heading, a game's)
     // — is --title-size on its own tight line.
     const titles = {};
+    // A page's headline panel crosses with the sheen as it arrives (.fx-sheen, Panel's `sheen`), one
+    // a view: /portfolio's account summary and Home's accounts (read below, once they stream in).
+    const sheens = {};
     let game = null;
     let gameTabs = null;
     for (const path of ['/portfolio', '/trade', '/games/kelly', '/']) {
         if (path !== '/portfolio') await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
         await page.locator('h1').first().waitFor({timeout: 30000}).catch(() => {});
         titles[path] = await page.locator('h1').first().evaluate((h) => [parseFloat(getComputedStyle(h).fontSize), parseFloat(getComputedStyle(h).lineHeight)]).catch(() => null);
+        if (path === '/portfolio') sheens[path] = await page.locator('.fx-sheen').count();
         if (path === '/games/kelly') {
             // A game page narrows back to its own column (max-w-3xl) in the middle of the content's,
             // while its section's tabs keep the column's left.
@@ -269,6 +280,32 @@ try {
     check('panels side by side stand their grid\'s own gap apart, gap-4 (4 × --spacing), never one the look forces',
         near(home.gap, 4 * T['--spacing']) && near(home.columnGap, 4 * T['--spacing']) && near(home.rowGap, 4 * T['--spacing']),
         `${JSON.stringify(home)} — ${tokens('--spacing')}`);
+    sheens['/'] = await page.locator('.fx-sheen').count();
+    check('a page\'s headline panel crosses with the sheen once a view: /portfolio\'s account summary and Home\'s accounts',
+        sheens['/portfolio'] === 1 && sheens['/'] === 1, JSON.stringify(sheens));
+
+    // An anchor lands where the content starts, under the bar (html { scroll-padding-top:
+    // var(--sticky-top) }), never behind it: a glossary entry from the middle of the page, reached by
+    // its fragment once the page's panels have risen into place. (A fragment scrolled to while they
+    // rise — panel-in, 6px — is aimed at the risen-from place and settles up to 6px higher.)
+    await page.goto(`${BASE}/glossary`, {waitUntil: 'load'});
+    await page.locator('[data-learn-entry]').first().waitFor({timeout: 30000}).catch(() => {});
+    // Every animation that ends (the robot's loops never do), at most three seconds.
+    await page.evaluate(() => Promise.race([
+        Promise.all(document.getAnimations().filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
+            .map((a) => a.finished.catch(() => {}))),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]));
+    const midEntry = await page.$$eval('[data-learn-entry][id]', (els) => els[Math.floor(els.length / 2)]?.id ?? null);
+    await page.evaluate((id) => { location.hash = encodeURIComponent(id); }, midEntry);
+    await page.waitForTimeout(400);
+    const anchored = await page.evaluate((id) => {
+        const entry = document.getElementById(id)?.getBoundingClientRect();
+        return entry ? {top: +entry.top.toFixed(1), scrolled: Math.round(scrollY), bar: document.querySelector('header.header').getBoundingClientRect().bottom} : null;
+    }, midEntry);
+    check('an anchor lands where the content starts (--sticky-top), under the bar: a glossary entry by its fragment',
+        anchored !== null && anchored.scrolled > 0 && Math.abs(anchored.top - T['--content-pt']) <= 2 && anchored.top >= anchored.bar,
+        `${midEntry}: ${JSON.stringify(anchored)} — ${tokens('--content-pt')}`);
 
     // The launcher floats over the content's foot, and the content keeps --content-pb of room for it:
     // scrolled to the end of a page that scrolls (the glossary, long for every reader), the robot
@@ -483,6 +520,27 @@ try {
     check('on a phone a section\'s tabs are one row that scrolls sideways, inside the column',
         phoneTabs !== null && phoneTabs.rows === 1 && phoneTabs.wrap === 'nowrap' && phoneTabs.overflowX === 'auto'
         && near(phoneTabs.height, phoneTabs.tab + phoneTabs.padY) && near(phoneTabs.left, 0) && phoneTabs.right >= -0.5, JSON.stringify(phoneTabs));
+    // At 320 px the Learn row runs well past the screen's edge: the row keeps its current tab in sight
+    // and fades at an end with more to scroll to (hooks/useCurrentInTrack, data-edge-fade) — the end
+    // on Games, its first tab; on the Glossary, its last, the row scrolled to it and the start fading.
+    await page.setViewportSize({width: 320, height: 640});
+    const trackEnds = async (path) => {
+        await page.goto(`${BASE}${path}`, {waitUntil: 'load'});
+        await page.waitForSelector('[data-section-tabs="learn"][data-edge-fade]', {timeout: 15000}).catch(() => {});
+        return page.evaluate(() => {
+            const track = document.querySelector('[data-section-tabs="learn"]');
+            const box = track.getBoundingClientRect();
+            const tab = track.querySelector('[aria-current="page"]').getBoundingClientRect();
+            return {fade: track.dataset.edgeFade ?? null, reach: track.scrollWidth - track.clientWidth, scrollLeft: Math.round(track.scrollLeft),
+                inside: tab.left >= box.left - 0.5 && tab.right <= box.right + 0.5};
+        });
+    };
+    const gamesEnds = await trackEnds('/games');
+    const glossaryEnds = await trackEnds('/glossary');
+    check('…and where the row runs past the screen, its current tab is in sight and an end with more fades: the end on Games, the start on the Glossary, scrolled to',
+        gamesEnds.reach > 1 && gamesEnds.scrollLeft === 0 && gamesEnds.inside && gamesEnds.fade === 'end'
+        && glossaryEnds.reach > 1 && glossaryEnds.scrollLeft > 0 && glossaryEnds.inside && glossaryEnds.fade === 'start', JSON.stringify({gamesEnds, glossaryEnds}));
+    await page.setViewportSize({width: 390, height: 844});
 
     // --- friend-request badge --------------------------------------------------
     const second = await browser.newPage({viewport: {width: 1440, height: 900}});

@@ -36,6 +36,10 @@ the map is `docs/MAP.md`.
   test), and a searched stock, which Finnhub names in capitals (`lib/stocks/watchlist-add.isShouting`),
   is saved under its profile's name when there is one (`lib/actions/watchlist.actions.addToWatchlist`).
 - `components/stocks/StockHit` is the one stock search row, shared by ⌘K and the add dialog.
+- The market-status badge (`components/stocks/MarketStatus`, on Home, /trade and /watchlist) takes
+  its dot's class from `lib/stocks/market-dot.marketDotClass`: the page's one beacon (`.fx-beacon`)
+  while the regular session is open, still otherwise. Its test holds both states from the app's own
+  clock, since the browser QA cannot set the session.
 - `components/stocks/TradingViewWidget` takes `height: number | null`: null renders the title and
   the frame and embeds nothing until the height is a number (`components/stocks/useTradingViewWidget`).
   An embed's place is held only by a height on its container (`className`): the stylesheet sizes
