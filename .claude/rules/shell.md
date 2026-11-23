@@ -72,10 +72,14 @@ the map is `docs/MAP.md`.
 - How much room the frame takes is the density tokens on `:root` in `app/globals.css` (`--header-h`,
   `--rail-w`, `--rail-tile`, `--search-h`, `--content-pt`/`-px`/`-pb`/`-max`, `--sticky-top`), each
   declared once (`lib/theme/__tests__/density.test.ts`), read by the frame's rules in the
-  components layer (so a class at a call site still wins) and by the shell's own classes. An
-  anchor and a sticky panel stop at `--sticky-top`, through `html { scroll-padding-top }` and
-  `lg:top-(--sticky-top)`, never an offset of their own (only poker night's Hands drawer, which
-  scrolls inside itself, keeps a scroll margin).
+  components layer (so a class at a call site still wins) and by the shell's own classes: the
+  content wrapper in `app/(root)/layout.tsx` (one column of `--content-max` holding a section's tabs
+  and the page), the rail's tiles (`--rail-tile`, the current one `.lifted`), the search
+  (`--search-h`) and the drawer's head (`components/shell/MobileNav`, `h-(--header-h)`). No rule
+  reaches into a page or sizes a component that says its own size; `qa-shell` holds each element
+  to its token by computed style. An anchor and a sticky panel stop at `--sticky-top`, through
+  `html { scroll-padding-top }` and `lg:top-(--sticky-top)`, never an offset of their own (only
+  poker night's Hands drawer, which scrolls inside itself, keeps a scroll margin).
 - On a phone a tab track (`.tab-track`: `components/shell/SectionTabs`, `components/primitives/Tabs`)
   is one row that scrolls sideways. `hooks/useCurrentInTrack` keeps its current tab in sight — placed
   at once on load, gliding there on a change unless motion is reduced — and names the ends of the

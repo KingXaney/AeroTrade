@@ -26,7 +26,10 @@ the map is `docs/MAP.md`.
   `lib/learn/copy/landing`: numbers only from the app's own constants, no return figure, user
   count or testimonial, and the no-advice list applies as everywhere. The example screen is
   the app's own primitives, labelled as an example. `components/landing/ThemeDemo` previews a
-  palette — six of them, `data-theme-demo` carrying the palette's id — and saves nothing.
+  palette — six of them in even rows, `data-theme-demo` carrying the palette's id — and saves
+  nothing. The page's content starts at `--content-pt`, where the app's does
+  (`app/(marketing)/welcome`, held by `lib/theme/__tests__/density.test.ts`), and its header's row
+  keeps the page's own sides (`px-6`), so the logo lines up with the hero, not with the app's rail.
 - The hero is the momentum terrain, `components/landing/MomentumTerrain`: a 3D surface of SPY's
   normalised momentum — the last 250 sessions along x, lookbacks 5 to 250 days along y, height
   z = ln(P_t/P_{t−n}) / (σ_t√n) on the total-return index — that fetches `app/api/landing/surface`
@@ -39,7 +42,7 @@ the map is `docs/MAP.md`.
   its `adjClose` trusted because it is read inside ONE payload (invariant 11) — else from SPY's
   stored bars through `lib/prices/total-return`; either surface is memoised per ET day on its last
   bar's stamp (`lib/day-memo`), and the route caches five minutes (a 404, never). The footer names
-  the source, Tiingo with its credit linked. Colours are the
+  the source, Tiingo with its credit linked, the credit one unbroken line. Colours are the
   `--terrain-*` tokens in `app/globals.css`, read from the document at runtime and re-read when
   the page's theme switcher repaints it (never hex in a component); motion follows the OS setting
   and `html[data-motion]` (no auto-rotate, no intro, presets and the flatten toggle jump); on a

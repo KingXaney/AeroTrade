@@ -25,8 +25,10 @@ the map is `docs/MAP.md`.
   to its top rows. `lib/chat/culture-brain` is the culture brain's twin for `getCultureBrain`
   (see culture).
 - `components/chat/ChatWidget` mounts the one launcher — the robot, aria-label "Open Aero-AI
-  Assistant", the QA's handle — and, on `/topics` pages only while the panel is closed, its speech
-  bubble `components/chat/RobotTipBubble`. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the
+  Assistant", the QA's handle; a disc 48px across below md and 56px from md (### shell has why), in
+  `--brand-strong` with the look's `--glow` (`qa-chat` reads both) — and, on `/topics` pages only
+  while the panel is closed, its speech bubble `components/chat/RobotTipBubble`, whose place and
+  tail follow the disc's size. The tips are `lib/learn/copy/robot` (`ROBOT_TIPS`: the
   lead tip first, the rest in the day's order, none twice in a browser session —
   `lib/chat/robot-tips`, sessionStorage `aero-robot:shown`, never an `aero-chat:` key); a tip the
   reader is on — the pointer resting on it, focus inside it — is not taken away

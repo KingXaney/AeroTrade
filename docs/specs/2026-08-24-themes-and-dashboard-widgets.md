@@ -1,9 +1,9 @@
 # Themes + Customizable Dashboard Widgets — Design Spec
 
 **Date:** 2026-08-24
-**Status:** Implemented — `22ea56c` (2026-08-28). Superseded in part by One look (2026-11-22): the
-five visual styles were removed, so a theme is a palette and Reduce motion, drawn in one look (the
-style this spec calls soft).
+**Status:** Implemented — `22ea56c` (2026-08-28). Superseded in part by
+[One look](2026-11-22-one-look.md): the five visual styles were removed, so a theme is a palette and
+Reduce motion, drawn in one look (the style this spec calls soft).
 
 ## Context
 

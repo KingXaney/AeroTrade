@@ -123,7 +123,7 @@ its topics and lesson sections are pure builders covered by unit tests instead.
   route, and what a first visit changes — the topics' first fetch, the News dot, the first-week
   step that opening a topic ticks — is the same in every picture, whichever theme comes first.
   While it runs the sweep has the harness's stand-ins answer as the services do, and puts them
-  back at the end: Tiingo up, so the front door and Home draw the momentum terrain's panel, and
+  back at the end: Tiingo up, so the front door draws the momentum terrain and Home its strip, and
   Finnhub pricing SPY and AAPL at prices that never move, so `/stocks/SPY` is the stock's page
   for an account that is not the owner (unpriced, it is the 404) and the order ticket shows a
   price. The app keeps what it read from them, so in a run that names suites too, name the sweep

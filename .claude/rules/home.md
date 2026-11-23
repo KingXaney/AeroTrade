@@ -23,7 +23,10 @@ the map is `docs/MAP.md`.
 - The order is the reader's own figures first: the title and its chips; the paper accounts
   (`#home-accounts`, the total `[data-home-total]`) beside the next step; the momentum terrain; the
   topics (`#home-topics`) beside the briefing or the lesson; the first week or the lesson; poker
-  night. Each section keeps its rule: a box with nothing to say is not drawn.
+  night. Each section keeps its rule: a box with nothing to say is not drawn. The accounts panel is
+  the page's headline panel, the one a sheen crosses as it arrives (`Panel`'s `sheen`, one a view).
+  An account's cash ("Cash $100,000.00") is one unbreakable piece, so a phone's row never leaves the
+  amount alone on a line.
 - The terrain is the landing page's (`components/landing/MomentumTerrain`) at `size="strip"`, under
   the section's own heading (handed in as `heading`, no eyebrow), frameless like the landing hero so
   the transparent canvas sits on the page background, not in a panel's box, and inset as a panel's

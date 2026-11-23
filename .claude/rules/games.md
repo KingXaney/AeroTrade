@@ -60,6 +60,13 @@ the map is `docs/MAP.md`.
   (`components/learn/StreakMini`), and in `components/games/DailyPuzzleCard` on the library-only
   `daily-puzzle` widget (its strip off on Lab › Today while the streak card is on the page) — all from
   `lib/learn/activity-store.readActivityStreak`.
+- Each game page — today's puzzle, an archive puzzle, the sprint, Kelly, market making, correlation —
+  is a column of its own, `mx-auto max-w-3xl` (768px), centred in the page's column, its panels at
+  the default padding; the section's tabs above it stay at the column's left (`qa-shell` holds
+  /games/kelly to it). On the hub a card with less to say than its neighbour keeps its own height
+  (`components/games/GameCard`'s `className`: the Poker night card, which has no records, is
+  `lg:self-start` beside the outside links) rather than stretching with its button far under its
+  sentence.
 - The arithmetic sprint's custom settings and the practice time are kept in this browser
   (`components/games/ArithmeticGame`: localStorage `aero-arithmetic:custom` and
   `aero-arithmetic:practice-duration`, read through `useSyncExternalStore` with the defaults as the

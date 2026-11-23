@@ -92,7 +92,16 @@ page outgrows 30,000, since every session reads all of it.
   `openOnHash` the page hash that opens it), `ActionButton` every labelled button (primary,
   strong, secondary, danger, destructive; `actionButton()` for a Link), `Switch` the themed toggle
   over `components/ui/switch`, `TextField`/`TextArea` the compact form field, `iconButton` the
-  square icon affordance's class string.
+  square icon affordance's class string. `Panel`'s `pad` keys draw a step under their names (the
+  default, 5, is 16px; `panelPad()` for a surface that frames its body itself), and its `sheen`
+  marks a page's one headline panel (Home's accounts, /portfolio's summary). `RowCard`'s padding is
+  the row tokens (`--row-pad-y`/`-x`, read by `.row-card`), so a call site's own `px-3 py-2` wins.
+  A page's title in the app's frame takes `PageTitle`'s `pageTitleClass` (`--title-size` on a tight
+  line), a hand-written `h1` too; the pages with a frame of their own (the auth pages, the front
+  door, the 404, the office, a poker night table) keep theirs. `Tabs` (a page's views, in the URL)
+  and `components/shell/SectionTabs` (a section's pages) are drawn in one `.tab-track`, the current
+  tab `.lifted`, as the rail's current tile and the settings nav's section are. `Skeleton` is the
+  shared streaming placeholder (its bars `.fx-shimmer`, its box `data-skeleton`).
 - A caption, a panel heading and a labelled control take their face, case, tracking and colour
   from the look's type tokens (`--label-*`, `--heading-*`, `--control-*`), through `.label-type`,
   `.heading-type` and `.control-type` (`app/globals.css`, the components layer — a utility at the
@@ -101,9 +110,19 @@ page outgrows 30,000, since every session reads all of it.
   written as it should read in sentence case; the tokens apply any capitals. `RowCard` and
   `.news-item` read the `--card-*` tokens; the header and everything that floats (menus, dialogs,
   the drawer, the chat window: `.chrome-surface` and the shadcn `data-slot` contents) read
-  `--chrome-*`. The app has one look: its tokens are `:root`'s, and its rules sit unlayered at the
-  foot of `app/globals.css`, under no attribute. A palette block (`html[data-palette]`) outranks
-  `:root`, so a token of the look is never a palette token.
+  `--chrome-*`. The app has one look (`docs/specs/2026-11-22-one-look.md`), under no attribute. Its
+  tokens are `:root`'s, density included (the bar, the rail, where the content starts, a row, a
+  title, a tab: each declared once, `lib/theme/__tests__/density.test.ts`). The type roles, the row,
+  the frame, `.lifted` and `.tab-track` sit in the components layer, so a class at a call site still
+  wins; `.glass-panel`, the floating chrome, the look's motion and its decorations (at the foot of
+  `app/globals.css`) stay unlayered. A palette block (`html[data-palette]`) outranks `:root`, so a
+  token of the look is never a palette token.
+- The look's motion is `panel-in` and the `.fx-*` vocabulary — `.fx-beacon` (the market-open dot),
+  `.fx-shimmer` (`Skeleton`), `.fx-sheen` (`Panel`'s `sheen`) — each a class of its own name on a
+  real element, unlayered, landing with its first user. Both reduced-motion guards (the OS setting
+  and `html[data-motion="reduced"]`) zero the motion tokens and stop by name every animation timed in
+  literal seconds: `lib/theme/__tests__/motion-guards.test.ts` finds each of those and every
+  `@keyframes fx-*` and holds it to both (the spinners alone keep turning, `SPINNERS`).
 - The look has three faces, declared once in `app/layout.tsx` (`next/font/local` over `app/fonts`,
   each family beside its licence in `app/fonts/licenses`) and all preloaded: Sora is
   `--type-display` (`font-heading`), Inter `--type-body` (`font-sans`) and JetBrains Mono

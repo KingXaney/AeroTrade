@@ -169,6 +169,11 @@ the map is `docs/MAP.md`.
   and the delete cascade, which refuses the last account, the one the AI Navigator trades in and
   one a culture picker trades in (`CultureFollow`). `lib/trading/traded-by.tradedBy` is the one read
   of who else trades an account, drawn under its name on `/portfolio` (never when nobody does).
+- `/portfolio`'s account summary is the page's headline panel: `components/trading/portfolio/AccountSummary`
+  takes `sheen` (`Panel`'s, one a view) from `/portfolio` alone, and its other uses (the dashboard
+  widget, a friend's page, a strategy's page, the culture pickers) draw it plain. `/history`'s two
+  panels keep their own heights (`items-start`): stretched to their row, fifty trades left the
+  watchlist beside them a box three screens tall with its rows at the top (`qa-trading` holds it).
 - `lib/trading/csv`: the exports' quoted, formula-safe cells and `tradesCsv`, the one row builder
   both CSV routes (`app/api/accounts/[accountId]/export`, `app/api/strategies/[slug]/export`) share.
 - `/portfolio`'s learn panels (`lib/trading/learn/`, drawn by `components/trading/learn/`):
@@ -197,7 +202,10 @@ the map is `docs/MAP.md`.
   a number (so it is built once). `TRADE_CHART_PLACE_CLASS` holds the chart's place in CSS from
   the first paint, on the embed's container, and `TICKER_TAPE_PLACE_CLASS` the tape's over the
   desk, at the taller of the two heights TradingView draws it at: the page under them does not
-  move when their frames arrive a second later (qa-trading measures it).
+  move when their frames arrive a second later (qa-trading measures it). The chart's panel draws
+  its own heading — a `SectionHeading`, "Advanced Chart", as Order Entry's beside it, with its
+  TRADINGVIEW note, on the 28px line the embed's own title took — so the embed is given no title
+  and the panel keeps its height (the stock page's chart does the same, ### stocks).
 - `lib/actions/trading.actions.placeOrder` spends the reader's order counter
   (`lib/prices/action-limits.withinOrderLimit`, 20 a minute) before `executeOrder` is reached and
   refuses past it with `ORDER_COPY.tooFast` (`lib/learn/copy/trade`); a counter that cannot be
